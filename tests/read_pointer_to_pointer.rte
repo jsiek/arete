@@ -1,0 +1,4 @@
+var y = new 42
+var x = new &y
+var z = &*x
+return *z - *y
