@@ -1,0 +1,3 @@
+var x = new 10
+x = new 20
+return *x - 20

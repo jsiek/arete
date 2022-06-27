@@ -1,0 +1,53 @@
+DIGIT: /[0-9]/
+INT: DIGIT+
+UPPER: /[A-Z]/
+LOWER: /[a-z]/
+IDENT: (/_/|UPPER|LOWER) (/_/|UPPER|LOWER|DIGIT)*
+NEWLINE: (/\r/? /\n/)+
+WS: /[ \t\f\r\n]/+
+
+?exp: exp_add
+
+?exp_add: exp "+" exp_hi        -> add
+        | exp "-" exp_hi       -> sub
+        | exp_hi
+    
+exp_hi: INT                   -> int
+      | IDENT                 -> var
+      | "-" exp_hi            -> neg
+      | "!" exp_hi            -> release
+      | "&" exp_hi            -> share
+      | "*" exp_hi            -> deref
+      | "(" exp ")"           -> paren
+      | "fn" param_list block -> lambda
+      | exp_hi "(" exp_list ")"  -> call
+      | "new" exp             -> new
+      
+?exp_list:                     -> empty
+         | exp_non_empty
+
+exp_non_empty: exp              -> single
+      | exp "," exp_non_empty   -> add_exp
+
+?param_list:                -> empty
+      | param_non_empty
+
+param_non_empty: IDENT     -> single
+     | IDENT "," param_non_empty -> add_param
+
+?stmt: "var" IDENT "=" exp -> init
+    | exp ":=" exp         -> write
+    | IDENT "=" exp        -> assign
+    | exp                  -> expr
+    | "return" exp         -> return
+    | "borrow" IDENT "=" exp "for" stmt -> borrow
+    | block
+
+stmt_list:                -> empty
+    | stmt stmt_list      -> add_stmt
+
+block: "{" stmt_list "}"  -> block
+
+arete: stmt_list
+
+%ignore WS
