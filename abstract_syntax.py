@@ -32,16 +32,6 @@ class Deref(Exp):
     __match_args__ = ("arg",)
     
 @dataclass
-class Release(Exp):
-    arg: Exp
-    __match_args__ = ("arg",)
-
-@dataclass
-class Share(Exp):
-    arg: Exp
-    __match_args__ = ("arg",)
-    
-@dataclass
 class Var(Exp):
     ident: str
     __match_args__ = ("ident",)
@@ -54,39 +44,24 @@ class Int(Exp):
 @dataclass
 class Lambda(Exp):
     params: List[Any]
-    body: List[Stmt]
+    body: Stmt
     __match_args__ = ("params", "body")
 
 @dataclass
 class Init(Stmt):
+    kind: str
     var: str
     init: Exp
-    __match_args__ = ("var", "init")
-
-@dataclass
-class Assign(Stmt):
-    var: str
-    rhs: Exp
-    __match_args__ = ("var", "rhs")
+    rest: Stmt
+    __match_args__ = ("kind", "var", "init", "rest")
 
 @dataclass
 class Write(Stmt):
     lhs: Exp
     rhs: Exp
-    __match_args__ = ("lhs", "rhs")
+    rest: Stmt
+    __match_args__ = ("lhs", "rhs", "rest")
     
-@dataclass
-class Borrow(Stmt):
-    var: str
-    init: Exp
-    body: Stmt
-    __match_args__ = ("var", "init", "body")
-
-@dataclass
-class Block(Stmt):
-    body: List[Stmt]
-    __match_args__ = ("body",)
-
 @dataclass
 class Return(Stmt):
     exp: Exp
@@ -95,5 +70,11 @@ class Return(Stmt):
 @dataclass
 class Expr(Stmt):
     exp: Exp
-    __match_args__ = ("exp",)
+    rest: Stmt
+    __match_args__ = ("exp", "rest")
     
+@dataclass(frozen=True)
+class Param:
+    kind: str # share, take, borrow
+    ident: str
+    __match_args__ = ("kind", "ident")

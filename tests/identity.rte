@@ -1,0 +1,2 @@
+var id = fn x { return x; };
+return id(0);

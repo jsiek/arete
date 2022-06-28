@@ -8,46 +8,42 @@ WS: /[ \t\f\r\n]/+
 
 ?exp: exp_add
 
-?exp_add: exp "+" exp_hi        -> add
-        | exp "-" exp_hi       -> sub
+?exp_add: exp "+" exp_hi         -> add
+        | exp "-" exp_hi         -> sub
         | exp_hi
     
-exp_hi: INT                   -> int
-      | IDENT                 -> var
-      | "-" exp_hi            -> neg
-      | "!" exp_hi            -> release
-      | "&" exp_hi            -> share
-      | "*" exp_hi            -> deref
-      | "(" exp ")"           -> paren
-      | "fn" param_list block -> lambda
+exp_hi: INT                      -> int
+      | IDENT                    -> var
+      | "-" exp_hi               -> neg
+      | "*" exp_hi               -> deref
+      | "(" exp ")"              -> paren
+      | "fn" param_list "{" stmt "}" -> lambda
       | exp_hi "(" exp_list ")"  -> call
-      | "new" exp             -> new
+      | "new" exp                -> new
       
-?exp_list:                     -> empty
+?exp_list:                       -> empty
          | exp_non_empty
 
 exp_non_empty: exp              -> single
-      | exp "," exp_non_empty   -> add_exp
+      | exp "," exp_non_empty   -> push
 
 ?param_list:                -> empty
       | param_non_empty
 
-param_non_empty: IDENT     -> single
-     | IDENT "," param_non_empty -> add_param
+param: IDENT               -> share
+     | "take" IDENT        -> take
+     | "borrow" IDENT      -> borrow
 
-?stmt: "var" IDENT "=" exp -> init
-    | exp ":=" exp         -> write
-    | IDENT "=" exp        -> assign
-    | exp                  -> expr
-    | "return" exp         -> return
-    | "borrow" IDENT "=" exp "for" stmt -> borrow
-    | block
+param_non_empty: param           -> single
+     | param "," param_non_empty -> push
 
-stmt_list:                -> empty
-    | stmt stmt_list      -> add_stmt
+?stmt: "var" IDENT "=" exp ";" stmt    -> init_share
+    | "take" IDENT "=" exp ";" stmt    -> init_take
+    | "borrow" IDENT "=" exp ";" stmt  -> init_borrow
+    | exp ":=" exp ";" stmt            -> write
+    | exp ";" stmt                     -> expr
+    | "return" exp ";"                 -> return
 
-block: "{" stmt_list "}"  -> block
-
-arete: stmt_list
+arete: stmt
 
 %ignore WS

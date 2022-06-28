@@ -1,0 +1,8 @@
+var inc = fn borrow p {
+            p := *p + 1;
+	    return 0;
+          };
+take q = new 0;
+inc(q);
+q := *q + 1;
+return *q - 2;

@@ -1,95 +1,118 @@
 from abstract_syntax import *
 from dataclasses import dataclass
 from parser import parse
+from typing import List, Set, Dict, Tuple, Any
 import sys
+import copy
 
 @dataclass
-class Integer:
+class Value:
+    pass
+
+@dataclass
+class Integer(Value):
     value: int
+    def __str__(self):
+        return repr(self.value)
 
 @dataclass
-class Pointer:
+class Pointer(Value):
     address: int
     privilege: str  # none, read, write
     __match_args__ = ("address", "privilege")
 
-# Increment the reference count of an address
-def increment(addr, mem):
-    (v, count) = mem[addr]
-    mem[addr] = (v, count + 1)
-
-# Decrement the reference count of an address
-def decrement(addr, mem):
-    (v, count) = mem[addr]
-    new_count = count - 1
-    if new_count == 0:
-        mem[addr] = (None, 0)
-    else:
-        mem[addr] = (v, new_count)
+@dataclass
+class Closure(Value):
+    params: List[Any]
+    body: Stmt
+    env: Any # needs work
+    __match_args__ = ("params", "body", "env")
     
-def share(ptr, mem):
-    match ptr:
-      case Pointer(addr, priv):
-        if priv == 'none':
-            raise Exception('cannot share if have no privileges')
-        increment(addr, mem)
-        ptr.privilege = 'read'
-        return Pointer(addr, 'read')
-      case _:
-        raise Exception('expected pointer, not ' + repr(ptr))
-
-def release(ptr, mem):
-    match ptr:
-      case Pointer(addr, priv):
-        if priv != 'write':
-            raise Exception('cannot release if do not have write privilege')
-        ptr.addr = -1
-        ptr.privilege = 'none'
-        return Pointer(addr, 'write')
-      case _:
-        raise Exception('expected pointer, not ' + repr(ptr))
-
+@dataclass
+class Cell:
+    value: Value
+    owners: int
+    observers: int
+    def inc_owner(self):
+        self.owners += 1
+    def dec_owner(self):
+        self.owners -= 1
+        if self.count() == 0:
+            self.value = None
+    def inc_observer(self):
+        self.observers += 1
+    def dec_observer(self):
+        self.observers -= 1
+        if self.count() == 0:
+            self.value = None
+    def count(self):
+        return self.owners + self.observers
+        
+trace = False
+    
+# End the life of a value.
+# If the value is a pointer, decrement the target's reference count.
 def kill(val, mem):
     match val:
       case Integer(value):
         pass
       case Pointer(addr, priv):
-        if priv != 'write':
-            raise Exception('cannot kill if do not have write privilege')
-        decrement(addr, mem)
-        val.addr = -1
-        val.privilege = 'none'
+        if priv == 'none':
+            mem[addr].dec_observer()
+        else:
+            mem[addr].dec_owner()
+        val.addr = None
+        val.privilege = None
 
-def bind(val, mem):
-  match val:
-    case Integer(value):
-      return Integer(value)
-    case Pointer(address, priv):
-      if mem[address][1] > 0 and priv != 'read':
-        raise Exception('in bind, cannot steal from owner')
-      increment(address, mem)
-      return val
-    case _:
-      raise Exception('in bind, unhandled value ' + repr(val))
-        
+# Copy a value.
+# If it is a pointer, it must not have 'write' privilege.
 def copy(val, mem):
     match val:
       case Integer(value):
         return Integer(value)
-      case Pointer(address, priv):
-        if priv != 'read':
-            raise Exception('in copy, pointer must have read privilege, not ' + priv)
-        increment(address, mem)
-        return Pointer(address, priv)
+      case Pointer(addr, priv):
+        if priv == 'write':
+            raise Exception('to copy, pointer must not have write privilege')
+        elif priv == 'read':
+            mem[addr].inc_owner()
+        elif priv == 'none':
+            mem[addr].inc_observer()
+        return Pointer(addr, priv)
+      case Closure(params, body, env):
+        return val # ??
       case _:
         raise Exception('in copy, unhandled value ' + repr(val))
     
+def initialize(kind, val, mem):
+  match val:
+    case Integer(value):
+      return Integer(value)
+    case Pointer(addr, priv):
+      if kind == 'take' or kind == 'borrow':
+          if priv == 'write':
+              mem[addr].inc_observer()
+              val.priv = 'none'
+              return Pointer(addr, 'write')
+          else:
+              raise Exception('take requires a write pointer')
+      elif kind == 'share':
+          if priv == 'write':
+              val.priv = 'read'
+          elif priv == 'none':
+              raise Exception('share requires a read or write pointer')
+          mem[addr].inc_owner()
+          return Pointer(addr, 'read')
+    case Closure(params, body, env):
+      return val # ??
+    case _:
+      raise Exception('in initialize, unhandled value ' + repr(val))
+        
 def read(ptr, mem):
     match ptr:
       case Pointer(addr, priv):
         if priv == 'none':
-            raise Exception('cannot read if do not have read privilege')
-        return mem[addr][0]
+            raise Exception('pointer does not have read privilege')
+        return mem[addr].value
       case _:
         raise Exception('in read expected a pointer, not ' + repr(ptr))
 
@@ -97,15 +120,25 @@ def write(ptr, val, mem):
     match ptr:
       case Pointer(addr, priv):
         if priv != 'write':
-            raise Exception('cannot write if do not have write privilege')
-        (old_val, count) = mem[addr]
-        if count != 1:
+            raise Exception('pointer does not have write privilege')
+        if mem[addr].owners != 1:
             raise Exception('write requires unique ownership')
-        kill(old_val, mem)
-        mem[addr] = (copy(val, mem), count)
+        kill(mem[addr].value, mem)
+        mem[addr].value = copy(val, mem)
       case _:
         raise Exception('in read expected a pointer, not ' + repr(ptr))
-    
+
+def revive(ptr, mem):
+    match ptr:
+      case Pointer(addr, priv):
+        if mem[addr].owners != 0:
+            raise Exception("can't revive an aliased value")
+        else:
+            mem[addr].inc_owner()
+            mem[addr].dec_observer()
+            ptr.priv = 'write'
+      case _:
+        raise Exception('in revive expected a pointer, not ' + repr(ptr))
     
 def interp_exp(e, env, mem):
     match e:
@@ -126,58 +159,91 @@ def interp_exp(e, env, mem):
       case New(arg):
         val = interp_exp(arg, env, mem)
         addr = len(mem)
-        mem[addr] = (copy(val, mem), 0)
+        mem[addr] = Cell(copy(val, mem), 1, 0)
         return Pointer(addr, 'write')
       case Deref(arg):
         ptr = interp_exp(arg, env, mem)
         return read(ptr, mem)
-      case Share(arg):
-        ptr = interp_exp(arg, env, mem)
-        return share(ptr, mem)
-      case Release(arg):
-        ptr = interp_exp(arg, env, mem)
-        return release(ptr, mem)
+      case Lambda(params, body):
+        return Closure(params, body, env)
+      case Call(fun, args):
+        f = interp_exp(fun, env, mem)
+        vals = [interp_exp(arg, env, mem) for arg in args]
+        match f:
+            case Closure(params, body, clos_env):
+              body_env = clos_env.copy()
+              for (param, arg) in zip(params, vals):
+                  body_env[param.ident] = initialize(param.kind, arg, mem)
+              retval = interp_stmt(body, body_env, mem)
+              for param in params:
+                  kill(body_env[param.ident], mem)
+              for (param, arg) in zip(params, vals):
+                  if param.kind == 'borrow':
+                      revive(arg, mem)
+              return retval
+            case _:
+              raise Exception('expected function in call, not ' + repr(f))
       case _:
         raise Exception('error in interp_exp, unhandled: ' + repr(e)) 
     
 def interp_stmt(s, env, mem):
-    print('interp_stmt ' + repr(s))
+    if trace:
+        print('interp_stmt ' + repr(s))
+        print(env)
+        print(mem)
+        print()
     match s:
-      case Return(e):
-        return interp_exp(e, env, mem)
-      case Init(var, init):
+      case Init(kind, var, init, rest):
         val = interp_exp(init, env, mem)
-        env[var] = bind(val, mem)
-      case Assign(var, rhs):
-        kill(env[var], mem)
-        env[var] = interp_exp(rhs, env, mem)
-      case Write(lhs, rhs):
+        env[var] = initialize(kind, val, mem)
+        retval = interp_stmt(rest, env, mem)
+        if kind == 'borrow':
+            revive(val, mem)
+        return retval
+      case Write(lhs, rhs, rest):
         ptr = interp_exp(lhs, env, mem)
         val = interp_exp(rhs, env, mem)
-        write(ptr, copy(val, mem), mem)
+        write(ptr, val, mem)
+        return interp_stmt(rest, env, mem)
+      case Expr(e, rest):
+        interp_exp(e, env, mem)
+        return interp_stmt(rest, env, mem)
+      case Return(e):
+        return interp_exp(e, env, mem)
       case _:
         raise Exception('error in interp_stmt, unhandled: ' + repr(s)) 
 
 def interp(p):
     env = {}
-    memory = {}
-    rv = None
-    for s in p:
-        rv = interp_stmt(s, env, memory)
-        if not (rv is None):
-            break
+    mem = {}
+    retval = interp_stmt(p, env, mem)
+    if trace:
         print(env)
-        print(memory)
+        print(mem)
         print()
-    print(env)
-    print(memory)
-    print()
-    return rv
+    return retval
 
 if __name__ == "__main__":
     file = open(sys.argv[1], 'r')
+    expect_fail = False
+    if 'fail' in sys.argv:
+        expect_fail = True
+    if 'trace' in sys.argv:
+        trace = True
     p = file.read()
-    ast = parse(p)
-    retval = interp(ast)
-    print('return value:')
-    print(retval)
+    ast = parse(p, trace)
+    try:
+        retval = interp(ast)
+        if expect_fail:
+            print("expected failure, but didn't")
+            exit(-1)
+        else:
+            exit(retval.value)
+    except Exception as ex:
+        if expect_fail:
+            exit(0)
+        else:
+            print('unexpected failure: ' + str(ex))
+            raise
+            exit(-1)
+

@@ -20,7 +20,17 @@ lark_parser = Lark(open("./Arete.lark").read(), start='arete', parser='lalr',
 # Parsing Concrete to Abstract Syntax
 ##################################################
 
+def parse_tree_to_param(e):
+    if e.data == 'single':
+        return [parse_tree_to_param(e.children[0])]
+    elif e.data == 'push':
+        return [parse_tree_to_param(e.children[0])] \
+            + parse_tree_to_param(e.children[1])
+    else:
+        return Param(e.data, e.children[0].value)
+
 def parse_tree_to_ast(e):
+    # expressions
     if e.data == 'var':
         return Var(str(e.children[0].value))
     elif e.data == 'int':
@@ -33,61 +43,72 @@ def parse_tree_to_ast(e):
         return Prim('sub', [parse_tree_to_ast(e1), parse_tree_to_ast(e2)])
     elif e.data == 'neg':
         return Prim('neg', [parse_tree_to_ast(e.children[0])])
-    elif e.data == 'init':
-        return Init(str(e.children[0].value),
-                    parse_tree_to_ast(e.children[1]))
-    elif e.data == 'assign':
-        return Assign(str(e.children[0].value),
-                      parse_tree_to_ast(e.children[1]))
-    elif e.data == 'write':
-        return Write(parse_tree_to_ast(e.children[0]),
-                     parse_tree_to_ast(e.children[1]))
-    elif e.data == 'expr':
-        return Expr(parse_tree_to_ast(e.children[0]))
-    elif e.data == 'return':
-        return Return(parse_tree_to_ast(e.children[0]))
     elif e.data == 'new':
         return New(parse_tree_to_ast(e.children[0]))
     elif e.data == 'deref':
         return Deref(parse_tree_to_ast(e.children[0]))
-    elif e.data == 'share':
-        return Share(parse_tree_to_ast(e.children[0]))
-    elif e.data == 'release':
-        return Release(parse_tree_to_ast(e.children[0]))
-    elif e.data == 'borrow':
-        return Borrow(str(e.children[0].value),
-                      parse_tree_to_ast(e.children[1]),
-                      parse_tree_to_ast(e.children[2]))
-    elif e.data == 'block':
-        return Block([parse_tree_to_ast(child) for child in e.children])
+    elif e.data == 'lambda':
+        return Lambda(parse_tree_to_param(e.children[0]),
+                      parse_tree_to_ast(e.children[1]))
+    elif e.data == 'call':
+        e1, e2 = e.children
+        return Call(parse_tree_to_ast(e1), parse_tree_to_ast(e2))
+    # statements
+    elif e.data == 'init_share':
+        return Init('share',
+                    str(e.children[0].value),
+                    parse_tree_to_ast(e.children[1]),
+                    parse_tree_to_ast(e.children[2]))
+    elif e.data == 'init_take':
+        return Init('take',
+                    str(e.children[0].value),
+                    parse_tree_to_ast(e.children[1]),
+                    parse_tree_to_ast(e.children[2]))
+    elif e.data == 'init_borrow':
+        return Init('borrow',
+                    str(e.children[0].value),
+                    parse_tree_to_ast(e.children[1]),
+                    parse_tree_to_ast(e.children[2]))
+    elif e.data == 'write':
+        return Write(parse_tree_to_ast(e.children[0]),
+                     parse_tree_to_ast(e.children[1]),
+                    parse_tree_to_ast(e.children[2]))
+    elif e.data == 'expr':
+        return Expr(parse_tree_to_ast(e.children[0]),
+                    parse_tree_to_ast(e.children[1]))
+    elif e.data == 'return':
+        return Return(parse_tree_to_ast(e.children[0]))
+    # lists
     elif e.data == 'single':
         return [parse_tree_to_ast(e.children[0])]
-    elif e.data == 'add_exp' or e.data == 'add_stmt' or e.data == 'add_param':
+    elif e.data == 'push':
         return [parse_tree_to_ast(e.children[0])] \
             + parse_tree_to_ast(e.children[1])
     elif e.data == 'empty':
         return []
-    elif e.data == 'lambda':
-        return Lambda(e.children[0], parse_tree_to_ast(e.children[1]))
+    # whole program
     elif e.data == 'arete':
         return parse_tree_to_ast(e.children[0])
     else:
         raise Exception('unhandled parse tree', e)
 
-def parse(s):
+def parse(s, trace = False):
     lexed = lark_parser.lex(s)
-    print('tokens: ')
-    for word in lexed:
-        print(repr(word))
-    print('')
+    if trace:
+        print('tokens: ')
+        for word in lexed:
+            print(repr(word))
+        print('')
     parse_tree = lark_parser.parse(s)
-    print('parse tree: ')
-    print(parse_tree)
-    print('')
+    if trace:
+        print('parse tree: ')
+        print(parse_tree)
+        print('')
     ast = parse_tree_to_ast(parse_tree)
-    print('abstract syntax tree: ')
-    print(ast)
-    print('')
+    if trace:
+        print('abstract syntax tree: ')
+        print(ast)
+        print('')
     return ast
 
 if __name__ == "__main__":
