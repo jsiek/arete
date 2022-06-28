@@ -37,13 +37,16 @@ param: IDENT               -> share
 param_non_empty: param           -> single
      | param "," param_non_empty -> push
 
+?basic_stmt: exp ":=" exp ";"     -> write
+    | exp ";"                     -> expr
+    | "{" stmt "}"                -> block
+    
 ?stmt: "var" IDENT "=" exp ";" stmt    -> init_share
     | "take" IDENT "=" exp ";" stmt    -> init_take
     | "borrow" IDENT "=" exp ";" stmt  -> init_borrow
-    | exp ":=" exp ";" stmt            -> write
-    | exp ";" stmt                     -> expr
     | "return" exp ";"                 -> return
-
+    | basic_stmt stmt                  -> seq
+    |                                  -> pass
 arete: stmt
 
 %ignore WS

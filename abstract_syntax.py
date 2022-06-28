@@ -59,8 +59,7 @@ class Init(Stmt):
 class Write(Stmt):
     lhs: Exp
     rhs: Exp
-    rest: Stmt
-    __match_args__ = ("lhs", "rhs", "rest")
+    __match_args__ = ("lhs", "rhs")
     
 @dataclass
 class Return(Stmt):
@@ -70,9 +69,18 @@ class Return(Stmt):
 @dataclass
 class Expr(Stmt):
     exp: Exp
+    __match_args__ = ("exp",)
+
+@dataclass
+class Pass(Stmt):
+    pass
+
+@dataclass
+class Seq(Stmt):
+    first: Stmt
     rest: Stmt
-    __match_args__ = ("exp", "rest")
-    
+    __match_args__ = ("first", "rest")
+
 @dataclass(frozen=True)
 class Param:
     kind: str # share, take, borrow

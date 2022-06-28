@@ -53,6 +53,7 @@ def parse_tree_to_ast(e):
     elif e.data == 'call':
         e1, e2 = e.children
         return Call(parse_tree_to_ast(e1), parse_tree_to_ast(e2))
+    
     # statements
     elif e.data == 'init_share':
         return Init('share',
@@ -71,13 +72,19 @@ def parse_tree_to_ast(e):
                     parse_tree_to_ast(e.children[2]))
     elif e.data == 'write':
         return Write(parse_tree_to_ast(e.children[0]),
-                     parse_tree_to_ast(e.children[1]),
-                    parse_tree_to_ast(e.children[2]))
+                     parse_tree_to_ast(e.children[1]))
     elif e.data == 'expr':
-        return Expr(parse_tree_to_ast(e.children[0]),
-                    parse_tree_to_ast(e.children[1]))
+        return Expr(parse_tree_to_ast(e.children[0]))
     elif e.data == 'return':
         return Return(parse_tree_to_ast(e.children[0]))
+    elif e.data == 'pass':
+        return Pass()
+    elif e.data == 'seq':
+        return Seq(parse_tree_to_ast(e.children[0]),
+                   parse_tree_to_ast(e.children[1]))
+    elif e.data == 'block':
+        return parse_tree_to_ast(e.children[0])
+    
     # lists
     elif e.data == 'single':
         return [parse_tree_to_ast(e.children[0])]

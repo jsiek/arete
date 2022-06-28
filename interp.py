@@ -197,19 +197,26 @@ def interp_stmt(s, env, mem):
         val = interp_exp(init, env, mem)
         env[var] = initialize(kind, val, mem)
         retval = interp_stmt(rest, env, mem)
+        kill(env[var], mem)
         if kind == 'borrow':
             revive(val, mem)
         return retval
-      case Write(lhs, rhs, rest):
+      case Write(lhs, rhs):
         ptr = interp_exp(lhs, env, mem)
         val = interp_exp(rhs, env, mem)
         write(ptr, val, mem)
-        return interp_stmt(rest, env, mem)
-      case Expr(e, rest):
+      case Expr(e):
         interp_exp(e, env, mem)
-        return interp_stmt(rest, env, mem)
       case Return(e):
         return interp_exp(e, env, mem)
+      case Seq(first, rest):
+        retval = interp_stmt(first, env, mem)
+        if retval is None:
+            return interp_stmt(rest, env, mem)
+        else:
+            return retval
+      case Pass():
+        pass
       case _:
         raise Exception('error in interp_stmt, unhandled: ' + repr(s)) 
 
