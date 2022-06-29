@@ -21,7 +21,9 @@ lark_parser = Lark(open("./Arete.lark").read(), start='arete', parser='lalr',
 ##################################################
 
 def parse_tree_to_param(e):
-    if e.data == 'single':
+    if e.data == 'empty':
+        return []
+    elif e.data == 'single':
         return [parse_tree_to_param(e.children[0])]
     elif e.data == 'push':
         return [parse_tree_to_param(e.children[0])] \
@@ -60,21 +62,10 @@ def parse_tree_to_ast(e):
         return Index(parse_tree_to_ast(e1), parse_tree_to_ast(e2))
     
     # statements
-    elif e.data == 'init_share':
-        return Init('share',
-                    str(e.children[0].value),
-                    parse_tree_to_ast(e.children[1]),
-                    parse_tree_to_ast(e.children[2]))
-    elif e.data == 'init_take':
-        return Init('take',
-                    str(e.children[0].value),
-                    parse_tree_to_ast(e.children[1]),
-                    parse_tree_to_ast(e.children[2]))
-    elif e.data == 'init_borrow':
-        return Init('borrow',
-                    str(e.children[0].value),
-                    parse_tree_to_ast(e.children[1]),
-                    parse_tree_to_ast(e.children[2]))
+    elif e.data == 'var_init':
+        return VarInit(str(e.children[0].value),
+                       parse_tree_to_ast(e.children[1]),
+                       parse_tree_to_ast(e.children[2]))
     elif e.data == 'write':
         return Write(parse_tree_to_ast(e.children[0]),
                      parse_tree_to_ast(e.children[1]))
@@ -93,8 +84,14 @@ def parse_tree_to_ast(e):
         return Match(parse_tree_to_ast(e.children[0]),
                      parse_tree_to_ast(e.children[1]))
     # patterns
-    elif e.data == 'var_pat':
-        return VarPat(str(e.children[0].value))
+    elif e.data == 'share_pat':
+        return VarPat('share', str(e.children[0].value))
+    elif e.data == 'take_pat':
+        return VarPat('take', str(e.children[0].value))
+    elif e.data == 'borrow_pat':
+        return VarPat('borrow', str(e.children[0].value))
+    elif e.data == 'share_pat':
+        return VarPat('share', str(e.children[0].value))
     elif e.data == 'tuple_pat':
         return TuplePat(parse_tree_to_ast(e.children[0]))
     
@@ -102,7 +99,13 @@ def parse_tree_to_ast(e):
     elif e.data == 'case':
         return Case(parse_tree_to_ast(e.children[0]),
                     parse_tree_to_ast(e.children[1]))
-    
+    elif e.data == 'share_init':
+        return Initializer('share', parse_tree_to_ast(e.children[0]))
+    elif e.data == 'take_init':
+        return Initializer('take', parse_tree_to_ast(e.children[0]))
+    elif e.data == 'borrow_init':
+        return Initializer('borrow', parse_tree_to_ast(e.children[0]))
+        
     # lists
     elif e.data == 'single':
         return [parse_tree_to_ast(e.children[0])]

@@ -1,0 +1,31 @@
+var null = fn { return new ⟨⟩; };
+var push = fn data, take list {
+  return new ⟨ data, take list ⟩;
+};
+var head = fn list {
+  match *list
+  | case ⟨hd, tl⟩:
+    return hd;
+};
+var tail = fn list {
+  match *list
+  | case ⟨hd, tl⟩:
+    return tl;
+};
+var remove_last = fn take n {
+  match *n
+  | case ⟨hd₁, take tl₁⟩:
+    {
+      match *tl₁
+      | case ⟨_ , _⟩:
+        return remove_last(tl₁);
+      | case ⟨⟩:
+        n := ⟨hd₁, null()⟩;
+        return hd₂;
+    }      
+  | case ⟨⟩:
+    return 0;
+};
+var list = take push(1, push(2, null()));
+var last = remove_last(list);
+return head(list) + 2 - last;

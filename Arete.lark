@@ -2,7 +2,7 @@ DIGIT: /[0-9]/
 INT: DIGIT+
 UPPER: /[A-Z]/
 LOWER: /[a-z]/
-IDENT: (/_/|UPPER|LOWER) (/_/|UPPER|LOWER|DIGIT)*
+IDENT: (UPPER|LOWER) (/_/|UPPER|LOWER|DIGIT|/[₀₁₂₃₄₅₆₇₈₉]/)*
 NEWLINE: (/\r/? /\n/)+
 WS: /[ \t\f\r\n]/+
 
@@ -19,32 +19,38 @@ exp_hi: INT                      -> int
       | "(" exp ")"              -> paren
       | "fn" param_list "{" stmt "}" -> lambda
       | exp_hi "(" exp_list ")"  -> call
-      | "new" exp                -> new
-      | "⟨" exp_list "⟩"         -> tuple
+      | "new" init               -> new
+      | "⟨" init_list "⟩"        -> tuple
       | exp_hi "[" exp "]"       -> index
       
-?exp_list:                       -> empty
-         | exp_non_empty
+?exp_list:                  -> empty
+      | exp                 -> single
+      | exp "," exp_list    -> push
 
-exp_non_empty: exp              -> single
-      | exp "," exp_non_empty   -> push
+?init: exp                        -> share_init
+    | "take" exp                  -> take_init
+    | "borrow" exp                -> borrow_init
 
-?param_list:                -> empty
-      | param_non_empty
+?init_list:                  -> empty
+      | init                 -> single
+      | init "," init_list   -> push
 
 param: IDENT               -> share
      | "take" IDENT        -> take
      | "borrow" IDENT      -> borrow
 
-param_non_empty: param           -> single
-     | param "," param_non_empty -> push
+?param_list:                     -> empty
+     | param                     -> single
+     | param "," param_list      -> push
 
 ?basic_stmt: exp ":=" exp ";"     -> write
     | exp ";"                     -> expr
     | "{" stmt "}"                -> block
 
 ?pat: "⟨" pat_list "⟩"            -> tuple_pat
-    | IDENT                       -> var_pat
+    | IDENT                       -> share_pat
+    | "take" IDENT                -> take_pat
+    | "borrow" IDENT              -> borrow_pat
 
 ?pat_list:                        -> empty
     | pat                         -> single
@@ -55,9 +61,7 @@ param_non_empty: param           -> single
 ?case_list: "|" case              -> single
    | "|" case case_list           -> push
    
-?stmt: "var" IDENT "=" exp ";" stmt    -> init_share
-    | "take" IDENT "=" exp ";" stmt    -> init_take
-    | "borrow" IDENT "=" exp ";" stmt  -> init_borrow
+?stmt: "var" IDENT "=" init ";" stmt   -> var_init
     | "return" exp ";"                 -> return
     | basic_stmt stmt                  -> seq
     |                                  -> pass
