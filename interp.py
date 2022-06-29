@@ -16,6 +16,12 @@ class Integer(Value):
         return repr(self.value)
 
 @dataclass
+class Tuple(Value):
+    elts: List[Value]
+    def __str__(self):
+        return "⟨" + ",".join([str(e) for e in self.elts]) + "⟩"
+    
+@dataclass
 class Pointer(Value):
     address: int
     privilege: str  # none, read, write
@@ -183,6 +189,20 @@ def interp_exp(e, env, mem):
               return retval
             case _:
               raise Exception('expected function in call, not ' + repr(f))
+      case TupleExp(elts):
+        return Tuple([interp_exp(e, env, mem) for e in elts])
+      case Index(arg, index):
+        val = interp_exp(arg, env, mem)
+        ind = interp_exp(index, env, mem)
+        match val:
+          case Tuple(elts):
+            match ind:
+              case Integer(i):
+                return elts[i]
+              case _:
+                raise Exception('index must be an integer, not ' + repr(ind))
+          case _:
+            raise Excpeiont('cannot index into ' + repr(val))
       case _:
         raise Exception('error in interp_exp, unhandled: ' + repr(e)) 
     

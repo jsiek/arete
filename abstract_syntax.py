@@ -42,6 +42,17 @@ class Int(Exp):
     __match_args__ = ("value",)
 
 @dataclass
+class TupleExp(Exp):
+    elts: List[Exp]
+    __match_args__ = ("elts",)
+
+@dataclass
+class Index(Exp):
+    arg: Exp
+    index: Exp
+    __match_args__ = ("arg", "index")
+    
+@dataclass
 class Lambda(Exp):
     params: List[Any]
     body: Stmt

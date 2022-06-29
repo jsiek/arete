@@ -20,6 +20,8 @@ exp_hi: INT                      -> int
       | "fn" param_list "{" stmt "}" -> lambda
       | exp_hi "(" exp_list ")"  -> call
       | "new" exp                -> new
+      | "⟨" exp_list "⟩"         -> tuple
+      | exp_hi "[" exp "]"       -> index
       
 ?exp_list:                       -> empty
          | exp_non_empty

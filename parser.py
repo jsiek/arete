@@ -53,6 +53,11 @@ def parse_tree_to_ast(e):
     elif e.data == 'call':
         e1, e2 = e.children
         return Call(parse_tree_to_ast(e1), parse_tree_to_ast(e2))
+    elif e.data == 'tuple':
+        return TupleExp(parse_tree_to_ast(e.children[0]))
+    elif e.data == 'index':
+        e1, e2 = e.children
+        return Index(parse_tree_to_ast(e1), parse_tree_to_ast(e2))
     
     # statements
     elif e.data == 'init_share':
