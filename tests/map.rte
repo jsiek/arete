@@ -1,0 +1,10 @@
+var map = fn f, ls {
+  match ls
+  | case ⟨⟩:
+    return ⟨⟩;
+  | case ⟨hd, tl⟩:
+    return ⟨f(hd), map(f, tl)⟩;
+};
+var ls = ⟨0, ⟨1, ⟨2, ⟨⟩⟩⟩⟩;
+var ls2 = map(fn x { return x + 1; }, ls);
+return ls2[1][1][0] - 3;

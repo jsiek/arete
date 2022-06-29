@@ -42,13 +42,27 @@ param_non_empty: param           -> single
 ?basic_stmt: exp ":=" exp ";"     -> write
     | exp ";"                     -> expr
     | "{" stmt "}"                -> block
-    
+
+?pat: "⟨" pat_list "⟩"            -> tuple_pat
+    | IDENT                       -> var_pat
+
+?pat_list:                        -> empty
+    | pat                         -> single
+    | pat "," pat_list            -> push
+
+?case: "case" pat ":" stmt        -> case
+
+?case_list: "|" case              -> single
+   | "|" case case_list           -> push
+   
 ?stmt: "var" IDENT "=" exp ";" stmt    -> init_share
     | "take" IDENT "=" exp ";" stmt    -> init_take
     | "borrow" IDENT "=" exp ";" stmt  -> init_borrow
     | "return" exp ";"                 -> return
     | basic_stmt stmt                  -> seq
     |                                  -> pass
+    | "match" exp case_list            -> match
+
 arete: stmt
 
 %ignore WS

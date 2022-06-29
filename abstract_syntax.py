@@ -10,6 +10,12 @@ class Stmt:
     pass
 
 @dataclass
+class Pat:
+    pass
+
+# Expressions
+
+@dataclass
 class Call(Exp):
     fun: Exp
     args: List[Exp]
@@ -58,6 +64,8 @@ class Lambda(Exp):
     body: Stmt
     __match_args__ = ("params", "body")
 
+# Statements
+
 @dataclass
 class Init(Stmt):
     kind: str
@@ -92,8 +100,38 @@ class Seq(Stmt):
     rest: Stmt
     __match_args__ = ("first", "rest")
 
+@dataclass
+class Match(Stmt):
+    arg: Exp
+    cases: Any
+    __match_args__ = ("arg", "cases")
+
+# Patterns
+
+@dataclass
+class VarPat(Pat):
+    ident: str
+    __match_args__ = ("ident",)
+    def __str__(self):
+        return self.ident
+
+@dataclass
+class TuplePat(Pat):
+    elts: List[Pat]
+    __match_args__ = ("elts",)
+    def __str__(self):
+        return "⟨" + ",".join([str(e) for e in self.elts]) + "⟩"
+    
+# Miscelaneous
+
 @dataclass(frozen=True)
 class Param:
     kind: str # share, take, borrow
     ident: str
     __match_args__ = ("kind", "ident")
+
+@dataclass
+class Case:
+    pat: Pat
+    body: Stmt
+    __match_args__ = ("pat", "body")

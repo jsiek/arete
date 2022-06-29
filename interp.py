@@ -14,11 +14,15 @@ class Integer(Value):
     value: int
     def __str__(self):
         return repr(self.value)
+    def __repr__(self):
+        return repr(self.value)
 
 @dataclass
 class Tuple(Value):
     elts: List[Value]
     def __str__(self):
+        return "⟨" + ",".join([str(e) for e in self.elts]) + "⟩"
+    def __repr__(self):
         return "⟨" + ",".join([str(e) for e in self.elts]) + "⟩"
     
 @dataclass
@@ -33,6 +37,10 @@ class Closure(Value):
     body: Stmt
     env: Any # needs work
     __match_args__ = ("params", "body", "env")
+    def __str__(self):
+        return "closure"
+    def __repr__(self):
+        return "closure"
     
 @dataclass
 class Cell:
@@ -110,6 +118,8 @@ def initialize(kind, val, mem):
           return Pointer(addr, 'read')
     case Closure(params, body, env):
       return val # ??
+    case Tuple(elts):
+      return val # ??
     case _:
       raise Exception('in initialize, unhandled value ' + repr(val))
         
@@ -149,6 +159,8 @@ def revive(ptr, mem):
 def interp_exp(e, env, mem):
     match e:
       case Var(x):
+        if x not in env:
+            raise Exception('use of undefined variable ' + x)
         return env[x]
       case Int(n):
         return Integer(n)
@@ -205,6 +217,29 @@ def interp_exp(e, env, mem):
             raise Excpeiont('cannot index into ' + repr(val))
       case _:
         raise Exception('error in interp_exp, unhandled: ' + repr(e)) 
+
+def pattern_match(pat, val, matches):
+    if trace:
+        print('pattern_match(' + str(pat) + "," + str(val) + ")")
+        print()
+    match pat:
+      case VarPat(id):
+        matches[id] = val
+        return True
+      case TuplePat(pat_elts):
+        match val:
+          case Tuple(elts):
+            if len(pat_elts) != len(elts):
+                return False
+            for (p, v) in zip(pat_elts, elts):
+                r = pattern_match(p, v, matches)
+                if not r:
+                    return False
+            return True
+          case _:
+            return False
+      case _:
+        raise Exception('error in pattern match, unhandled: ' + repr(pat))
     
 def interp_stmt(s, env, mem):
     if trace:
@@ -237,6 +272,24 @@ def interp_stmt(s, env, mem):
             return retval
       case Pass():
         pass
+      case Match(arg, cases):
+        val = interp_exp(arg, env, mem)
+        for c in cases:
+           matches = {}
+           if pattern_match(c.pat, val, matches):
+               body_env = env.copy()
+               if trace:
+                   print('matches')
+                   print(matches)
+                   print()
+               for x,v in matches.items():
+                   body_env[x] = v
+               if trace:
+                   print('body_env')
+                   print(body_env)
+                   print()
+               return interp_stmt(c.body, body_env, mem)
+        raise Exception('error, no match')
       case _:
         raise Exception('error in interp_stmt, unhandled: ' + repr(s)) 
 

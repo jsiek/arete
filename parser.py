@@ -89,6 +89,19 @@ def parse_tree_to_ast(e):
                    parse_tree_to_ast(e.children[1]))
     elif e.data == 'block':
         return parse_tree_to_ast(e.children[0])
+    elif e.data == 'match':
+        return Match(parse_tree_to_ast(e.children[0]),
+                     parse_tree_to_ast(e.children[1]))
+    # patterns
+    elif e.data == 'var_pat':
+        return VarPat(str(e.children[0].value))
+    elif e.data == 'tuple_pat':
+        return TuplePat(parse_tree_to_ast(e.children[0]))
+    
+    # miscelaneous
+    elif e.data == 'case':
+        return Case(parse_tree_to_ast(e.children[0]),
+                    parse_tree_to_ast(e.children[1]))
     
     # lists
     elif e.data == 'single':
