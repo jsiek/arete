@@ -2,6 +2,6 @@ var inc = fn take p {
             p := *p + 1;
 	    return *p;
           };
-take q = new 0;
+var q = take new 0;
 return inc(q) - 1;
 

@@ -94,6 +94,8 @@ def parse_tree_to_ast(e):
         return VarPat('share', str(e.children[0].value))
     elif e.data == 'tuple_pat':
         return TuplePat(parse_tree_to_ast(e.children[0]))
+    elif e.data == 'wildcard_pat':
+        return WildCard()
     
     # miscelaneous
     elif e.data == 'case':

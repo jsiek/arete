@@ -1,5 +1,5 @@
-take q = new 0;
-{ borrow p = q;
+var q = take new 0;
+{ var p = borrow q;
   p := *p + 1; }
 q := *q + 1;
 return *q - 2;

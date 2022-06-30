@@ -1,4 +1,4 @@
-take x = new 42;
+var x = take new 42;
 var y = x;
 x := 0;
 return *y;

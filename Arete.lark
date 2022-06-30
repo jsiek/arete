@@ -5,6 +5,7 @@ LOWER: /[a-z]/
 IDENT: (UPPER|LOWER) (/_/|UPPER|LOWER|DIGIT|/[₀₁₂₃₄₅₆₇₈₉]/)*
 NEWLINE: (/\r/? /\n/)+
 WS: /[ \t\f\r\n]/+
+COMMENT: "//" /[^\n]*/ NEWLINE
 
 ?exp: exp_add
 
@@ -51,6 +52,7 @@ param: IDENT               -> share
     | IDENT                       -> share_pat
     | "take" IDENT                -> take_pat
     | "borrow" IDENT              -> borrow_pat
+    | "_"                         -> wildcard_pat
 
 ?pat_list:                        -> empty
     | pat                         -> single
@@ -69,4 +71,5 @@ param: IDENT               -> share
 
 arete: stmt
 
+%ignore COMMENT
 %ignore WS

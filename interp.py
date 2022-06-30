@@ -32,6 +32,8 @@ def priv_str(priv):
     return 'R'
   elif priv == 'write':
     return 'W'
+  else:
+    raise Exception('unrecognized priviledge: ' + str(priv))
     
 @dataclass
 class Pointer(Value):
@@ -95,9 +97,10 @@ def kill(val, mem):
         else:
             mem[addr].dec_owner()
         val.addr = None
-        val.privilege = None
-    print(mem)
-    print()
+        val.privilege = 'none'
+    if trace:
+        print(mem)
+        print()
 
 # Copy a value.
 def copy(val, mem):
@@ -191,21 +194,23 @@ def revive(ptr, mem):
 
 def call_function(fun, args, env, mem):
     f = interp_exp(fun, env, mem, 'none')
+    vals = [interp_exp(arg, env, mem, 'none') for arg in args]
     match f:
         case Closure(params, body, clos_env):
           body_env = clos_env.copy()
-          for (param, arg) in zip(params, args):
-              body_env[param.ident] = interp_init(Initializer(param.kind, arg), env, mem)
+          for (param, val) in zip(params, vals):
+              body_env[param.ident] = initialize(param.kind, val, mem)
           if trace:
               print('call ' + str(Call(fun, args)))
               print()
           retval = interp_stmt(body, body_env, mem)
-          print('function parameter cleanup')
+          if trace:
+              print('function parameter cleanup')
           for param in params:
               kill(body_env[param.ident], mem)
-          for (param, arg) in zip(params, args):
+          for (param, val) in zip(params, vals):
               if param.kind == 'borrow':
-                  revive(body_env[param.ident], mem)
+                  revive(val, mem)
           if trace:
               print('return from ' + str(fun) + ' with ' + str(retval))
               print(mem)
@@ -280,6 +285,8 @@ def pattern_match(pat, val, matches):
         print('pattern_match(' + str(pat) + "," + str(val) + ")")
         print()
     match pat:
+      case WildCard():
+        return True
       case VarPat(kind, id):
         matches[id] = (kind, val)
         return True
@@ -306,8 +313,8 @@ def interp_stmt(s, env, mem):
         print()
     match s:
       case VarInit(var, init, rest):
-        val = interp_init(init, env, mem)
-        env[var] = val
+        val = interp_exp(init.arg, env, mem, 'none')
+        env[var] = initialize(init.kind , val, mem)
         retval = interp_stmt(rest, env, mem)
         kill(env[var], mem)
         if init.kind == 'borrow':
@@ -375,6 +382,8 @@ if __name__ == "__main__":
             print("expected failure, but didn't")
             exit(-1)
         else:
+            if trace:
+                print('result: ' + str(retval.value))
             exit(retval.value)
     except Exception as ex:
         if expect_fail:

@@ -1,3 +1,3 @@
-take x = new 10;
+var x = take new 10;
 x := 20;
 return *x - 20;

@@ -26,11 +26,32 @@ class Call(Exp):
     def __repr__(self):
         return str(self)
 
+def op_str(op):
+    if op == 'add':
+        return '+'
+    elif op == 'sub':
+        return '-'
+    elif op == 'usub':
+        return '-'
+    else:
+        raise Exception('unhandled op ' + op)
+    
 @dataclass
 class Prim(Exp):
     op: str
     args: List[Exp]
     __match_args__ = ("op", "args")
+    def __str__(self):
+        if len(self.args) == 1:
+            return op_str(self.op) + str(self.args[0])
+        elif len(self.args) == 2:
+            return str(self.args[0]) + " " + op_str(self.op) + " " + \
+                str(self.args[1])
+        else:
+            return self.op + \
+                "(" + ", ".join([str(arg) for arg in self.args]) + ")"
+    def __repr__(self):
+        return str(self)
 
 @dataclass
 class New(Exp):
@@ -187,6 +208,14 @@ class TuplePat(Pat):
         return "⟨" + ", ".join([str(e) for e in self.elts]) + "⟩"
     def __repr__(self):
         return str(self)
+
+@dataclass
+class WildCard(Pat):
+    def __str__(self):
+        return "_"
+    def __repr__(self):
+        return str(self)
+    
     
 # Miscelaneous
 
