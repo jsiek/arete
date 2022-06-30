@@ -1,0 +1,10 @@
+var t = take (new take (new 10));
+{
+  match *t
+  | case take p:
+    match *t
+    | case take q:
+      p := 0;
+      q := 42;
+}
+return **t;

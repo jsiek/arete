@@ -150,7 +150,7 @@ def initialize(kind, val, mem):
     case Closure(params, body, env):
       retval = val # ??
     case Tuple(elts):
-      retval = val # ??
+      retval = copy(val, mem) # ??
     case _:
       raise Exception('in initialize, unhandled value ' + repr(val))
   if trace:
@@ -351,6 +351,7 @@ def interp_stmt(s, env, mem):
                if trace:
                    print('body_env')
                    print(body_env)
+                   print(mem)
                    print()
                return interp_stmt(c.body, body_env, mem)
         raise Exception('error, no match')
@@ -390,6 +391,7 @@ if __name__ == "__main__":
             exit(0)
         else:
             print('unexpected failure: ' + str(ex))
+            print()
             raise
             exit(-1)
 
