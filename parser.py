@@ -60,6 +60,8 @@ def parse_tree_to_ast(e):
     elif e.data == 'index':
         e1, e2 = e.children
         return Index(parse_tree_to_ast(e1), parse_tree_to_ast(e2))
+    elif e.data == 'paren':
+        return parse_tree_to_ast(e.children[0])
     
     # statements
     elif e.data == 'var_init':
