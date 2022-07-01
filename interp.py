@@ -7,7 +7,7 @@ import copy
 
 @dataclass
 class Value:
-    pass
+    temporary: bool
 
 @dataclass
 class Integer(Value):
@@ -17,6 +17,14 @@ class Integer(Value):
     def __repr__(self):
         return repr(self.value)
 
+@dataclass
+class Boolean(Value):
+    value: bool
+    def __str__(self):
+        return repr(self.value)
+    def __repr__(self):
+        return repr(self.value)
+    
 @dataclass
 class Tuple(Value):
     elts: List[Value]
@@ -39,9 +47,9 @@ def priv_str(priv):
 class Pointer(Value):
     address: int
     privilege: str  # none, read, write
-    __match_args__ = ("address", "privilege")
+    __match_args__ = ("temporary", "address", "privilege")
     def __str__(self):
-        return "⟪" + str(self.address) + "@" + priv_str(self.privilege) + "⟫"
+        return "⦅" + str(self.address) + "@" + priv_str(self.privilege) + "⦆"
     def __repr__(self):
         return str(self)
 
@@ -50,7 +58,7 @@ class Closure(Value):
     params: List[Any]
     body: Stmt
     env: Any # needs work
-    __match_args__ = ("params", "body", "env")
+    __match_args__ = ("temporary", "params", "body", "env")
     def __str__(self):
         return "closure"
     def __repr__(self):
@@ -89,15 +97,19 @@ def kill(val, mem):
     if trace:
         print('kill ' + str(val))
     match val:
-      case Integer(value):
+      case Integer(tmp, value):
         pass
-      case Pointer(addr, priv):
+      case Pointer(tmp, addr, priv):
         if priv == 'none':
-            mem[addr].dec_observer()
-        else:
+            if mem[addr]:
+                mem[addr].dec_observer()
+        elif mem[addr]:
             mem[addr].dec_owner()
         val.addr = None
         val.privilege = 'none'
+      case Tuple(tmp, elts):
+        for elt in elts:
+            kill(elt, mem)
     if trace:
         print(mem)
         print()
@@ -107,9 +119,11 @@ def copy(val, mem):
     if trace:
         print('copy ' + str(val))
     match val:
-      case Integer(value):
-        return Integer(value)
-      case Pointer(addr, priv):
+      case Integer(tmp, value):
+        return Integer(tmp, value)
+      case Boolean(tmp, value):
+        return Boolean(tmp, value)
+      case Pointer(tmp, addr, priv):
         if priv == 'write':
             val.privilege = 'none'
             mem[addr].inc_observer()
@@ -117,10 +131,10 @@ def copy(val, mem):
             mem[addr].inc_owner()
         elif priv == 'none':
             mem[addr].inc_observer()
-        return Pointer(addr, priv)
-      case Closure(params, body, env):
+        return Pointer(tmp, addr, priv)
+      case Closure(tmp, params, body, env):
         return val # ??
-      case Tuple(elts):
+      case Tuple(tmp, elts):
         return Tuple([copy(v, mem) for v in elts])
       case _:
         raise Exception('in copy, unhandled value ' + repr(val))
@@ -129,15 +143,31 @@ def initialize(kind, val, mem):
   if trace:
       print('initialize ' + str(val) + ' into ' + kind)
   retval = None
+  if val.temporary and trace:
+      print('from temporary')
   match val:
-    case Integer(value):
-      retval = Integer(value)
-    case Pointer(addr, priv):
+    case Integer(tmp, value):
+      if tmp:
+          retval = val
+          val.temporary = False
+      else:
+          retval = Integer(False, value)
+    case Boolean(tmp, value):
+      if tmp:
+          retval = val
+          val.temporary = False
+      else:
+          retval = Boolean(False, value)
+    case Pointer(tmp, addr, priv):
       if kind == 'take' or kind == 'borrow':
           if priv == 'write':
-              mem[addr].inc_observer()
-              val.privilege = 'none'
-              retval = Pointer(addr, 'write')
+              if tmp:
+                  retval = val
+                  val.temporary = False
+              else:
+                  mem[addr].inc_observer()
+                  val.privilege = 'none'
+                  retval = Pointer(False, addr, 'write')
           else:
               raise Exception('take requires a write pointer')
       elif kind == 'share':
@@ -145,12 +175,21 @@ def initialize(kind, val, mem):
               val.privilege = 'read'
           elif priv == 'none':
               raise Exception('share requires a read or write pointer')
-          mem[addr].inc_owner()
-          retval = Pointer(addr, 'read')
-    case Closure(params, body, env):
+          if tmp:
+              retval = val
+              val.temporary = False
+          else:
+              mem[addr].inc_owner()
+              retval = Pointer(False, addr, 'read')
+      else:
+          raise Exception('initialize unexpected kind: ' + kind)
+    case Closure(tmp, params, body, env):
       retval = val # ??
-    case Tuple(elts):
-      retval = copy(val, mem) # ??
+    case Tuple(tmp, elts):
+      if tmp:
+          retval = val
+      else:
+          retval = copy(val, mem)
     case _:
       raise Exception('in initialize, unhandled value ' + repr(val))
   if trace:
@@ -159,7 +198,7 @@ def initialize(kind, val, mem):
         
 def read(ptr, mem):
     match ptr:
-      case Pointer(addr, priv):
+      case Pointer(tmp, addr, priv):
         if priv == 'none':
             raise Exception('pointer does not have read privilege')
         return mem[addr].value
@@ -168,7 +207,7 @@ def read(ptr, mem):
 
 def write(ptr, val, mem):
     match ptr:
-      case Pointer(addr, priv):
+      case Pointer(tmp, addr, priv):
         if priv != 'write':
             raise Exception('pointer does not have write privilege')
         if mem[addr].owners != 1:
@@ -178,41 +217,67 @@ def write(ptr, val, mem):
       case _:
         raise Exception('in read expected a pointer, not ' + repr(ptr))
 
-def revive(ptr, mem):
+def revive(ptr, mem, old_priv):
     if trace:
-        print('revive ' + str(ptr))
+        print('revive ' + str(ptr) + ' to ' + old_priv)
     match ptr:
-      case Pointer(addr, priv):
-        if mem[addr].owners != 0:
-            raise Exception("can't revive an aliased value")
-        else:
-            mem[addr].inc_owner()
-            mem[addr].dec_observer()
-            ptr.privilege = 'write'
+      case Pointer(tmp, addr, priv):
+        if old_priv == 'write' and mem[addr].owners > 1:
+            raise Exception("can't revive an aliased value to write privilege")
+        elif old_priv == 'write' or old_priv == 'read':
+            ptr.privilege = old_priv
       case _:
-        raise Exception('in revive expected a pointer, not ' + repr(ptr))
+        pass
 
+def priviledge(val):
+    match val:
+      case Pointer(tmp, addr, priv):
+        return priv
+      case _:
+        return 'none' # ???
+
+def allocate_locals(vars_kinds, vals, env, mem):
+    if trace:
+        print('allocating ' + ', '.join([v for (v,k) in vars_kinds]))
+    old_priv = {}
+    for ((var,kind), val) in zip(vars_kinds, vals):
+        old_priv[var] = priviledge(val)
+        env[var] = initialize(kind, val, mem)
+    if trace:
+        print('finish allocating ' + ', '.join([v for (v,k) in vars_kinds]))
+    return old_priv
+
+def deallocate_locals(vars_kinds, vals, env, mem, old_priv):
+    if trace:
+        print('deallocating ' + ', '.join([v for (v,k) in vars_kinds]))
+    for (var,kind) in vars_kinds:
+        kill(env[var], mem)
+    for ((var,kind), val) in zip(vars_kinds, vals):
+        if kind == 'borrow' or kind == 'share':
+            if trace:
+                print('reviving ' + var)
+            revive(val, mem, old_priv[var])
+    if trace:
+        print('finished deallocating ' + ', '.join([v for (v,k) in vars_kinds]))
+        
 def call_function(fun, args, env, mem):
-    f = interp_exp(fun, env, mem, 'none')
-    vals = [interp_exp(arg, env, mem, 'none') for arg in args]
+    f = interp_exp(fun, env, mem)
+    vals = [interp_exp(arg, env, mem) for arg in args]
     match f:
-        case Closure(params, body, clos_env):
+        case Closure(tmp, params, body, clos_env):
           body_env = clos_env.copy()
-          for (param, val) in zip(params, vals):
-              body_env[param.ident] = initialize(param.kind, val, mem)
+          vars_kinds = [(param.ident, param.kind) for param in params]
+          old_priv = allocate_locals(vars_kinds, vals, body_env, mem)
           if trace:
               print('call ' + str(Call(fun, args)))
               print()
           retval = interp_stmt(body, body_env, mem)
           if trace:
               print('function parameter cleanup')
-          for param in params:
-              kill(body_env[param.ident], mem)
-          for (param, val) in zip(params, vals):
-              if param.kind == 'borrow':
-                  revive(val, mem)
+          deallocate_locals(vars_kinds, vals, body_env, mem, old_priv)
           if trace:
               print('return from ' + str(fun) + ' with ' + str(retval))
+              print(env)
               print(mem)
               print()
           return retval
@@ -222,56 +287,55 @@ def call_function(fun, args, env, mem):
 def interp_init(init, env, mem):
     match init:
       case Initializer(kind, arg):
-        return interp_exp(arg, env, mem, kind)
+        val = interp_exp(arg, env, mem)
+        return initialize(kind, val, mem)
       case _:
-        raise Exception('in interp_init, expected an initializer, not ' + repr(init))
+        raise Exception('in interp_init, expected an initializer, not '
+                        + repr(init))
     
-def interp_exp(e, env, mem, ctx):
+def interp_exp(e, env, mem):
     match e:
       case Var(x):
         if x not in env:
             raise Exception('use of undefined variable ' + x)
-        if ctx == 'none':
-            return env[x]
-        else:
-            return initialize(ctx, env[x], mem)
+        return env[x]
       case Int(n):
-        return Integer(n)
+        return Integer(True, n)
+      case Bool(b):
+        return Boolean(True, b)
       case Prim('add', args):
-        left = interp_exp(args[0], env, mem, 'none')
-        right = interp_exp(args[1], env, mem, 'none')
-        return Integer(left.value + right.value)
+        left = interp_exp(args[0], env, mem)
+        right = interp_exp(args[1], env, mem)
+        return Integer(True, left.value + right.value)
       case Prim('sub', args):
-        left = interp_exp(args[0], env, mem, 'none')
-        right = interp_exp(args[1], env, mem, 'none')
-        return Integer(left.value - right.value)
+        left = interp_exp(args[0], env, mem)
+        right = interp_exp(args[1], env, mem)
+        return Integer(True, left.value - right.value)
       case Prim('neg', args):
-        return Integer(- interp_exp(args[0], env, mem, 'none').value)
+        val = interp_exp(args[0], env, mem)
+        return Integer(True, - val.value)
       case New(init):
         val = interp_init(init, env, mem)
         addr = len(mem)
         mem[addr] = Cell(val, 1, 0)
-        return Pointer(addr, 'write')
+        return Pointer(True, addr, 'write')
       case Deref(arg):
-        ptr = interp_exp(arg, env, mem, 'none')
+        ptr = interp_exp(arg, env, mem)
         val = read(ptr, mem)
-        if ctx == 'none':
-            return val
-        else:
-            return initialize(ctx, val, mem)
+        return val
       case Lambda(params, body):
-        return Closure(params, body, env)
+        return Closure(True, params, body, env)
       case Call(fun, args):
         return call_function(fun, args, env, mem)
       case TupleExp(inits):
-        return Tuple([interp_init(init, env, mem) for init in inits])
+        return Tuple(True, [interp_init(init, env, mem) for init in inits])
       case Index(arg, index):
-        val = interp_exp(arg, env, mem, 'none')
-        ind = interp_exp(index, env, mem, 'none')
+        val = interp_exp(arg, env, mem)
+        ind = interp_exp(index, env, mem)
         match val:
-          case Tuple(elts):
+          case Tuple(tmp, elts):
             match ind:
-              case Integer(i):
+              case Integer(tmp, i):
                 return elts[i]
               case _:
                 raise Exception('index must be an integer, not ' + repr(ind))
@@ -292,7 +356,7 @@ def pattern_match(pat, val, matches):
         return True
       case TuplePat(pat_elts):
         match val:
-          case Tuple(elts):
+          case Tuple(tmp, elts):
             if len(pat_elts) != len(elts):
                 return False
             for (p, v) in zip(pat_elts, elts):
@@ -313,21 +377,24 @@ def interp_stmt(s, env, mem):
         print()
     match s:
       case VarInit(var, init, rest):
-        val = interp_exp(init.arg, env, mem, 'none')
-        env[var] = initialize(init.kind , val, mem)
-        retval = interp_stmt(rest, env, mem)
-        kill(env[var], mem)
-        if init.kind == 'borrow':
-            revive(val, mem)
+        val = interp_exp(init.arg, env, mem)
+        rest_env = env.copy()
+        vars_kinds = [(var,init.kind)]
+        old_priv = allocate_locals(vars_kinds, [val], rest_env, mem)
+        retval = interp_stmt(rest, rest_env, mem)
+        deallocate_locals(vars_kinds, vals, rest_env, mem, old_priv)
         return retval
       case Write(lhs, rhs):
-        ptr = interp_exp(lhs, env, mem, 'none')
-        val = interp_exp(rhs, env, mem, 'none') # ???
+        ptr = interp_exp(lhs, env, mem)
+        val = interp_exp(rhs, env, mem) # ???
         write(ptr, val, mem)
       case Expr(e):
-        interp_exp(e, env, mem, 'none')
+        interp_exp(e, env, mem)
       case Return(e):
-        return interp_exp(e, env, mem, 'none')
+        retval = interp_exp(e, env, mem)
+        retval = copy(retval, mem)
+        retval.temporary = True
+        return retval
       case Seq(first, rest):
         retval = interp_stmt(first, env, mem)
         if retval is None:
@@ -336,8 +403,14 @@ def interp_stmt(s, env, mem):
             return retval
       case Pass():
         pass
+      case IfStmt(cond, thn, els):
+        c = interp_exp(cond, env, mem)
+        if c.value:
+            return interp_stmt(thn, env, mem)
+        else:
+            return interp_stmt(els, env, mem)
       case Match(arg, cases):
-        val = interp_exp(arg, env, mem, 'none')
+        val = interp_exp(arg, env, mem)
         for c in cases:
            matches = {}
            if pattern_match(c.pat, val, matches):
@@ -346,15 +419,32 @@ def interp_stmt(s, env, mem):
                    print('matches')
                    print(matches)
                    print()
-               for x, (kind, v) in matches.items():
-                   body_env[x] = initialize(kind, v, mem)
+               vars_kinds = [(x,kind) for x, (kind,v) in matches.items()]
+               vals = [v for x, (kind,v) in matches.items()]
+               old_priv = allocate_locals(vars_kinds, vals, body_env, mem)
                if trace:
-                   print('body_env')
+                   print('case body_env')
                    print(body_env)
                    print(mem)
                    print()
-               return interp_stmt(c.body, body_env, mem)
+               retval = interp_stmt(c.body, body_env, mem)
+               deallocate_locals(vars_kinds, vals, body_env, mem, old_priv)
+               return retval
         raise Exception('error, no match')
+      case Delete(arg):
+        p = interp_exp(arg, env, mem)
+        if trace:
+            print('delete ' + str(p))
+        match p:
+          case Pointer(tmp, addr, priv):
+            if priv == 'write':
+              mem[addr] = None
+            else:
+              raise Exception('delete require write priviledge, not ' + priv)
+        if trace:
+            print(env)
+            print(mem)
+            print()
       case _:
         raise Exception('error in interp_stmt, unhandled: ' + repr(s)) 
 

@@ -23,6 +23,8 @@ exp_hi: INT                      -> int
       | "new" init               -> new
       | "⟨" init_list "⟩"        -> tuple
       | exp_hi "[" exp "]"       -> index
+      | "true"                   -> true
+      | "false"                  -> false
       
 ?exp_list:                  -> empty
       | exp                 -> single
@@ -44,10 +46,6 @@ param: IDENT               -> share
      | param                     -> single
      | param "," param_list      -> push
 
-?basic_stmt: exp ":=" exp ";"     -> write
-    | exp ";"                     -> expr
-    | "{" stmt "}"                -> block
-
 ?pat: "⟨" pat_list "⟩"            -> tuple_pat
     | IDENT                       -> share_pat
     | "take" IDENT                -> take_pat
@@ -63,11 +61,17 @@ param: IDENT               -> share
 ?case_list: "|" case              -> single
    | "|" case case_list           -> push
    
+?basic_stmt: exp ":=" exp ";"     -> write
+    | exp ";"                     -> expr
+    | "{" stmt "}"                -> block
+    | "delete" exp ";"            -> delete
+
 ?stmt: "var" IDENT "=" init ";" stmt   -> var_init
     | "return" exp ";"                 -> return
     | basic_stmt stmt                  -> seq
     |                                  -> pass
     | "match" exp case_list            -> match
+    | "if" exp "then" stmt "else" stmt -> if
 
 arete: stmt
 

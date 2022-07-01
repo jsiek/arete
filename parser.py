@@ -37,6 +37,10 @@ def parse_tree_to_ast(e):
         return Var(str(e.children[0].value))
     elif e.data == 'int':
         return Int(int(e.children[0]))
+    elif e.data == 'true':
+        return Bool(True)
+    elif e.data == 'false':
+        return Bool(False)
     elif e.data == 'add':
         e1, e2 = e.children
         return Prim('add', [parse_tree_to_ast(e1), parse_tree_to_ast(e2)])
@@ -85,6 +89,13 @@ def parse_tree_to_ast(e):
     elif e.data == 'match':
         return Match(parse_tree_to_ast(e.children[0]),
                      parse_tree_to_ast(e.children[1]))
+    elif e.data == 'if':
+        return IfStmt(parse_tree_to_ast(e.children[0]),
+                      parse_tree_to_ast(e.children[1]),
+                      parse_tree_to_ast(e.children[2]))
+    elif e.data == 'delete':
+        return Delete(parse_tree_to_ast(e.children[0]))
+    
     # patterns
     elif e.data == 'share_pat':
         return VarPat('share', str(e.children[0].value))

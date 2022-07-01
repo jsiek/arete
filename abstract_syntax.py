@@ -90,6 +90,15 @@ class Int(Exp):
         return str(self)
 
 @dataclass
+class Bool(Exp):
+    value: bool
+    __match_args__ = ("value",)
+    def __str__(self):
+        return str(self.value)
+    def __repr__(self):
+        return str(self)
+    
+@dataclass
 class TupleExp(Exp):
     elts: List[Exp]
     __match_args__ = ("elts",)
@@ -128,8 +137,7 @@ class VarInit(Stmt):
     rest: Stmt
     __match_args__ = ("var", "init", "rest")
     def __str__(self):
-        return "var " + self.var + " = " + str(self.init) + ";" \
-            + " " + str(self.rest)
+        return "var " + self.var + " = " + str(self.init) + "; ..."
     def __repr__(self):
         return str(self)
 
@@ -174,10 +182,21 @@ class Seq(Stmt):
     rest: Stmt
     __match_args__ = ("first", "rest")
     def __str__(self):
-        return str(self.first) + " " + str(self.rest)
+        return str(self.first) + "..."
     def __repr__(self):
         return str(self)
 
+@dataclass
+class IfStmt(Stmt):
+    cond: Exp
+    thn: Stmt
+    els: Stmt
+    __match_args__ = ("cond", "thn", "els")
+    def __str__(self):
+        return "if " + str(self.cond) + "..."
+    def __repr__(self):
+        return str(self)
+    
 @dataclass
 class Match(Stmt):
     arg: Exp
@@ -188,6 +207,15 @@ class Match(Stmt):
     def __repr__(self):
         return str(self)
 
+@dataclass
+class Delete(Stmt):
+    arg: Exp
+    __match_args__ = ("arg",)
+    def __str__(self):
+        return "delete " + str(self.arg) + ";"
+    def __repr__(self):
+        return str(self)
+    
 # Patterns
 
 @dataclass

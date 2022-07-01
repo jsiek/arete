@@ -10,25 +10,57 @@ var head = fn list {
 var tail = fn list {
   match *list
   | case ⟨hd, tl⟩:
-    return tl;
+    return tl;     // return creates a copy, but that aliases with the cdr
 };
-var remove_last = fn borrow n {
-  match *n
-  | case ⟨data, borrow p⟩: { // n -> p
-      match *p
-      | case ⟨last_data , q⟩:
-        match *q
-        | case ⟨_, _⟩:      // n -> p -> q -> ...
-          return remove_last(p);
-        | case ⟨⟩:         // n -> p -> ⟨⟩
-          n := ⟨data, null()⟩;
-          return last_data;
-      | case ⟨⟩:  // n -> ⟨⟩
-        return 0;
-    }      
+var is_null = fn ptr {
+  match *ptr
   | case ⟨⟩:
+    return true;
+  | case ⟨_, _⟩:
+    return false;
+};
+var is_last = fn n {
+  match *n
+  | case ⟨⟩:
+    return false;
+  | case ⟨_, next⟩: {
+    return is_null(next);
+  }
+};
+
+var remove_last = fn borrow n {
+  if is_null(n) then
     return 0;
+  // tail creates an alias into n
+  // which is read inside is_last,
+  // but then it dies after the call to is_last,
+  // and should return the privilege to n.
+  // so in general, a pointer needs to remember who it borrowed
+  // from, so it can return the permission when it dies.
+  else if is_last(tail(n)) then {
+    match *n
+    | case ⟨data, take p⟩:
+      n := ⟨data, null()⟩;
+      return p;
+  } else {
+    match *n
+    | case ⟨data, borrow p⟩:
+      return remove_last(p);
+  }
+};
+var delete_list = fn take n {
+  {
+    match *n
+    | case ⟨⟩:
+    | case ⟨data, take p⟩:
+      delete_list(p);
+  }
+  delete n;
 };
 var one_two = take push(1, push(2, null()));
-var two = remove_last(one_two);
-return head(one_two) + 1 - two;
+var two_null = remove_last(one_two);
+var one = head(one_two);
+var two = head(two_null);
+delete_list(one_two);
+delete_list(two_null);
+return one + 1 - two;
