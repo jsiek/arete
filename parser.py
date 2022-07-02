@@ -53,6 +53,9 @@ def parse_tree_to_ast(e):
         return New(parse_tree_to_ast(e.children[0]))
     elif e.data == 'deref':
         return Deref(parse_tree_to_ast(e.children[0]))
+    elif e.data == 'acquire':
+        return Acquire(parse_tree_to_ast(e.children[0]),
+                       parse_tree_to_ast(e.children[1]))
     elif e.data == 'lambda':
         return Lambda(parse_tree_to_param(e.children[0]),
                       parse_tree_to_ast(e.children[1]))
@@ -66,6 +69,12 @@ def parse_tree_to_ast(e):
         return Index(parse_tree_to_ast(e1), parse_tree_to_ast(e2))
     elif e.data == 'paren':
         return parse_tree_to_ast(e.children[0])
+    elif e.data == 'write_priv':
+        return 'write'
+    elif e.data == 'read_priv':
+        return 'read'
+    elif e.data == 'none_priv':
+        return 'none'
     
     # statements
     elif e.data == 'var_init':
@@ -97,14 +106,10 @@ def parse_tree_to_ast(e):
         return Delete(parse_tree_to_ast(e.children[0]))
     
     # patterns
-    elif e.data == 'share_pat':
-        return VarPat('share', str(e.children[0].value))
-    elif e.data == 'take_pat':
-        return VarPat('take', str(e.children[0].value))
-    elif e.data == 'borrow_pat':
-        return VarPat('borrow', str(e.children[0].value))
-    elif e.data == 'share_pat':
-        return VarPat('share', str(e.children[0].value))
+    elif e.data == 'read_pat':
+        return VarPat('read', str(e.children[0].value))
+    elif e.data == 'write_pat':
+        return VarPat('write', str(e.children[0].value))
     elif e.data == 'tuple_pat':
         return TuplePat(parse_tree_to_ast(e.children[0]))
     elif e.data == 'wildcard_pat':
@@ -114,12 +119,10 @@ def parse_tree_to_ast(e):
     elif e.data == 'case':
         return Case(parse_tree_to_ast(e.children[0]),
                     parse_tree_to_ast(e.children[1]))
-    elif e.data == 'share_init':
-        return Initializer('share', parse_tree_to_ast(e.children[0]))
-    elif e.data == 'take_init':
-        return Initializer('take', parse_tree_to_ast(e.children[0]))
-    elif e.data == 'borrow_init':
-        return Initializer('borrow', parse_tree_to_ast(e.children[0]))
+    elif e.data == 'read_init':
+        return Initializer('read', parse_tree_to_ast(e.children[0]))
+    elif e.data == 'write_init':
+        return Initializer('write', parse_tree_to_ast(e.children[0]))
         
     # lists
     elif e.data == 'single':

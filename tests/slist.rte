@@ -1,6 +1,6 @@
 var null = fn { return new ⟨⟩; };
-var push = fn data, take list {
-  return new ⟨ data, take list ⟩;
+var push = fn data, write list {
+  return new ⟨ data, write (list ! none) ⟩;
 };
 var head = fn list {
   match *list

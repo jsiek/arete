@@ -41,7 +41,7 @@ def priv_str(priv):
   elif priv == 'write':
     return 'W'
   else:
-    raise Exception('unrecognized priviledge: ' + str(priv))
+    raise Exception('unrecognized privilege: ' + str(priv))
     
 @dataclass
 class Pointer(Value):
@@ -67,25 +67,72 @@ class Closure(Value):
 @dataclass
 class Cell:
     value: Value
-    owners: int
-    observers: int
-    def inc_owner(self):
-        self.owners += 1
-    def dec_owner(self):
-        self.owners -= 1
-        if self.count() == 0:
-            self.value = None
-    def inc_observer(self):
-        self.observers += 1
-    def dec_observer(self):
-        self.observers -= 1
-        if self.count() == 0:
-            self.value = None
-    def count(self):
-        return self.owners + self.observers
+    writers: int      # at most 1 writer, if 1 writer, no readers
+    readers: int
+    bystanders: int
+
+    def initialize(self, priv, addr):
+      if priv == 'write':
+          if self.writers > 0 or self.readers > 0:
+              raise Exception('write privilege requires unique ownership')
+          self.writers = 1
+          return Pointer(False, addr, 'write')
+      elif priv == 'read':
+          if self.writers != 0:
+              raise Exception('read privilege requires no writers')
+          self.readers += 1
+          return Pointer(False, addr, 'read')
+      else:
+          raise Exception('initialize unexpected privilege: ' + priv)
+      
+    def copy(self, ptr):
+        match ptr:
+            case Pointer(tmp, addr, priv):
+              if priv == 'write':
+                  raise Exception('cannot copy a write pointer, share first')
+              elif priv == 'read':
+                  self.readers += 1
+              elif priv == 'none':
+                  self.bystanders += 1
+              return Pointer(tmp, addr, priv)
+            case _:
+              raise Exception('expected Pointer in Cell.copy, not ' + str(ptr))
+
+    def acquire(self, priv, ptr):
+        if priv == 'write':
+            if self.writers > 0:
+                raise Exception('cannot acquire write, other writers')
+            self.writers = 1
+            ptr.privilege = 'write'
+        elif priv == 'read':
+            if self.writers > 0:
+                raise Exception('cannot acquire read, other writers')
+            self.readers += 1
+            ptr.privilege = 'read'
+        elif priv == 'none':
+            self.bystanders += 1
+            ptr.privilege = 'none'
+        return ptr
+
+    def kill(self, val):
+        match val:
+          case Pointer(tmp, addr, priv):
+            if priv == 'dead':
+                raise Exception('pointer already dead ' + str(val))
+            elif priv == 'none':
+                self.bystanders -= 1
+            elif priv == 'read':
+                self.readers -= 1
+            elif priv == 'write':
+                self.writers -= 1
+            val.privilege = 'dead'
+          case _:
+            raise Exception('Cell.kill expected pointer, not ' + str(val))
+          
     def __str__(self):
-        return "⟦" +  str(self.value) + "/" + str(self.owners) + "/" \
-               + str(self.observers) + "⟧"
+        return "⟦" +  str(self.value) + "|" + str(self.writers) + "/" \
+               + str(self.readers) + "/" + str(self.bystanders) + "⟧"
+    
     def __repr__(self):
         return str(self)
         
@@ -100,13 +147,7 @@ def kill(val, mem):
       case Integer(tmp, value):
         pass
       case Pointer(tmp, addr, priv):
-        if priv == 'none':
-            if mem[addr]:
-                mem[addr].dec_observer()
-        elif mem[addr]:
-            mem[addr].dec_owner()
-        val.addr = None
-        val.privilege = 'none'
+        mem[addr].kill(val)
       case Tuple(tmp, elts):
         for elt in elts:
             kill(elt, mem)
@@ -124,18 +165,11 @@ def copy(val, mem):
       case Boolean(tmp, value):
         return Boolean(tmp, value)
       case Pointer(tmp, addr, priv):
-        if priv == 'write':
-            val.privilege = 'none'
-            mem[addr].inc_observer()
-        elif priv == 'read':
-            mem[addr].inc_owner()
-        elif priv == 'none':
-            mem[addr].inc_observer()
-        return Pointer(tmp, addr, priv)
+        return mem[addr].copy(val)
       case Closure(tmp, params, body, env):
         return val # ??
       case Tuple(tmp, elts):
-        return Tuple([copy(v, mem) for v in elts])
+        return Tuple(True, [copy(v, mem) for v in elts])
       case _:
         raise Exception('in copy, unhandled value ' + repr(val))
     
@@ -159,30 +193,13 @@ def initialize(kind, val, mem):
       else:
           retval = Boolean(False, value)
     case Pointer(tmp, addr, priv):
-      if kind == 'take' or kind == 'borrow':
-          if priv == 'write':
-              if tmp:
-                  retval = val
-                  val.temporary = False
-              else:
-                  mem[addr].inc_observer()
-                  val.privilege = 'none'
-                  retval = Pointer(False, addr, 'write')
-          else:
-              raise Exception('take requires a write pointer')
-      elif kind == 'share':
-          if priv == 'write':
-              val.privilege = 'read'
-          elif priv == 'none':
-              raise Exception('share requires a read or write pointer')
-          if tmp:
-              retval = val
-              val.temporary = False
-          else:
-              mem[addr].inc_owner()
-              retval = Pointer(False, addr, 'read')
+      if tmp:
+          if priv != kind:
+              raise Exception('initialize privilege mismatch: ' + kind + ' != ' + priv)
+          val.temporary = False
+          retval = val
       else:
-          raise Exception('initialize unexpected kind: ' + kind)
+          retval = mem[addr].initialize(kind, addr)
     case Closure(tmp, params, body, env):
       retval = val # ??
     case Tuple(tmp, elts):
@@ -201,6 +218,8 @@ def read(ptr, mem):
       case Pointer(tmp, addr, priv):
         if priv == 'none':
             raise Exception('pointer does not have read privilege')
+        if mem[addr].writers > 1:
+            raise Exception('read requires no other writers')
         return mem[addr].value
       case _:
         raise Exception('in read expected a pointer, not ' + repr(ptr))
@@ -210,53 +229,26 @@ def write(ptr, val, mem):
       case Pointer(tmp, addr, priv):
         if priv != 'write':
             raise Exception('pointer does not have write privilege')
-        if mem[addr].owners != 1:
+        if mem[addr].writers > 1 or mem[addr].readers > 0:
             raise Exception('write requires unique ownership')
         kill(mem[addr].value, mem)
         mem[addr].value = copy(val, mem)
       case _:
         raise Exception('in read expected a pointer, not ' + repr(ptr))
 
-def revive(ptr, mem, old_priv):
-    if trace:
-        print('revive ' + str(ptr) + ' to ' + old_priv)
-    match ptr:
-      case Pointer(tmp, addr, priv):
-        if old_priv == 'write' and mem[addr].owners > 1:
-            raise Exception("can't revive an aliased value to write privilege")
-        elif old_priv == 'write' or old_priv == 'read':
-            ptr.privilege = old_priv
-      case _:
-        pass
-
-def priviledge(val):
-    match val:
-      case Pointer(tmp, addr, priv):
-        return priv
-      case _:
-        return 'none' # ???
-
 def allocate_locals(vars_kinds, vals, env, mem):
     if trace:
         print('allocating ' + ', '.join([v for (v,k) in vars_kinds]))
-    old_priv = {}
     for ((var,kind), val) in zip(vars_kinds, vals):
-        old_priv[var] = priviledge(val)
         env[var] = initialize(kind, val, mem)
     if trace:
         print('finish allocating ' + ', '.join([v for (v,k) in vars_kinds]))
-    return old_priv
 
-def deallocate_locals(vars_kinds, vals, env, mem, old_priv):
+def deallocate_locals(vars_kinds, vals, env, mem):
     if trace:
         print('deallocating ' + ', '.join([v for (v,k) in vars_kinds]))
     for (var,kind) in vars_kinds:
         kill(env[var], mem)
-    for ((var,kind), val) in zip(vars_kinds, vals):
-        if kind == 'borrow' or kind == 'share':
-            if trace:
-                print('reviving ' + var)
-            revive(val, mem, old_priv[var])
     if trace:
         print('finished deallocating ' + ', '.join([v for (v,k) in vars_kinds]))
         
@@ -267,14 +259,14 @@ def call_function(fun, args, env, mem):
         case Closure(tmp, params, body, clos_env):
           body_env = clos_env.copy()
           vars_kinds = [(param.ident, param.kind) for param in params]
-          old_priv = allocate_locals(vars_kinds, vals, body_env, mem)
+          allocate_locals(vars_kinds, vals, body_env, mem)
           if trace:
               print('call ' + str(Call(fun, args)))
               print()
           retval = interp_stmt(body, body_env, mem)
           if trace:
               print('function parameter cleanup')
-          deallocate_locals(vars_kinds, vals, body_env, mem, old_priv)
+          deallocate_locals(vars_kinds, vals, body_env, mem)
           if trace:
               print('return from ' + str(fun) + ' with ' + str(retval))
               print(env)
@@ -317,12 +309,20 @@ def interp_exp(e, env, mem):
       case New(init):
         val = interp_init(init, env, mem)
         addr = len(mem)
-        mem[addr] = Cell(val, 1, 0)
-        return Pointer(True, addr, 'write')
+        mem[addr] = Cell(val, 0, 1, 0)
+        return Pointer(True, addr, 'read')
       case Deref(arg):
         ptr = interp_exp(arg, env, mem)
         val = read(ptr, mem)
         return val
+      case Acquire(arg, new_priv):
+        ptr = interp_exp(arg, env, mem)
+        match ptr:
+          case Pointer(tmp, addr, priv):
+            mem[addr].kill(ptr)
+            return mem[addr].acquire(new_priv, ptr)
+          case _:
+            raise Exception('acquire expects a pointer, not ' + str(ptr))
       case Lambda(params, body):
         return Closure(True, params, body, env)
       case Call(fun, args):
@@ -377,12 +377,14 @@ def interp_stmt(s, env, mem):
         print()
     match s:
       case VarInit(var, init, rest):
-        val = interp_exp(init.arg, env, mem)
+        # allow recursion
         rest_env = env.copy()
+        rest_env[var] = None
+        val = interp_exp(init.arg, rest_env, mem)
         vars_kinds = [(var,init.kind)]
-        old_priv = allocate_locals(vars_kinds, [val], rest_env, mem)
+        allocate_locals(vars_kinds, [val], rest_env, mem)
         retval = interp_stmt(rest, rest_env, mem)
-        deallocate_locals(vars_kinds, vals, rest_env, mem, old_priv)
+        deallocate_locals(vars_kinds, [val], rest_env, mem)
         return retval
       case Write(lhs, rhs):
         ptr = interp_exp(lhs, env, mem)
@@ -421,14 +423,14 @@ def interp_stmt(s, env, mem):
                    print()
                vars_kinds = [(x,kind) for x, (kind,v) in matches.items()]
                vals = [v for x, (kind,v) in matches.items()]
-               old_priv = allocate_locals(vars_kinds, vals, body_env, mem)
+               allocate_locals(vars_kinds, vals, body_env, mem)
                if trace:
                    print('case body_env')
                    print(body_env)
                    print(mem)
                    print()
                retval = interp_stmt(c.body, body_env, mem)
-               deallocate_locals(vars_kinds, vals, body_env, mem, old_priv)
+               deallocate_locals(vars_kinds, vals, body_env, mem)
                return retval
         raise Exception('error, no match')
       case Delete(arg):
@@ -440,7 +442,7 @@ def interp_stmt(s, env, mem):
             if priv == 'write':
               mem[addr] = None
             else:
-              raise Exception('delete require write priviledge, not ' + priv)
+              raise Exception('delete require write privilege, not ' + priv)
         if trace:
             print(env)
             print(mem)

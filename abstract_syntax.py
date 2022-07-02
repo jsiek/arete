@@ -72,6 +72,16 @@ class Deref(Exp):
         return str(self)
     
 @dataclass
+class Acquire(Exp):
+    arg: Exp
+    kind: str
+    __match_args__ = ("arg","kind")
+    def __str__(self):
+        return "(" + str(self.arg) + "!" + self.kind + ")"
+    def __repr__(self):
+        return str(self)
+
+@dataclass
 class Var(Exp):
     ident: str
     __match_args__ = ("ident",)
@@ -152,6 +162,15 @@ class Write(Stmt):
         return str(self)
     
 @dataclass
+class Delete(Stmt):
+    arg: Exp
+    __match_args__ = ("arg",)
+    def __str__(self):
+        return "delete " + str(self.arg) + ";"
+    def __repr__(self):
+        return str(self)
+    
+@dataclass
 class Return(Stmt):
     exp: Exp
     __match_args__ = ("exp",)
@@ -207,20 +226,11 @@ class Match(Stmt):
     def __repr__(self):
         return str(self)
 
-@dataclass
-class Delete(Stmt):
-    arg: Exp
-    __match_args__ = ("arg",)
-    def __str__(self):
-        return "delete " + str(self.arg) + ";"
-    def __repr__(self):
-        return str(self)
-    
 # Patterns
 
 @dataclass
 class VarPat(Pat):
-    kind: str  # share, take, borrow
+    kind: str  # read, write
     ident: str
     __match_args__ = ("kind", "ident")
     def __str__(self):
@@ -249,7 +259,7 @@ class WildCard(Pat):
 
 @dataclass(frozen=True)
 class Param:
-    kind: str # share, take, borrow
+    kind: str # read, write
     ident: str
     __match_args__ = ("kind", "ident")
     def __str__(self):
@@ -259,7 +269,7 @@ class Param:
 
 @dataclass
 class Initializer:
-    kind: str # share, take, borrow
+    kind: str # read, write
     arg: Exp
     __match_args__ = ("kind", "arg")
     def __str__(self):

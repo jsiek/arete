@@ -7,6 +7,10 @@ NEWLINE: (/\r/? /\n/)+
 WS: /[ \t\f\r\n]/+
 COMMENT: "//" /[^\n]*/ NEWLINE
 
+?privilege: "read"               -> read_priv
+          | "write"              -> write_priv
+          | "none"               -> none_priv
+
 ?exp: exp_add
 
 ?exp_add: exp "+" exp_hi         -> add
@@ -17,6 +21,7 @@ exp_hi: INT                      -> int
       | IDENT                    -> var
       | "-" exp_hi               -> neg
       | "*" exp_hi               -> deref
+      | exp_hi "!" privilege     -> acquire
       | "(" exp ")"              -> paren
       | "fn" param_list "{" stmt "}" -> lambda
       | exp_hi "(" exp_list ")"  -> call
@@ -30,26 +35,23 @@ exp_hi: INT                      -> int
       | exp                 -> single
       | exp "," exp_list    -> push
 
-?init: exp                        -> share_init
-    | "take" exp                  -> take_init
-    | "borrow" exp                -> borrow_init
+?init: exp                       -> read_init
+    | "write" exp                -> write_init
 
 ?init_list:                  -> empty
       | init                 -> single
       | init "," init_list   -> push
 
-param: IDENT               -> share
-     | "take" IDENT        -> take
-     | "borrow" IDENT      -> borrow
+param: IDENT                 -> read
+     | "write" IDENT         -> write
 
 ?param_list:                     -> empty
      | param                     -> single
      | param "," param_list      -> push
 
 ?pat: "⟨" pat_list "⟩"            -> tuple_pat
-    | IDENT                       -> share_pat
-    | "take" IDENT                -> take_pat
-    | "borrow" IDENT              -> borrow_pat
+    | IDENT                       -> read_pat
+    | "write" IDENT               -> write_pat
     | "_"                         -> wildcard_pat
 
 ?pat_list:                        -> empty
