@@ -76,7 +76,7 @@ class Cell:
     def initialize(self, priv, addr):
       if priv == 'write':
           if self.writers > 0 or self.readers > 0:
-              raise Exception('write privilege requires unique ownership')
+              raise Exception('init to write privilege requires unique ownership')
           self.writers = 1
           return Pointer(False, addr, 'write')
       elif priv == 'read':
@@ -91,8 +91,10 @@ class Cell:
         match ptr:
             case Pointer(tmp, addr, priv):
               if priv == 'write':
-                  raise Exception('cannot copy a write pointer, share first')
+                  raise Exception('cannot copy a write pointer')
               elif priv == 'read':
+                  if self.writers > 0:
+                      raise Exception('read privilege requires no writers')
                   self.readers += 1
               elif priv == 'none':
                   self.bystanders += 1
@@ -104,6 +106,8 @@ class Cell:
         if priv == 'write':
             if self.writers > 0:
                 raise Exception('cannot acquire write, other writers')
+            if self.readers > 0:
+                raise Exception('cannot acquire write, other readers')
             self.writers = 1
             ptr.privilege = 'write'
         elif priv == 'read':
@@ -132,8 +136,8 @@ class Cell:
             raise Exception('Cell.kill expected pointer, not ' + str(val))
           
     def __str__(self):
-        return "⟦" +  str(self.value) + "|" + str(self.writers) + "/" \
-               + str(self.readers) + "/" + str(self.bystanders) + "⟧"
+        return "⟦" +  str(self.value) + "|W:" + str(self.writers) + "/R:" \
+               + str(self.readers) + "/B:" + str(self.bystanders) + "⟧"
     
     def __repr__(self):
         return str(self)
@@ -149,6 +153,8 @@ def kill(val, mem):
       case Integer(tmp, value):
         pass
       case Pointer(tmp, addr, priv):
+        if priv == 'dead':
+            raise Exception("can't kill an already dead value " + str(val))
         mem[addr].kill(val)
       case Tuple(tmp, elts):
         for elt in elts:
@@ -234,7 +240,10 @@ def write(ptr, val, mem):
         if mem[addr].writers > 1 or mem[addr].readers > 0:
             raise Exception('write requires unique ownership')
         kill(mem[addr].value, mem)
-        mem[addr].value = copy(val, mem)
+        if val.temporary:
+            mem[addr].value = val
+        else:
+            mem[addr].value = copy(val, mem)
       case _:
         raise Exception('in read expected a pointer, not ' + repr(ptr))
 
@@ -401,9 +410,12 @@ def interp_stmt(s, env, mem):
         interp_exp(e, env, mem)
       case Return(e):
         retval = interp_exp(e, env, mem)
-        retval = copy(retval, mem)
-        retval.temporary = True
-        return retval
+        if retval.temporary:
+            return retval
+        else:
+            retval = copy(retval, mem)
+            retval.temporary = True
+            return retval
       case Seq(first, rest):
         retval = interp_stmt(first, env, mem)
         if retval is None:
@@ -428,16 +440,18 @@ def interp_stmt(s, env, mem):
                    print('matches')
                    print(matches)
                    print()
-               vars_kinds = [(x,kind) for x, (kind,v) in matches.items()]
-               vals = [v for x, (kind,v) in matches.items()]
-               allocate_locals(vars_kinds, vals, body_env, mem)
+               # vals = [v for x, (kind,v) in matches.items()]
+               # vars_kinds = [(x,kind) for x, (kind,v) in matches.items()]
+               # allocate_locals(vars_kinds, vals, body_env, mem)
+               for x, (kind,v) in matches.items():
+                   body_env[x] = v
                if trace:
                    print('case body_env')
                    print(body_env)
                    print(mem)
                    print()
                retval = interp_stmt(c.body, body_env, mem)
-               deallocate_locals(vars_kinds, vals, body_env, mem)
+               #deallocate_locals(vars_kinds, vals, body_env, mem)
                return retval
         raise Exception('error, no match')
       case Delete(arg):
@@ -447,7 +461,7 @@ def interp_stmt(s, env, mem):
         match p:
           case Pointer(tmp, addr, priv):
             if priv == 'write':
-              mem[addr] = None
+              mem[addr].value = None
             else:
               raise Exception('delete require write privilege, not ' + priv)
         if trace:
