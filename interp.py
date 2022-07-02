@@ -40,8 +40,10 @@ def priv_str(priv):
     return 'R'
   elif priv == 'write':
     return 'W'
+  elif priv == 'dead':
+    return 'D'
   else:
-    raise Exception('unrecognized privilege: ' + str(priv))
+    raise Exception('in priv_str, unrecognized privilege: ' + str(priv))
     
 @dataclass
 class Pointer(Value):
@@ -320,6 +322,11 @@ def interp_exp(e, env, mem):
         match ptr:
           case Pointer(tmp, addr, priv):
             mem[addr].kill(ptr)
+            if trace:
+                print('acquire ' + str(ptr) + ' ! ' + new_priv)
+                print(env)
+                print(mem)
+                print()
             return mem[addr].acquire(new_priv, ptr)
           case _:
             raise Exception('acquire expects a pointer, not ' + str(ptr))
