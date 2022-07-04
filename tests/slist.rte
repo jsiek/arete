@@ -3,15 +3,11 @@ var push = fn data, write list {
   return (new ⟨ data, write (list ! none) ⟩) ! write;
 };
 var head = fn list {
-  match *list
-  | case ⟨hd, tl⟩:
-    return hd;
+  return (*list)[0];
 };
 var tail = fn list {
-  match *list
-  | case ⟨hd, tl⟩:
-    tl ! read;
-    return tl;     // return creates a copy, but that aliases with the cdr
+  (*list)[1] ! read;
+  return (*list)[1];
 };
 var is_null = fn ptr {
   match *ptr
@@ -21,13 +17,12 @@ var is_null = fn ptr {
     return false;
 };
 var is_last = fn n {
-  match *n
-  | case ⟨⟩:
+  if is_null(n) then
     return false;
-  | case ⟨_, next⟩: {
-    next ! read;
-    var ans = is_null(next);
-    next ! write;
+  else {
+    (*n)[1] ! read;
+    var ans = is_null((*n)[1]);
+    (*n)[1] ! write;
     return ans;
   }
 };
@@ -37,26 +32,24 @@ var remove_last = fn write n {
   if is_null(n) then
     return 0;
   else if is_last(tail(n)) then {
-    match *n
-    | case ⟨data, p⟩:
-      var q = (p ! none);
+      var q = ((*n)[1] ! none);
       n ! write;
-      n := ⟨data, write null()⟩;
+      n := ⟨(*n)[0], write null()⟩;
       return q;
   } else {
-    match *n
-    | case ⟨data, write p⟩:
-      return remove_last(p);
+    return remove_last((*n)[1]);
   }
 };
 var delete_list = fn write n {
-  {
-    match *n
-    | case ⟨⟩:
-    | case ⟨data, p⟩:
-      delete_list(p ! none);
+  n ! read;
+  if is_null(n) then
+    n ! write;
+    delete n;
+  else {
+    delete_list((*n)[1] ! none);
+    n ! write;
+    delete n;
   }
-  delete n;
 };
 var one_two = write push(1, push(2, null()));
 var two_null = remove_last(one_two ! none);

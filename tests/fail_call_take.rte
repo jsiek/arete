@@ -1,9 +1,10 @@
-var inc = fn take p {
+var inc = fn write p {
             p := *p + 1;
 	    return *p;
           };
-var q = take new 0;
-inc(q);
+var q = write ((new 0) ! write);
+inc(q); // error: init to write privilege requires unique ownership
+q ! write;
 q := *q + 1;
 return *q - 2;
 

@@ -1,9 +1,9 @@
-var t = take (new ⟨ take (new 10) ⟩);
+var t = new ⟨ write ((new 10) ! write) ⟩;
 {
   match *t
-  | case ⟨ take p ⟩:
+  | case ⟨ write p ⟩:
     match *t
-    | case ⟨ take q ⟩:
+    | case ⟨ write q ⟩: // init to write privilege requires unique ownership
       p := 0;
       q := 42;
 }

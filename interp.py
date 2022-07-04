@@ -440,18 +440,16 @@ def interp_stmt(s, env, mem):
                    print('matches')
                    print(matches)
                    print()
-               # vals = [v for x, (kind,v) in matches.items()]
-               # vars_kinds = [(x,kind) for x, (kind,v) in matches.items()]
-               # allocate_locals(vars_kinds, vals, body_env, mem)
-               for x, (kind,v) in matches.items():
-                   body_env[x] = v
+               vals = [v for x, (kind,v) in matches.items()]
+               vars_kinds = [(x,kind) for x, (kind,v) in matches.items()]
+               allocate_locals(vars_kinds, vals, body_env, mem)
                if trace:
                    print('case body_env')
                    print(body_env)
                    print(mem)
                    print()
                retval = interp_stmt(c.body, body_env, mem)
-               #deallocate_locals(vars_kinds, vals, body_env, mem)
+               deallocate_locals(vars_kinds, vals, body_env, mem)
                return retval
         raise Exception('error, no match')
       case Delete(arg):
