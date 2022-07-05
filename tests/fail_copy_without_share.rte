@@ -1,4 +1,4 @@
-var x = write ((new 42) ! write);
+var x = write (new 42);
 var y = x; // error: read privilege requires no writers
 x := 0;
 return *y;

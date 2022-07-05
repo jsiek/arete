@@ -1,4 +1,4 @@
-var t = new ⟨ write ((new 10) ! write) ⟩;
+var t = new ⟨ write (new 10) ⟩;
 {
   match *t
   | case ⟨ write p ⟩:

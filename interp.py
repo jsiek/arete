@@ -2,6 +2,7 @@ from abstract_syntax import *
 from dataclasses import dataclass
 from parser import parse
 from typing import List, Set, Dict, Tuple, Any
+from fractions import Fraction
 import sys
 import copy
 
@@ -12,6 +13,21 @@ class Value:
 @dataclass
 class Integer(Value):
     value: int
+    def initialize(self, kind):
+      if self.temporary:
+          self.temporary = False
+          return self
+      else:
+          return Integer(False, self.value)
+    def copy(self):
+        return Integer(True, self.value)
+    def return_copy(self, kind):
+      if self.temporary:
+          return self
+      else:
+          return Integer(True, self.value)
+    def kill(self):
+        pass
     def __str__(self):
         return repr(self.value)
     def __repr__(self):
@@ -20,6 +36,21 @@ class Integer(Value):
 @dataclass
 class Boolean(Value):
     value: bool
+    def initialize(self, kind):
+      if self.temporary:
+          self.temporary = False
+          return self
+      else:
+          return Boolean(False, self.value)
+    def copy(self):
+        return Boolean(True, self.value)
+    def return_copy(self, kind):
+      if self.temporary:
+          return self
+      else:
+          return Boolean(True, self.value)
+    def kill(self):
+        pass
     def __str__(self):
         return repr(self.value)
     def __repr__(self):
@@ -28,11 +59,27 @@ class Boolean(Value):
 @dataclass
 class Tuple(Value):
     elts: List[Value]
+    def initialize(self, kind):
+      if self.temporary:
+          self.temporary = False
+          return self
+      else:
+          return self.copy() # ??
+    def copy(self):
+        return Tuple(True, [v.copy() for v in self.elts])
+    def return_copy(self, kind):
+      if self.temporary:
+          return self
+      else:
+          return self.copy() # ??
+    def kill(self):
+        for val in self.elts:
+            val.kill()
     def __str__(self):
         return "⟨" + ", ".join([str(e) for e in self.elts]) + "⟩"
     def __repr__(self):
         return str(self)
-    
+
 def priv_str(priv):
   if priv == 'none':
     return 'N'
@@ -42,259 +89,237 @@ def priv_str(priv):
     return 'W'
   elif priv == 'dead':
     return 'D'
+  elif priv is None:
+    return 'None'
+  elif isinstance(priv, Fraction):
+    return str(priv.numerator) + '/' + str(priv.denominator)
   else:
     raise Exception('in priv_str, unrecognized privilege: ' + str(priv))
-    
+
 @dataclass
 class Pointer(Value):
     address: int
-    privilege: str  # none, read, write
+    privilege: Fraction    # none is 0, read is 1/n, write is 1/1
+    lender: Value          # who this pointer borrowed from, if any
+    borrowers: List[Value] # who borrowed from this pointer
+    
     __match_args__ = ("temporary", "address", "privilege")
     def __str__(self):
-        return "⦅" + str(self.address) + "@" + priv_str(self.privilege) + "⦆"
+        return "⦅ " + str(self.address) + " @" + priv_str(self.privilege) \
+            + ", " + ("tmp" if self.temporary else "perm") \
+            + (" from: " +str(self.lender) if not self.lender is None else "") \
+            + "⦆" \
+    
     def __repr__(self):
         return str(self)
 
-@dataclass
-class Closure(Value):
-    params: List[Any]
-    body: Stmt
-    env: Any # needs work
-    __match_args__ = ("temporary", "params", "body", "env")
-    def __str__(self):
-        return "closure"
-    def __repr__(self):
-        return "closure"
-    
-@dataclass
-class Cell:
-    value: Value
-    writers: int      # at most 1 writer, if 1 writer, no readers
-    readers: int
-    bystanders: int
+    def copy(self):
+        half = self.privilege / 2
+        self.privilege = half
+        ptr = Pointer(False, self.address, half, self)
+        self.borrowers.append(ptr)
+        return ptr
 
-    def initialize(self, priv, addr):
-      if priv == 'write':
-          if self.writers > 0 or self.readers > 0:
-              raise Exception('init to write privilege requires unique ownership')
-          self.writers = 1
-          return Pointer(False, addr, 'write')
-      elif priv == 'read':
-          if self.writers != 0:
-              raise Exception('read privilege requires no writers')
-          self.readers += 1
-          return Pointer(False, addr, 'read')
+    # self: the pointer being initialized from
+    # kind: the privilege of the pointer to return
+    def initialize(self, kind):
+      if kind == 'write':
+          if not writable(self.privilege):
+              raise Exception('initialing writable pointer requires writable pointer, not ' + str(self))
+          if self.temporary:
+              self.temporary = False
+              return self
+          else:
+              self.privilege = Fraction(0,1)
+              ptr = Pointer(False, self.address, Fraction(1, 1), self, [])
+              self.borrowers.append(ptr)
+              return ptr
+      elif kind == 'read':
+          if self.temporary:
+              self.temporary = False
+              return self
+          else:
+              half = self.privilege / 2
+              self.privilege = half
+              ptr = Pointer(False, self.address, half, self, [])
+              self.borrowers.append(ptr)
+              return ptr
+      else:
+          raise Exception('initialize unexpected privilege: ' + priv)
+
+    # Copy the return value of a function.
+    # Similar to initialize with respect to permissions, but
+    # produces a temporary value.
+    def return_copy(self, kind):
+      if kind == 'write':
+          if not writable(self.privilege):
+              raise Exception('initialing writable pointer requires writable pointer, not ' + str(self))
+          if self.temporary:
+              return self
+          else:
+              self.privilege = Fraction(0,1)
+              ptr = Pointer(True, self.address, Fraction(1, 1), self, [])
+              self.borrowers.append(ptr)
+              return ptr
+      elif kind == 'read':
+          if self.temporary:
+              return self
+          else:
+              half = self.privilege / 2
+              self.privilege = half
+              ptr = Pointer(True, self.address, half, self, [])
+              self.borrowers.append(ptr)
+              return ptr
       else:
           raise Exception('initialize unexpected privilege: ' + priv)
       
-    def copy(self, ptr):
-        match ptr:
-            case Pointer(tmp, addr, priv):
-              if priv == 'write':
-                  raise Exception('cannot copy a write pointer')
-              elif priv == 'read':
-                  if self.writers > 0:
-                      raise Exception('read privilege requires no writers')
-                  self.readers += 1
-              elif priv == 'none':
-                  self.bystanders += 1
-              return Pointer(tmp, addr, priv)
-            case _:
-              raise Exception('expected Pointer in Cell.copy, not ' + str(ptr))
+    def kill(self):
+        if trace:
+            print('kill ' + str(self))
+        if not (self.lender is None):
+            if not (self.lender.address is None):
+                self.lender.privilege += self.privilege
+                for b in self.borrowers:
+                    b.lender = self.lender
+        self.address = None
+        self.privilege = Fraction(0,1)
+        self.lender = None
 
-    def acquire(self, priv, ptr):
-        if priv == 'write':
-            if self.writers > 0:
-                raise Exception('cannot acquire write, other writers')
-            if self.readers > 0:
-                raise Exception('cannot acquire write, other readers')
-            self.writers = 1
-            ptr.privilege = 'write'
-        elif priv == 'read':
-            if self.writers > 0:
-                raise Exception('cannot acquire read, other writers')
-            self.readers += 1
-            ptr.privilege = 'read'
-        elif priv == 'none':
-            self.bystanders += 1
-            ptr.privilege = 'none'
-        return ptr
+def writable(frac):
+    return frac == Fraction(1, 1)
 
-    def kill(self, val):
-        match val:
-          case Pointer(tmp, addr, priv):
-            if priv == 'dead':
-                raise Exception('pointer already dead ' + str(val))
-            elif priv == 'none':
-                self.bystanders -= 1
-            elif priv == 'read':
-                self.readers -= 1
-            elif priv == 'write':
-                self.writers -= 1
-            val.privilege = 'dead'
-          case _:
-            raise Exception('Cell.kill expected pointer, not ' + str(val))
-          
-    def __str__(self):
-        return "⟦" +  str(self.value) + "|W:" + str(self.writers) + "/R:" \
-               + str(self.readers) + "/B:" + str(self.bystanders) + "⟧"
+def readable(frac):
+    return Fraction(0, 1) < frac and frac < Fraction(1, 1)
+
+def none(frac):
+    return frac == Fraction(0, 1)
+
+def check_privilege(frac: Fraction, kind: str):
+    if kind == 'write':
+        return writable(frac)
+    elif kind == 'read':
+        return readable(frac)
+    elif kind == 'none':
+        return none(frac)
+    else:
+        raise Exception('unrecognized privilege kind: ' + str(kind))
+
+def privilege_to_fraction(priv):
+    if priv == 'write':
+        return Fraction(1, 1)
+    elif priv == 'read':
+        return Fraction(1, 2)
+    elif priv == 'none':
+        return Fraction(0, 1)
+    else:
+        raise Exception('unrecognized privilege: ' + priv)
     
+@dataclass
+class Closure(Value):
+    params: List[Any]
+    return_priv: str
+    body: Stmt
+    env: Any # needs work
+    __match_args__ = ("temporary", "params", "return_priv", "body", "env")
+    def initialize(self, kind):
+        return self # ???
+    def kill(self):
+        pass # ???
+    def __str__(self):
+        return "closure"
     def __repr__(self):
-        return str(self)
-        
+        return "closure"
+    
 trace = False
     
-# End the life of a value.
-# If the value is a pointer, decrement the target's reference count.
-def kill(val, mem):
-    if trace:
-        print('kill ' + str(val))
-    match val:
-      case Integer(tmp, value):
-        pass
-      case Pointer(tmp, addr, priv):
-        if priv == 'dead':
-            raise Exception("can't kill an already dead value " + str(val))
-        mem[addr].kill(val)
-      case Tuple(tmp, elts):
-        for elt in elts:
-            kill(elt, mem)
-    if trace:
-        print(mem)
-        print()
-
-# Copy a value.
-def copy(val, mem):
-    if trace:
-        print('copy ' + str(val))
-    match val:
-      case Integer(tmp, value):
-        return Integer(tmp, value)
-      case Boolean(tmp, value):
-        return Boolean(tmp, value)
-      case Pointer(tmp, addr, priv):
-        return mem[addr].copy(val)
-      case Closure(tmp, params, body, env):
-        return val # ??
-      case Tuple(tmp, elts):
-        return Tuple(True, [copy(v, mem) for v in elts])
-      case _:
-        raise Exception('in copy, unhandled value ' + repr(val))
-    
-def initialize(kind, val, mem):
-  if trace:
-      print('initialize ' + str(val) + ' into ' + kind)
-  retval = None
-  if val.temporary and trace:
-      print('from temporary')
-  match val:
-    case Integer(tmp, value):
-      if tmp:
-          retval = val
-          val.temporary = False
-      else:
-          retval = Integer(False, value)
-    case Boolean(tmp, value):
-      if tmp:
-          retval = val
-          val.temporary = False
-      else:
-          retval = Boolean(False, value)
-    case Pointer(tmp, addr, priv):
-      if tmp:
-          if priv != kind:
-              raise Exception('initialize privilege mismatch: ' + kind + ' != ' + priv)
-          val.temporary = False
-          retval = val
-      else:
-          retval = mem[addr].initialize(kind, addr)
-    case Closure(tmp, params, body, env):
-      retval = val # ??
-    case Tuple(tmp, elts):
-      if tmp:
-          retval = val
-      else:
-          retval = copy(val, mem)
-    case _:
-      raise Exception('in initialize, unhandled value ' + repr(val))
-  if trace:
-      print('initialized from ' + str(val) + ' to ' + str(retval))
-  return retval
-        
 def read(ptr, mem):
-    match ptr:
-      case Pointer(tmp, addr, priv):
-        if priv == 'none':
-            raise Exception('pointer does not have read privilege')
-        if mem[addr].writers > 1:
-            raise Exception('read requires no other writers')
-        return mem[addr].value
-      case _:
+    if not isinstance(ptr, Pointer):
         raise Exception('in read expected a pointer, not ' + repr(ptr))
+    if none(ptr.privilege):
+        raise Exception('pointer does not have read privilege')
+    return mem[ptr.address]
 
 def write(ptr, val, mem):
-    match ptr:
-      case Pointer(tmp, addr, priv):
-        if priv != 'write':
-            raise Exception('pointer does not have write privilege')
-        if mem[addr].writers > 1 or mem[addr].readers > 0:
-            raise Exception('write requires unique ownership')
-        kill(mem[addr].value, mem)
-        if val.temporary:
-            mem[addr].value = val
-        else:
-            mem[addr].value = copy(val, mem)
-      case _:
-        raise Exception('in read expected a pointer, not ' + repr(ptr))
+    if not isinstance(ptr, Pointer):
+        raise Exception('in write expected a pointer, not ' + repr(ptr))
+    if not writable(ptr.privilege):
+        raise Exception('pointer does not have write privilege')
+    mem[ptr.address].kill()
+    if val.temporary:
+        mem[ptr.address] = val
+    else:
+        mem[ptr.address] = copy(val, mem)
+    mem[ptr.address].temporary = False
 
-def allocate_locals(vars_kinds, vals, env, mem):
+def allocate_locals(vars_kinds, vals, env):
     if trace:
         print('allocating ' + ', '.join([v for (v,k) in vars_kinds]))
     for ((var,kind), val) in zip(vars_kinds, vals):
-        env[var] = initialize(kind, val, mem)
+        env[var] = val.initialize(kind)
     if trace:
         print('finish allocating ' + ', '.join([v for (v,k) in vars_kinds]))
 
-def deallocate_locals(vars_kinds, vals, env, mem):
+def deallocate_locals(vars_kinds, vals, env):
     if trace:
         print('deallocating ' + ', '.join([v for (v,k) in vars_kinds]))
     for (var,kind) in vars_kinds:
-        kill(env[var], mem)
+        env[var].kill()
     if trace:
         print('finished deallocating ' + ', '.join([v for (v,k) in vars_kinds]))
+
+def kill_temp(val):
+    if not (val is None) and val.temporary:
+        val.kill()
         
 def call_function(fun, args, env, mem):
     f = interp_exp(fun, env, mem)
     vals = [interp_exp(arg, env, mem) for arg in args]
     match f:
-        case Closure(tmp, params, body, clos_env):
-          body_env = clos_env.copy()
-          vars_kinds = [(param.ident, param.kind) for param in params]
-          allocate_locals(vars_kinds, vals, body_env, mem)
-          if trace:
-              print('call ' + str(Call(fun, args)))
-              print()
-          retval = interp_stmt(body, body_env, mem)
-          if trace:
-              print('function parameter cleanup')
-          deallocate_locals(vars_kinds, vals, body_env, mem)
-          if trace:
-              print('return from ' + str(fun) + ' with ' + str(retval))
-              print(env)
-              print(mem)
-              print()
-          return retval
-        case _:
-          raise Exception('expected function in call, not ' + repr(f))
+      case Closure(tmp, params, return_priv, body, clos_env):
+        body_env = clos_env.copy()
+        vars_kinds = [(param.ident, param.kind) for param in params]
+        allocate_locals(vars_kinds, vals, body_env)
+        if trace:
+            print('call ' + str(Call(fun, args)))
+            print()
+        retval = interp_stmt(body, body_env, mem, return_priv)
+        if trace:
+            print('deallocate locals from call to ' + str(fun))
+        deallocate_locals(vars_kinds, vals, body_env)
+        kill_temp(f)
+        for val in vals:
+            kill_temp(val)
+        if trace:
+            print('return from ' + str(fun) + ' with ' + str(retval))
+            print(env)
+            print(mem)
+            print()
+        return retval
+      case _:
+        raise Exception('expected function in call, not ' + repr(f))
     
 def interp_init(init, env, mem):
     match init:
       case Initializer(kind, arg):
         val = interp_exp(arg, env, mem)
-        return initialize(kind, val, mem)
+        return val.initialize(kind)
       case _:
         raise Exception('in interp_init, expected an initializer, not '
                         + repr(init))
+
+def to_integer(val):
+    match val:
+      case Integer(tmp, value):
+        return value
+      case _:
+        raise Exception('expected an integer, not ' + str(val))
+
+def to_boolean(val):
+    match val:
+      case Boolean(tmp, value):
+        return value
+      case _:
+        raise Exception('expected a boolean, not ' + str(val))
     
 def interp_exp(e, env, mem):
     match e:
@@ -307,40 +332,28 @@ def interp_exp(e, env, mem):
       case Bool(b):
         return Boolean(True, b)
       case Prim('add', args):
-        left = interp_exp(args[0], env, mem)
-        right = interp_exp(args[1], env, mem)
-        return Integer(True, left.value + right.value)
+        left = to_integer(interp_exp(args[0], env, mem))
+        right = to_integer(interp_exp(args[1], env, mem))
+        return Integer(True, left + right)
       case Prim('sub', args):
-        left = interp_exp(args[0], env, mem)
-        right = interp_exp(args[1], env, mem)
-        return Integer(True, left.value - right.value)
+        left = to_integer(interp_exp(args[0], env, mem))
+        right = to_integer(interp_exp(args[1], env, mem))
+        return Integer(True, left - right)
       case Prim('neg', args):
-        val = interp_exp(args[0], env, mem)
-        return Integer(True, - val.value)
+        val = to_integer(interp_exp(args[0], env, mem))
+        return Integer(True, - val)
       case New(init):
         val = interp_init(init, env, mem)
         addr = len(mem)
-        mem[addr] = Cell(val, 0, 1, 0)
-        return Pointer(True, addr, 'read')
+        mem[addr] = val
+        return Pointer(True, addr, Fraction(1,1), None, [])
       case Deref(arg):
         ptr = interp_exp(arg, env, mem)
         val = read(ptr, mem)
+        kill_temp(ptr)
         return val
-      case Acquire(arg, new_priv):
-        ptr = interp_exp(arg, env, mem)
-        match ptr:
-          case Pointer(tmp, addr, priv):
-            mem[addr].kill(ptr)
-            if trace:
-                print('acquire ' + str(ptr) + ' ! ' + new_priv)
-                print(env)
-                print(mem)
-                print()
-            return mem[addr].acquire(new_priv, ptr)
-          case _:
-            raise Exception('acquire expects a pointer, not ' + str(ptr))
-      case Lambda(params, body):
-        return Closure(True, params, body, env)
+      case Lambda(params, return_priv, body):
+        return Closure(True, params, return_priv, body, env)
       case Call(fun, args):
         return call_function(fun, args, env, mem)
       case TupleExp(inits):
@@ -352,7 +365,10 @@ def interp_exp(e, env, mem):
           case Tuple(tmp, elts):
             match ind:
               case Integer(tmp, i):
-                return elts[i]
+                retval = elts[i]
+                kill_temp(val)
+                kill_temp(ind)
+                return retval
               case _:
                 raise Exception('index must be an integer, not ' + repr(ind))
           case _:
@@ -385,7 +401,7 @@ def pattern_match(pat, val, matches):
       case _:
         raise Exception('error in pattern match, unhandled: ' + repr(pat))
     
-def interp_stmt(s, env, mem):
+def interp_stmt(s, env, mem, return_priv):
     if trace:
         print('interp_stmt ' + repr(s))
         print(env)
@@ -398,43 +414,42 @@ def interp_stmt(s, env, mem):
         rest_env[var] = None
         val = interp_exp(init.arg, rest_env, mem)
         vars_kinds = [(var,init.kind)]
-        allocate_locals(vars_kinds, [val], rest_env, mem)
-        retval = interp_stmt(rest, rest_env, mem)
-        deallocate_locals(vars_kinds, [val], rest_env, mem)
+        allocate_locals(vars_kinds, [val], rest_env)
+        retval = interp_stmt(rest, rest_env, mem, return_priv)
+        deallocate_locals(vars_kinds, [val], rest_env)
         return retval
-      case Write(lhs, rhs):
-        ptr = interp_exp(lhs, env, mem)
+      case Write(var, rhs):
+        # ptr = env[var].get()
+        ptr = env[var]
         val = interp_exp(rhs, env, mem) # ???
         write(ptr, val, mem)
+        kill_temp(ptr)
+        kill_temp(val)
       case Expr(e):
-        interp_exp(e, env, mem)
+        val = interp_exp(e, env, mem)
+        kill_temp(val)
       case Return(e):
-        retval = interp_exp(e, env, mem)
-        if retval.temporary:
-            return retval
-        else:
-            retval = copy(retval, mem)
-            retval.temporary = True
-            return retval
+        return interp_exp(e, env, mem).return_copy(return_priv)
       case Seq(first, rest):
-        retval = interp_stmt(first, env, mem)
+        retval = interp_stmt(first, env, mem, return_priv)
         if retval is None:
-            return interp_stmt(rest, env, mem)
+            return interp_stmt(rest, env, mem, return_priv)
         else:
             return retval
       case Pass():
         pass
       case IfStmt(cond, thn, els):
-        c = interp_exp(cond, env, mem)
-        if c.value:
-            return interp_stmt(thn, env, mem)
+        c = to_boolean(interp_exp(cond, env, mem))
+        if c:
+            return interp_stmt(thn, env, mem, return_priv)
         else:
-            return interp_stmt(els, env, mem)
+            return interp_stmt(els, env, mem, return_priv)
       case Match(arg, cases):
         val = interp_exp(arg, env, mem)
         for c in cases:
            matches = {}
            if pattern_match(c.pat, val, matches):
+               kill_temp(val)
                body_env = env.copy()
                if trace:
                    print('matches')
@@ -442,14 +457,14 @@ def interp_stmt(s, env, mem):
                    print()
                vals = [v for x, (kind,v) in matches.items()]
                vars_kinds = [(x,kind) for x, (kind,v) in matches.items()]
-               allocate_locals(vars_kinds, vals, body_env, mem)
+               allocate_locals(vars_kinds, vals, body_env)
                if trace:
                    print('case body_env')
                    print(body_env)
                    print(mem)
                    print()
-               retval = interp_stmt(c.body, body_env, mem)
-               deallocate_locals(vars_kinds, vals, body_env, mem)
+               retval = interp_stmt(c.body, body_env, mem, return_priv)
+               deallocate_locals(vars_kinds, vals, body_env)
                return retval
         raise Exception('error, no match')
       case Delete(arg):
@@ -458,10 +473,13 @@ def interp_stmt(s, env, mem):
             print('delete ' + str(p))
         match p:
           case Pointer(tmp, addr, priv):
-            if priv == 'write':
-              mem[addr].value = None
-            else:
+            if not writable(priv):
               raise Exception('delete require write privilege, not ' + priv)
+            mem[addr].kill()
+            del mem[addr]
+            p.privilege = Fraction(0, 1)
+            p.address = None
+        kill_temp(p)
         if trace:
             print(env)
             print(mem)
@@ -472,7 +490,7 @@ def interp_stmt(s, env, mem):
 def interp(p):
     env = {}
     mem = {}
-    retval = interp_stmt(p, env, mem)
+    retval = interp_stmt(p, env, mem, 'read')
     if trace:
         print(env)
         print(mem)

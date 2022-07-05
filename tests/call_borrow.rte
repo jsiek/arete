@@ -2,8 +2,7 @@ var inc = fn write p {
             p := *p + 1;
 	    return 0;
           };
-var q = write ((new 0) ! write);
-inc(q ! none);
-q ! write;
+var q = write (new 0);
+inc(q);
 q := *q + 1;
 return *q - 2;

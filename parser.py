@@ -53,12 +53,10 @@ def parse_tree_to_ast(e):
         return New(parse_tree_to_ast(e.children[0]))
     elif e.data == 'deref':
         return Deref(parse_tree_to_ast(e.children[0]))
-    elif e.data == 'acquire':
-        return Acquire(parse_tree_to_ast(e.children[0]),
-                       parse_tree_to_ast(e.children[1]))
     elif e.data == 'lambda':
         return Lambda(parse_tree_to_param(e.children[0]),
-                      parse_tree_to_ast(e.children[1]))
+                      parse_tree_to_ast(e.children[1]),
+                      parse_tree_to_ast(e.children[2]))
     elif e.data == 'call':
         e1, e2 = e.children
         return Call(parse_tree_to_ast(e1), parse_tree_to_ast(e2))
@@ -82,7 +80,7 @@ def parse_tree_to_ast(e):
                        parse_tree_to_ast(e.children[1]),
                        parse_tree_to_ast(e.children[2]))
     elif e.data == 'write':
-        return Write(parse_tree_to_ast(e.children[0]),
+        return Write(str(e.children[0].value),
                      parse_tree_to_ast(e.children[1]))
     elif e.data == 'expr':
         return Expr(parse_tree_to_ast(e.children[0]))
@@ -123,7 +121,11 @@ def parse_tree_to_ast(e):
         return Initializer('read', parse_tree_to_ast(e.children[0]))
     elif e.data == 'write_init':
         return Initializer('write', parse_tree_to_ast(e.children[0]))
-        
+    elif e.data == 'return_read':
+        return 'read'
+    elif e.data == 'return_write':
+        return 'write'
+    
     # lists
     elif e.data == 'single':
         return [parse_tree_to_ast(e.children[0])]

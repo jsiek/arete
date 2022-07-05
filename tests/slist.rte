@@ -1,12 +1,15 @@
-var null = fn { return (new ⟨⟩) ! write; };
-var push = fn data, write list {
-  return (new ⟨ data, write (list ! none) ⟩) ! write;
+var null = fn -> write { return new ⟨⟩; };
+var push = fn data, write list -> write {
+  return new ⟨ data, write list ⟩;
 };
 var head = fn list {
   return (*list)[0];
 };
 var tail = fn list {
-  (*list)[1] ! read;
+  return (*list)[1];
+};
+// mutable access to the tail
+var mtail = fn list -> write {
   return (*list)[1];
 };
 var is_null = fn ptr {
@@ -20,42 +23,34 @@ var is_last = fn n {
   if is_null(n) then
     return false;
   else {
-    (*n)[1] ! read;
-    var ans = is_null((*n)[1]);
-    (*n)[1] ! write;
-    return ans;
+    return is_null(tail(n));
   }
 };
-
-var remove_last = fn write n {
-  n ! read;
+// Split the list into two parts, with the second
+// part just containing the last element.
+var remove_last = fn write n -> write {
   if is_null(n) then
     return 0;
   else if is_last(tail(n)) then {
-      var q = ((*n)[1] ! none);
-      n ! write;
-      n := ⟨(*n)[0], write null()⟩;
+      var q = write mtail(n);
+      n := ⟨head(n), write null()⟩;
       return q;
   } else {
-    return remove_last((*n)[1]);
+    return remove_last(mtail(n));
   }
 };
 var delete_list = fn write n {
-  n ! read;
   if is_null(n) then
-    n ! write;
     delete n;
   else {
-    delete_list((*n)[1] ! none);
-    n ! write;
+    delete_list(mtail(n));
     delete n;
   }
 };
 var one_two = write push(1, push(2, null()));
-var two_null = remove_last(one_two ! none);
+var two_null = write remove_last(one_two);
 var one = head(one_two);
 var two = head(two_null);
 delete_list(one_two);
-two_null ! none;
 delete_list(two_null);
-return one + 1 - two;
+return one + one - two;

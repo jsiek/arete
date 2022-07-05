@@ -72,16 +72,6 @@ class Deref(Exp):
         return str(self)
     
 @dataclass
-class Acquire(Exp):
-    arg: Exp
-    kind: str
-    __match_args__ = ("arg","kind")
-    def __str__(self):
-        return "(" + str(self.arg) + "!" + self.kind + ")"
-    def __repr__(self):
-        return str(self)
-
-@dataclass
 class Var(Exp):
     ident: str
     __match_args__ = ("ident",)
@@ -130,10 +120,12 @@ class Index(Exp):
 @dataclass
 class Lambda(Exp):
     params: List[Any]
+    return_priv: str
     body: Stmt
-    __match_args__ = ("params", "body")
+    __match_args__ = ("params", "return_priv", "body")
     def __str__(self):
-        return "fn " + ", ".join([str(p) for p in self.params]) + " " \
+        return "fn " + ", ".join([str(p) for p in self.params]) \
+            + " -> " + self.return_priv + " " \
             + "{ " + str(self.body) + " }"
     def __repr__(self):
         return str(self)
