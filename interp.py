@@ -176,6 +176,9 @@ class Pointer(Value):
     def kill(self):
         if trace:
             print('kill ' + str(self))
+        if self.lender is None:
+            if not self.privilege == Fraction(0,1):
+                raise Exception('killing pointer without lender, leak?')
         if not (self.lender is None):
             if not (self.lender.address is None):
                 self.lender.privilege += self.privilege

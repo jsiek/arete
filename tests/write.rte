@@ -1,3 +1,5 @@
 var !x = new 10;
 x := 20;
-return *x - 20;
+var y = *x;
+delete x;
+return y - 20;
