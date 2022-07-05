@@ -1,4 +1,4 @@
-var map = fn f, ls {
+var map = function f, ls {
   match ls
   | case ⟨⟩:
     return ⟨⟩;
@@ -6,5 +6,6 @@ var map = fn f, ls {
     return ⟨f(hd), map(f, tl)⟩;
 };
 var ls = ⟨0, ⟨1, ⟨2, ⟨⟩⟩⟩⟩;
-var ls2 = map(fn x { return x + 1; }, ls);
+var inc = function x { return x + 1; };
+var ls2 = map(inc, ls);
 return ls2[1][1][0] - 3;

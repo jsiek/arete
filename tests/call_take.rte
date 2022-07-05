@@ -1,7 +1,7 @@
-var inc = fn write p {
+var inc = function !p {
             p := *p + 1;
 	    return *p;
           };
-var q = write (new 0);
+var !q = new 0;
 return inc(q) - 1;
 

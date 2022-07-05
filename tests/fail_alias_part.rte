@@ -1,9 +1,9 @@
-var t = write (new write (new 10));
+var !t = new !(new 10);
 {
   match *t
-  | case write p:
+  | case !p:
     match *t
-    | case write q:
+    | case !q:
       p := 0;
       q := 42;
 }

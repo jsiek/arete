@@ -1,10 +1,10 @@
-var inc = fn write p {
+var inc = function !p {
             p := *p + 1;
 	    return *p;
           };
-var q = write (new 0);
-var p = q;
-inc(q); // initialing writable pointer requires writable pointer, not ⦅0@1/2⦆
+var !q = new 0;
+var p = q; // create a read-only alias, causing q to lose write privilege
+inc(q); // initializing writable pointer requires writable pointer, not ⦅0@1/2⦆
 q := *q + 1;
 return *p - *q;
 

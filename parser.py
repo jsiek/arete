@@ -76,7 +76,7 @@ def parse_tree_to_ast(e):
     
     # statements
     elif e.data == 'var_init':
-        return VarInit(str(e.children[0].value),
+        return VarInit(parse_tree_to_param(e.children[0]),
                        parse_tree_to_ast(e.children[1]),
                        parse_tree_to_ast(e.children[2]))
     elif e.data == 'write':

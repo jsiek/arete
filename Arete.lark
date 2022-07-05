@@ -7,13 +7,8 @@ NEWLINE: (/\r/? /\n/)+
 WS: /[ \t\f\r\n]/+
 COMMENT: "//" /[^\n]*/ NEWLINE
 
-?privilege: "read"               -> read_priv
-          | "write"              -> write_priv
-          | "none"               -> none_priv
-
 ?ret_priv:                       -> return_read
-         | "-> read"             -> return_read
-         | "-> write"            -> return_write
+         | "->" "!"              -> return_write
 
 ?exp: exp_add
 
@@ -26,7 +21,7 @@ exp_hi: INT                      -> int
       | "-" exp_hi               -> neg
       | "*" exp_hi               -> deref
       | "(" exp ")"              -> paren
-      | "fn" param_list ret_priv "{" stmt "}" -> lambda
+      | "function" param_list ret_priv "{" stmt "}" -> lambda
       | exp_hi "(" exp_list ")"  -> call
       | "new" init               -> new
       | "⟨" init_list "⟩"        -> tuple
@@ -39,16 +34,14 @@ exp_hi: INT                      -> int
       | exp "," exp_list    -> push
 
 ?init: exp                       -> read_init
-    | "read" exp                 -> read_init
-    | "write" exp                -> write_init
+    | "!" exp                    -> write_init
 
 ?init_list:                  -> empty
       | init                 -> single
       | init "," init_list   -> push
 
 param: IDENT                 -> read
-     | "read" IDENT          -> read
-     | "write" IDENT         -> write
+     | "!" IDENT             -> write
 
 ?param_list:                     -> empty
      | param                     -> single
@@ -56,8 +49,7 @@ param: IDENT                 -> read
 
 ?pat: "⟨" pat_list "⟩"            -> tuple_pat
     | IDENT                       -> read_pat
-    | "read" IDENT                -> read_pat
-    | "write" IDENT               -> write_pat
+    | "!"     IDENT               -> write_pat
     | "_"                         -> wildcard_pat
 
 ?pat_list:                        -> empty
@@ -74,7 +66,7 @@ param: IDENT                 -> read
     | "{" stmt "}"                -> block
     | "delete" exp ";"            -> delete
 
-?stmt: "var" IDENT "=" init ";" stmt   -> var_init
+?stmt: "var" param "=" exp ";" stmt   -> var_init
     | "return" exp ";"                 -> return
     | basic_stmt stmt                  -> seq
     |                                  -> pass

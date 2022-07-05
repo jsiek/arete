@@ -411,9 +411,9 @@ def interp_stmt(s, env, mem, return_priv):
       case VarInit(var, init, rest):
         # allow recursion
         rest_env = env.copy()
-        rest_env[var] = None
-        val = interp_exp(init.arg, rest_env, mem)
-        vars_kinds = [(var,init.kind)]
+        rest_env[var.ident] = None
+        val = interp_exp(init, rest_env, mem)
+        vars_kinds = [(var.ident, var.kind)]
         allocate_locals(vars_kinds, [val], rest_env)
         retval = interp_stmt(rest, rest_env, mem, return_priv)
         deallocate_locals(vars_kinds, [val], rest_env)

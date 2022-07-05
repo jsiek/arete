@@ -13,6 +13,18 @@ class Stmt:
 class Pat:
     pass
 
+# Parameters
+
+@dataclass(frozen=True)
+class Param:
+    kind: str # read, write
+    ident: str
+    __match_args__ = ("kind", "ident")
+    def __str__(self):
+        return self.kind + " " + self.ident
+    def __repr__(self):
+        return str(self)
+
 # Expressions
 
 @dataclass
@@ -31,7 +43,7 @@ def op_str(op):
         return '+'
     elif op == 'sub':
         return '-'
-    elif op == 'usub':
+    elif op == 'neg':
         return '-'
     else:
         raise Exception('unhandled op ' + op)
@@ -119,7 +131,7 @@ class Index(Exp):
     
 @dataclass
 class Lambda(Exp):
-    params: List[Any]
+    params: List[Param]
     return_priv: str
     body: Stmt
     __match_args__ = ("params", "return_priv", "body")
@@ -134,12 +146,12 @@ class Lambda(Exp):
 
 @dataclass
 class VarInit(Stmt):
-    var: str
-    init: Any
+    var: Param
+    init: Exp
     rest: Stmt
     __match_args__ = ("var", "init", "rest")
     def __str__(self):
-        return "var " + self.var + " = " + str(self.init) + "; ..."
+        return "var " + str(self.var) + " = " + str(self.init) + "; ..."
     def __repr__(self):
         return str(self)
 
@@ -248,16 +260,6 @@ class WildCard(Pat):
     
     
 # Miscelaneous
-
-@dataclass(frozen=True)
-class Param:
-    kind: str # read, write
-    ident: str
-    __match_args__ = ("kind", "ident")
-    def __str__(self):
-        return self.kind + " " + self.ident
-    def __repr__(self):
-        return str(self)
 
 @dataclass
 class Initializer:

@@ -1,5 +1,5 @@
-var q = write (new 0);
-{ var p = write q;
+var !q = new 0;
+{ var !p = q;
   p := *p + 1; }
 q := *q + 1;
 return *q - 2;
