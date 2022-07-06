@@ -3,5 +3,7 @@ var inc = function !p {
 	    return *p;
           };
 var !q = new 0;
-return inc(q) - 1;
+var a = inc(q);
+delete q;
+return a - 1;
 

@@ -1,6 +1,6 @@
 from abstract_syntax import *
 from dataclasses import dataclass
-from parser import parse
+from parser import parse, set_filename
 from typing import List, Set, Dict, Tuple, Any
 from fractions import Fraction
 import sys
@@ -13,7 +13,7 @@ class Value:
 @dataclass
 class Integer(Value):
     value: int
-    def initialize(self, kind):
+    def initialize(self, kind, location):
       if self.temporary:
           self.temporary = False
           return self
@@ -21,12 +21,12 @@ class Integer(Value):
           return Integer(False, self.value)
     def copy(self):
         return Integer(True, self.value)
-    def return_copy(self, kind):
+    def return_copy(self, kind, location):
       if self.temporary:
           return self
       else:
           return Integer(True, self.value)
-    def kill(self):
+    def kill(self, location):
         pass
     def __str__(self):
         return repr(self.value)
@@ -36,7 +36,7 @@ class Integer(Value):
 @dataclass
 class Boolean(Value):
     value: bool
-    def initialize(self, kind):
+    def initialize(self, kind, location):
       if self.temporary:
           self.temporary = False
           return self
@@ -44,12 +44,12 @@ class Boolean(Value):
           return Boolean(False, self.value)
     def copy(self):
         return Boolean(True, self.value)
-    def return_copy(self, kind):
+    def return_copy(self, kind, location):
       if self.temporary:
           return self
       else:
           return Boolean(True, self.value)
-    def kill(self):
+    def kill(self, location):
         pass
     def __str__(self):
         return repr(self.value)
@@ -59,7 +59,7 @@ class Boolean(Value):
 @dataclass
 class Tuple(Value):
     elts: List[Value]
-    def initialize(self, kind):
+    def initialize(self, kind, location):
       if self.temporary:
           self.temporary = False
           return self
@@ -67,14 +67,14 @@ class Tuple(Value):
           return self.copy() # ??
     def copy(self):
         return Tuple(True, [v.copy() for v in self.elts])
-    def return_copy(self, kind):
+    def return_copy(self, kind, location):
       if self.temporary:
           return self
       else:
           return self.copy() # ??
-    def kill(self):
+    def kill(self, location):
         for val in self.elts:
-            val.kill()
+            val.kill(location)
     def __str__(self):
         return "⟨" + ", ".join([str(e) for e in self.elts]) + "⟩"
     def __repr__(self):
@@ -122,10 +122,10 @@ class Pointer(Value):
 
     # self: the pointer being initialized from
     # kind: the privilege of the pointer to return
-    def initialize(self, kind):
+    def initialize(self, kind, location):
       if kind == 'write':
           if not writable(self.privilege):
-              raise Exception('initialing writable pointer requires writable pointer, not ' + str(self))
+              error(location, 'initializing writable pointer requires writable pointer, not ' + str(self))
           if self.temporary:
               self.temporary = False
               return self
@@ -150,10 +150,10 @@ class Pointer(Value):
     # Copy the return value of a function.
     # Similar to initialize with respect to permissions, but
     # produces a temporary value.
-    def return_copy(self, kind):
+    def return_copy(self, kind, location):
       if kind == 'write':
           if not writable(self.privilege):
-              raise Exception('initialing writable pointer requires writable pointer, not ' + str(self))
+              error(location, 'initializing writable pointer requires writable pointer, not ' + str(self))
           if self.temporary:
               return self
           else:
@@ -173,12 +173,12 @@ class Pointer(Value):
       else:
           raise Exception('initialize unexpected privilege: ' + priv)
       
-    def kill(self):
+    def kill(self, location):
         if trace:
             print('kill ' + str(self))
         if self.lender is None:
             if not self.privilege == Fraction(0,1):
-                raise Exception('killing pointer without lender, leak?')
+                error(location, 'memory leak, killing nonempty pointer without lender')
         if not (self.lender is None):
             if not (self.lender.address is None):
                 self.lender.privilege += self.privilege
@@ -224,9 +224,9 @@ class Closure(Value):
     body: Stmt
     env: Any # needs work
     __match_args__ = ("temporary", "params", "return_priv", "body", "env")
-    def initialize(self, kind):
+    def initialize(self, kind, location):
         return self # ???
-    def kill(self):
+    def kill(self, location):
         pass # ???
     def __str__(self):
         return "closure"
@@ -235,63 +235,63 @@ class Closure(Value):
     
 trace = False
     
-def read(ptr, mem):
+def read(ptr, mem, location):
     if not isinstance(ptr, Pointer):
-        raise Exception('in read expected a pointer, not ' + repr(ptr))
+        error(location, 'in read expected a pointer, not ' + repr(ptr))
     if none(ptr.privilege):
-        raise Exception('pointer does not have read privilege')
+        error(location, 'pointer does not have read privilege')
     return mem[ptr.address]
 
-def write(ptr, val, mem):
+def write(ptr, val, mem, location):
     if not isinstance(ptr, Pointer):
-        raise Exception('in write expected a pointer, not ' + repr(ptr))
+        error(location, 'in write expected a pointer, not ' + repr(ptr))
     if not writable(ptr.privilege):
-        raise Exception('pointer does not have write privilege')
-    mem[ptr.address].kill()
+        error(location, 'pointer does not have write privilege')
+    mem[ptr.address].kill(location)
     if val.temporary:
         mem[ptr.address] = val
     else:
         mem[ptr.address] = copy(val, mem)
     mem[ptr.address].temporary = False
 
-def allocate_locals(vars_kinds, vals, env):
+def allocate_locals(vars_kinds, vals, env, location):
     if trace:
         print('allocating ' + ', '.join([v for (v,k) in vars_kinds]))
     for ((var,kind), val) in zip(vars_kinds, vals):
-        env[var] = val.initialize(kind)
+        env[var] = val.initialize(kind, location)
     if trace:
         print('finish allocating ' + ', '.join([v for (v,k) in vars_kinds]))
 
-def deallocate_locals(vars_kinds, vals, env):
+def deallocate_locals(vars_kinds, vals, env, location):
     if trace:
         print('deallocating ' + ', '.join([v for (v,k) in vars_kinds]))
     for (var,kind) in vars_kinds:
-        env[var].kill()
+        env[var].kill(location)
     if trace:
         print('finished deallocating ' + ', '.join([v for (v,k) in vars_kinds]))
 
-def kill_temp(val):
+def kill_temp(val, location):
     if not (val is None) and val.temporary:
-        val.kill()
+        val.kill(location)
         
-def call_function(fun, args, env, mem):
+def call_function(fun, args, env, mem, location):
     f = interp_exp(fun, env, mem)
     vals = [interp_exp(arg, env, mem) for arg in args]
     match f:
       case Closure(tmp, params, return_priv, body, clos_env):
         body_env = clos_env.copy()
         vars_kinds = [(param.ident, param.kind) for param in params]
-        allocate_locals(vars_kinds, vals, body_env)
+        allocate_locals(vars_kinds, vals, body_env, location)
         if trace:
             print('call ' + str(Call(fun, args)))
             print()
         retval = interp_stmt(body, body_env, mem, return_priv)
         if trace:
             print('deallocate locals from call to ' + str(fun))
-        deallocate_locals(vars_kinds, vals, body_env)
-        kill_temp(f)
+        deallocate_locals(vars_kinds, vals, body_env, location)
+        kill_temp(f, location)
         for val in vals:
-            kill_temp(val)
+            kill_temp(val, location)
         if trace:
             print('return from ' + str(fun) + ' with ' + str(retval))
             print(env)
@@ -299,51 +299,51 @@ def call_function(fun, args, env, mem):
             print()
         return retval
       case _:
-        raise Exception('expected function in call, not ' + repr(f))
+        error(location, 'expected function in call, not ' + repr(f))
     
 def interp_init(init, env, mem):
     match init:
       case Initializer(kind, arg):
         val = interp_exp(arg, env, mem)
-        return val.initialize(kind)
+        return val.initialize(kind, init.location)
       case _:
-        raise Exception('in interp_init, expected an initializer, not '
-                        + repr(init))
+        error(init.location, 'in interp_init, expected an initializer, not '
+              + repr(init))
 
-def to_integer(val):
+def to_integer(val, location):
     match val:
       case Integer(tmp, value):
         return value
       case _:
-        raise Exception('expected an integer, not ' + str(val))
+        error(location, 'expected an integer, not ' + str(val))
 
-def to_boolean(val):
+def to_boolean(val, location):
     match val:
       case Boolean(tmp, value):
         return value
       case _:
-        raise Exception('expected a boolean, not ' + str(val))
+        error(location, 'expected a boolean, not ' + str(val))
     
 def interp_exp(e, env, mem):
     match e:
       case Var(x):
         if x not in env:
-            raise Exception('use of undefined variable ' + x)
+            error(e.location, 'use of undefined variable ' + x)
         return env[x]
       case Int(n):
         return Integer(True, n)
       case Bool(b):
         return Boolean(True, b)
       case Prim('add', args):
-        left = to_integer(interp_exp(args[0], env, mem))
-        right = to_integer(interp_exp(args[1], env, mem))
+        left = to_integer(interp_exp(args[0], env, mem), e.location)
+        right = to_integer(interp_exp(args[1], env, mem), e.location)
         return Integer(True, left + right)
       case Prim('sub', args):
-        left = to_integer(interp_exp(args[0], env, mem))
-        right = to_integer(interp_exp(args[1], env, mem))
+        left = to_integer(interp_exp(args[0], env, mem), e.location)
+        right = to_integer(interp_exp(args[1], env, mem), e.location)
         return Integer(True, left - right)
       case Prim('neg', args):
-        val = to_integer(interp_exp(args[0], env, mem))
+        val = to_integer(interp_exp(args[0], env, mem), e.location)
         return Integer(True, - val)
       case New(init):
         val = interp_init(init, env, mem)
@@ -352,13 +352,13 @@ def interp_exp(e, env, mem):
         return Pointer(True, addr, Fraction(1,1), None, [])
       case Deref(arg):
         ptr = interp_exp(arg, env, mem)
-        val = read(ptr, mem)
-        kill_temp(ptr)
+        val = read(ptr, mem, e.location)
+        kill_temp(ptr, e.location)
         return val
       case Lambda(params, return_priv, body):
         return Closure(True, params, return_priv, body, env)
       case Call(fun, args):
-        return call_function(fun, args, env, mem)
+        return call_function(fun, args, env, mem, e.location)
       case TupleExp(inits):
         return Tuple(True, [interp_init(init, env, mem) for init in inits])
       case Index(arg, index):
@@ -369,8 +369,8 @@ def interp_exp(e, env, mem):
             match ind:
               case Integer(tmp, i):
                 retval = elts[i]
-                kill_temp(val)
-                kill_temp(ind)
+                kill_temp(val, e.location)
+                kill_temp(ind, e.location)
                 return retval
               case _:
                 raise Exception('index must be an integer, not ' + repr(ind))
@@ -403,6 +403,13 @@ def pattern_match(pat, val, matches):
             return False
       case _:
         raise Exception('error in pattern match, unhandled: ' + repr(pat))
+
+def error(location, msg):
+    header = '{file}:{line1}.{column1}-{line2}.{column2}: ' \
+        .format(file=location.filename,
+                line1=location.line, column1=location.column,
+                line2=location.end_line, column2=location.end_column)
+    raise Exception(header + msg)
     
 def interp_stmt(s, env, mem, return_priv):
     if trace:
@@ -417,22 +424,22 @@ def interp_stmt(s, env, mem, return_priv):
         rest_env[var.ident] = None
         val = interp_exp(init, rest_env, mem)
         vars_kinds = [(var.ident, var.kind)]
-        allocate_locals(vars_kinds, [val], rest_env)
+        allocate_locals(vars_kinds, [val], rest_env, s.location)
         retval = interp_stmt(rest, rest_env, mem, return_priv)
-        deallocate_locals(vars_kinds, [val], rest_env)
+        deallocate_locals(vars_kinds, [val], rest_env, s.location)
         return retval
       case Write(var, rhs):
         # ptr = env[var].get()
         ptr = env[var]
         val = interp_exp(rhs, env, mem) # ???
-        write(ptr, val, mem)
-        kill_temp(ptr)
-        kill_temp(val)
+        write(ptr, val, mem, s.location)
+        kill_temp(ptr, s.location)
+        kill_temp(val, s.location)
       case Expr(e):
         val = interp_exp(e, env, mem)
-        kill_temp(val)
+        kill_temp(val, s.location)
       case Return(e):
-        return interp_exp(e, env, mem).return_copy(return_priv)
+        return interp_exp(e, env, mem).return_copy(return_priv, e.location)
       case Seq(first, rest):
         retval = interp_stmt(first, env, mem, return_priv)
         if retval is None:
@@ -442,7 +449,7 @@ def interp_stmt(s, env, mem, return_priv):
       case Pass():
         pass
       case IfStmt(cond, thn, els):
-        c = to_boolean(interp_exp(cond, env, mem))
+        c = to_boolean(interp_exp(cond, env, mem), cond.location)
         if c:
             return interp_stmt(thn, env, mem, return_priv)
         else:
@@ -452,7 +459,7 @@ def interp_stmt(s, env, mem, return_priv):
         for c in cases:
            matches = {}
            if pattern_match(c.pat, val, matches):
-               kill_temp(val)
+               kill_temp(val, arg.location)
                body_env = env.copy()
                if trace:
                    print('matches')
@@ -460,16 +467,16 @@ def interp_stmt(s, env, mem, return_priv):
                    print()
                vals = [v for x, (kind,v) in matches.items()]
                vars_kinds = [(x,kind) for x, (kind,v) in matches.items()]
-               allocate_locals(vars_kinds, vals, body_env)
+               allocate_locals(vars_kinds, vals, body_env, c.location)
                if trace:
                    print('case body_env')
                    print(body_env)
                    print(mem)
                    print()
                retval = interp_stmt(c.body, body_env, mem, return_priv)
-               deallocate_locals(vars_kinds, vals, body_env)
+               deallocate_locals(vars_kinds, vals, body_env, c.location)
                return retval
-        raise Exception('error, no match')
+        error(s.location, 'no case was a match for ' + str(val))
       case Delete(arg):
         p = interp_exp(arg, env, mem)
         if trace:
@@ -477,12 +484,12 @@ def interp_stmt(s, env, mem, return_priv):
         match p:
           case Pointer(tmp, addr, priv):
             if not writable(priv):
-              raise Exception('delete require write privilege, not ' + priv)
-            mem[addr].kill()
+              error(s.location, 'delete needs writable, not ' + str(priv))
+            mem[addr].kill(s.location)
             del mem[addr]
             p.privilege = Fraction(0, 1)
             p.address = None
-        kill_temp(p)
+        kill_temp(p, s.location)
         if trace:
             print(env)
             print(mem)
@@ -498,10 +505,14 @@ def interp(p):
         print(env)
         print(mem)
         print()
+    if len(mem) > 0:
+        error(p.location, 'memory leak') 
     return retval
 
 if __name__ == "__main__":
-    file = open(sys.argv[1], 'r')
+    filename = sys.argv[1]
+    set_filename(filename)
+    file = open(filename, 'r')
     expect_fail = False
     if 'fail' in sys.argv:
         expect_fail = True
@@ -522,8 +533,8 @@ if __name__ == "__main__":
         if expect_fail:
             exit(0)
         else:
-            print('unexpected failure: ' + str(ex))
+            #print('unexpected failure: ' + str(ex))
+            print(str(ex))
             print()
-            raise
-            exit(-1)
+
 

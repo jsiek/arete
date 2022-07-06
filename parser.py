@@ -9,18 +9,25 @@ from lark import logger
 import logging
 #logger.setLevel(logging.DEBUG)
 
+filename = '???'
+
+def set_filename(fname):
+    global filename
+    filename = fname
+
 ##################################################
 # Concrete Syntax Parser
 ##################################################
 
 lark_parser = Lark(open("./Arete.lark").read(), start='arete', parser='lalr',
-                   debug=True)
+                   debug=True, propagate_positions=True)
 
 ##################################################
 # Parsing Concrete to Abstract Syntax
 ##################################################
 
 def parse_tree_to_param(e):
+    e.meta.filename = filename
     if e.data == 'empty':
         return []
     elif e.data == 'single':
@@ -29,42 +36,46 @@ def parse_tree_to_param(e):
         return [parse_tree_to_param(e.children[0])] \
             + parse_tree_to_param(e.children[1])
     else:
-        return Param(e.data, e.children[0].value)
+        return Param(e.meta, e.data, e.children[0].value)
 
 def parse_tree_to_ast(e):
+    e.meta.filename = filename
     # expressions
     if e.data == 'var':
-        return Var(str(e.children[0].value))
+        return Var(e.meta, str(e.children[0].value))
     elif e.data == 'int':
-        return Int(int(e.children[0]))
+        return Int(e.meta, int(e.children[0]))
     elif e.data == 'true':
-        return Bool(True)
+        return Bool(e.meta, True)
     elif e.data == 'false':
-        return Bool(False)
+        return Bool(e.meta, False)
     elif e.data == 'add':
         e1, e2 = e.children
-        return Prim('add', [parse_tree_to_ast(e1), parse_tree_to_ast(e2)])
+        return Prim(e.meta, 'add', [parse_tree_to_ast(e1),
+                                    parse_tree_to_ast(e2)])
     elif e.data == 'sub':
         e1, e2 = e.children
-        return Prim('sub', [parse_tree_to_ast(e1), parse_tree_to_ast(e2)])
+        return Prim(e.meta, 'sub', [parse_tree_to_ast(e1),
+                                    parse_tree_to_ast(e2)])
     elif e.data == 'neg':
-        return Prim('neg', [parse_tree_to_ast(e.children[0])])
+        return Prim(e.meta, 'neg', [parse_tree_to_ast(e.children[0])])
     elif e.data == 'new':
-        return New(parse_tree_to_ast(e.children[0]))
+        return New(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'deref':
-        return Deref(parse_tree_to_ast(e.children[0]))
+        return Deref(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'lambda':
-        return Lambda(parse_tree_to_param(e.children[0]),
+        return Lambda(e.meta,
+                      parse_tree_to_param(e.children[0]),
                       parse_tree_to_ast(e.children[1]),
                       parse_tree_to_ast(e.children[2]))
     elif e.data == 'call':
         e1, e2 = e.children
-        return Call(parse_tree_to_ast(e1), parse_tree_to_ast(e2))
+        return Call(e.meta, parse_tree_to_ast(e1), parse_tree_to_ast(e2))
     elif e.data == 'tuple':
-        return TupleExp(parse_tree_to_ast(e.children[0]))
+        return TupleExp(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'index':
         e1, e2 = e.children
-        return Index(parse_tree_to_ast(e1), parse_tree_to_ast(e2))
+        return Index(e.meta, parse_tree_to_ast(e1), parse_tree_to_ast(e2))
     elif e.data == 'paren':
         return parse_tree_to_ast(e.children[0])
     elif e.data == 'write_priv':
@@ -76,51 +87,57 @@ def parse_tree_to_ast(e):
     
     # statements
     elif e.data == 'var_init':
-        return VarInit(parse_tree_to_param(e.children[0]),
+        return VarInit(e.meta,
+                       parse_tree_to_param(e.children[0]),
                        parse_tree_to_ast(e.children[1]),
                        parse_tree_to_ast(e.children[2]))
     elif e.data == 'write':
-        return Write(str(e.children[0].value),
+        return Write(e.meta,
+                     str(e.children[0].value),
                      parse_tree_to_ast(e.children[1]))
     elif e.data == 'expr':
-        return Expr(parse_tree_to_ast(e.children[0]))
+        return Expr(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'return':
-        return Return(parse_tree_to_ast(e.children[0]))
+        return Return(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'pass':
-        return Pass()
+        return Pass(e.meta)
     elif e.data == 'seq':
-        return Seq(parse_tree_to_ast(e.children[0]),
+        return Seq(e.meta,
+                   parse_tree_to_ast(e.children[0]),
                    parse_tree_to_ast(e.children[1]))
     elif e.data == 'block':
         return parse_tree_to_ast(e.children[0])
     elif e.data == 'match':
-        return Match(parse_tree_to_ast(e.children[0]),
+        return Match(e.meta,
+                     parse_tree_to_ast(e.children[0]),
                      parse_tree_to_ast(e.children[1]))
     elif e.data == 'if':
-        return IfStmt(parse_tree_to_ast(e.children[0]),
+        return IfStmt(e.meta,
+                      parse_tree_to_ast(e.children[0]),
                       parse_tree_to_ast(e.children[1]),
                       parse_tree_to_ast(e.children[2]))
     elif e.data == 'delete':
-        return Delete(parse_tree_to_ast(e.children[0]))
+        return Delete(e.meta, parse_tree_to_ast(e.children[0]))
     
     # patterns
     elif e.data == 'read_pat':
-        return VarPat('read', str(e.children[0].value))
+        return VarPat(e.meta, 'read', str(e.children[0].value))
     elif e.data == 'write_pat':
-        return VarPat('write', str(e.children[0].value))
+        return VarPat(e.meta, 'write', str(e.children[0].value))
     elif e.data == 'tuple_pat':
-        return TuplePat(parse_tree_to_ast(e.children[0]))
+        return TuplePat(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'wildcard_pat':
-        return WildCard()
+        return WildCard(e.meta)
     
     # miscelaneous
     elif e.data == 'case':
-        return Case(parse_tree_to_ast(e.children[0]),
+        return Case(e.meta,
+                    parse_tree_to_ast(e.children[0]),
                     parse_tree_to_ast(e.children[1]))
     elif e.data == 'read_init':
-        return Initializer('read', parse_tree_to_ast(e.children[0]))
+        return Initializer(e.meta, 'read', parse_tree_to_ast(e.children[0]))
     elif e.data == 'write_init':
-        return Initializer('write', parse_tree_to_ast(e.children[0]))
+        return Initializer(e.meta, 'write', parse_tree_to_ast(e.children[0]))
     elif e.data == 'return_read':
         return 'read'
     elif e.data == 'return_write':
@@ -160,7 +177,8 @@ def parse(s, trace = False):
     return ast
 
 if __name__ == "__main__":
-    file = open(sys.argv[1], 'r')
+    filename = sys.argv[1]
+    file = open(filename, 'r')
     p = file.read()
     ast = parse(p)
     print(str(ast))

@@ -1,22 +1,28 @@
 from dataclasses import dataclass
 from typing import List, Set, Dict, Tuple, Any
+from lark.tree import Meta
 
 @dataclass
-class Exp:
+class AST:
+    location: Meta
+
+@dataclass
+class Exp(AST):
     pass
 
 @dataclass
-class Stmt:
+class Stmt(AST):
     pass
 
 @dataclass
-class Pat:
+class Pat(AST):
     pass
 
 # Parameters
 
 @dataclass(frozen=True)
 class Param:
+    location: Meta
     kind: str # read, write
     ident: str
     __match_args__ = ("kind", "ident")
@@ -263,6 +269,7 @@ class WildCard(Pat):
 
 @dataclass
 class Initializer:
+    location: Meta
     kind: str # read, write
     arg: Exp
     __match_args__ = ("kind", "arg")
@@ -273,6 +280,7 @@ class Initializer:
     
 @dataclass
 class Case:
+    location: Meta
     pat: Pat
     body: Stmt
     __match_args__ = ("pat", "body")

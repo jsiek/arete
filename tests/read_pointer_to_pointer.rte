@@ -1,4 +1,11 @@
-var y = new 42;
-var x = new y;
-var z = *x;
-return *z - *y;
+var f = function y {
+    var !x = new y;
+    var z = *x;
+    delete x;
+    return *z - *y;
+};
+var !y = new 42;
+var a = f(y);
+delete y;
+return a;
+
