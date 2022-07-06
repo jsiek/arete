@@ -26,7 +26,7 @@ class Integer(Value):
           return self
       else:
           return Integer(True, self.value)
-    def kill(self, location):
+    def kill(self, mem, location):
         pass
     def __str__(self):
         return repr(self.value)
@@ -49,7 +49,7 @@ class Boolean(Value):
           return self
       else:
           return Boolean(True, self.value)
-    def kill(self, location):
+    def kill(self, mem, location):
         pass
     def __str__(self):
         return repr(self.value)
@@ -72,9 +72,9 @@ class Tuple(Value):
           return self
       else:
           return self.copy() # ??
-    def kill(self, location):
+    def kill(self, mem, location):
         for val in self.elts:
-            val.kill(location)
+            val.kill(mem, location)
     def __str__(self):
         return "⟨" + ", ".join([str(e) for e in self.elts]) + "⟩"
     def __repr__(self):
@@ -173,11 +173,14 @@ class Pointer(Value):
       else:
           raise Exception('initialize unexpected privilege: ' + priv)
       
-    def kill(self, location):
+    def kill(self, mem, location):
         if trace:
             print('kill ' + str(self))
         if self.lender is None:
-            if not self.privilege == Fraction(0,1):
+            # consider automatically deleting
+            # if self.privilege == Fraction(1,1):
+            #     delete(self, mem, location)
+            if self.privilege != Fraction(0,1):
                 error(location, 'memory leak, killing nonempty pointer without lender')
         if not (self.lender is None):
             if not (self.lender.address is None):
@@ -226,7 +229,7 @@ class Closure(Value):
     __match_args__ = ("temporary", "params", "return_priv", "body", "env")
     def initialize(self, kind, location):
         return self # ???
-    def kill(self, location):
+    def kill(self, mem, location):
         pass # ???
     def __str__(self):
         return "closure"
@@ -247,13 +250,23 @@ def write(ptr, val, mem, location):
         error(location, 'in write expected a pointer, not ' + repr(ptr))
     if not writable(ptr.privilege):
         error(location, 'pointer does not have write privilege')
-    mem[ptr.address].kill(location)
+    mem[ptr.address].kill(mem, location)
     if val.temporary:
         mem[ptr.address] = val
     else:
         mem[ptr.address] = copy(val, mem)
     mem[ptr.address].temporary = False
 
+def delete(ptr, mem, location):
+    match ptr:
+      case Pointer(tmp, addr, priv):
+        if not writable(priv):
+          error(location, 'delete needs writable, not ' + str(priv))
+        mem[addr].kill(mem, location)
+        del mem[addr]
+        ptr.privilege = Fraction(0, 1)
+        ptr.address = None
+    
 def allocate_locals(vars_kinds, vals, env, location):
     if trace:
         print('allocating ' + ', '.join([v for (v,k) in vars_kinds]))
@@ -262,17 +275,17 @@ def allocate_locals(vars_kinds, vals, env, location):
     if trace:
         print('finish allocating ' + ', '.join([v for (v,k) in vars_kinds]))
 
-def deallocate_locals(vars_kinds, vals, env, location):
+def deallocate_locals(vars_kinds, vals, env, mem, location):
     if trace:
         print('deallocating ' + ', '.join([v for (v,k) in vars_kinds]))
     for (var,kind) in vars_kinds:
-        env[var].kill(location)
+        env[var].kill(mem, location)
     if trace:
         print('finished deallocating ' + ', '.join([v for (v,k) in vars_kinds]))
 
-def kill_temp(val, location):
+def kill_temp(val, mem, location):
     if not (val is None) and val.temporary:
-        val.kill(location)
+        val.kill(mem, location)
         
 def call_function(fun, args, env, mem, location):
     f = interp_exp(fun, env, mem)
@@ -283,15 +296,15 @@ def call_function(fun, args, env, mem, location):
         vars_kinds = [(param.ident, param.kind) for param in params]
         allocate_locals(vars_kinds, vals, body_env, location)
         if trace:
-            print('call ' + str(Call(fun, args)))
+            print('call ' + str(Call(location, fun, args)))
             print()
         retval = interp_stmt(body, body_env, mem, return_priv)
         if trace:
             print('deallocate locals from call to ' + str(fun))
-        deallocate_locals(vars_kinds, vals, body_env, location)
-        kill_temp(f, location)
+        deallocate_locals(vars_kinds, vals, body_env, mem, location)
+        kill_temp(f, mem, location)
         for val in vals:
-            kill_temp(val, location)
+            kill_temp(val, mem, location)
         if trace:
             print('return from ' + str(fun) + ' with ' + str(retval))
             print(env)
@@ -353,7 +366,7 @@ def interp_exp(e, env, mem):
       case Deref(arg):
         ptr = interp_exp(arg, env, mem)
         val = read(ptr, mem, e.location)
-        kill_temp(ptr, e.location)
+        kill_temp(ptr, mem, e.location)
         return val
       case Lambda(params, return_priv, body):
         return Closure(True, params, return_priv, body, env)
@@ -369,8 +382,8 @@ def interp_exp(e, env, mem):
             match ind:
               case Integer(tmp, i):
                 retval = elts[i]
-                kill_temp(val, e.location)
-                kill_temp(ind, e.location)
+                kill_temp(val, mem, e.location)
+                kill_temp(ind, mem, e.location)
                 return retval
               case _:
                 raise Exception('index must be an integer, not ' + repr(ind))
@@ -426,18 +439,17 @@ def interp_stmt(s, env, mem, return_priv):
         vars_kinds = [(var.ident, var.kind)]
         allocate_locals(vars_kinds, [val], rest_env, s.location)
         retval = interp_stmt(rest, rest_env, mem, return_priv)
-        deallocate_locals(vars_kinds, [val], rest_env, s.location)
+        deallocate_locals(vars_kinds, [val], rest_env, mem, s.location)
         return retval
       case Write(var, rhs):
-        # ptr = env[var].get()
         ptr = env[var]
-        val = interp_exp(rhs, env, mem) # ???
+        val = interp_exp(rhs, env, mem)
         write(ptr, val, mem, s.location)
-        kill_temp(ptr, s.location)
-        kill_temp(val, s.location)
+        kill_temp(ptr, mem, s.location)
+        kill_temp(val, mem, s.location)
       case Expr(e):
         val = interp_exp(e, env, mem)
-        kill_temp(val, s.location)
+        kill_temp(val, mem, s.location)
       case Return(e):
         return interp_exp(e, env, mem).return_copy(return_priv, e.location)
       case Seq(first, rest):
@@ -459,7 +471,7 @@ def interp_stmt(s, env, mem, return_priv):
         for c in cases:
            matches = {}
            if pattern_match(c.pat, val, matches):
-               kill_temp(val, arg.location)
+               kill_temp(val, mem, arg.location)
                body_env = env.copy()
                if trace:
                    print('matches')
@@ -474,22 +486,15 @@ def interp_stmt(s, env, mem, return_priv):
                    print(mem)
                    print()
                retval = interp_stmt(c.body, body_env, mem, return_priv)
-               deallocate_locals(vars_kinds, vals, body_env, c.location)
+               deallocate_locals(vars_kinds, vals, body_env, mem, c.location)
                return retval
         error(s.location, 'no case was a match for ' + str(val))
       case Delete(arg):
-        p = interp_exp(arg, env, mem)
+        ptr = interp_exp(arg, env, mem)
         if trace:
             print('delete ' + str(p))
-        match p:
-          case Pointer(tmp, addr, priv):
-            if not writable(priv):
-              error(s.location, 'delete needs writable, not ' + str(priv))
-            mem[addr].kill(s.location)
-            del mem[addr]
-            p.privilege = Fraction(0, 1)
-            p.address = None
-        kill_temp(p, s.location)
+        delete(ptr, mem, s.location)
+        kill_temp(ptr, mem, s.location)
         if trace:
             print(env)
             print(mem)
@@ -506,7 +511,7 @@ def interp(p):
         print(mem)
         print()
     if len(mem) > 0:
-        error(p.location, 'memory leak') 
+        error(p.location, 'memory leak, memory size = ' + str(len(mem))) 
     return retval
 
 if __name__ == "__main__":
