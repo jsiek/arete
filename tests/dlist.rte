@@ -19,7 +19,6 @@ var push = function data, !lst {
 		  [ B , / , / ]
     */
     var !n = join(lst[front], lst[back]);
-    delete lst;
     n @ prev = first;
     first <= 1 of n[prev];
     first @ next = n;
@@ -31,7 +30,9 @@ var push = function data, !lst {
                     |.5       |.5
       n: -.5-> [ B, * , / ]<--|
     */
-    return new !first, !n;
+    lst @ front = first;
+    lst @ back = n;
+    return lst;
   } else { // lst has at least 2 elements
     /*
       first: *-1-> [ E, / , / ]
@@ -50,10 +51,9 @@ var push = function data, !lst {
     lst[front][next][prev] <= 1/2 of lst[front];
     first @ next = lst[front];
     first[next][prev] <= 1/2 of first;
-    var !new_lst = new !first, !lst[back];
-    delete lst;
+    lst @ front = first;
     /*
-      new_list: *-1-> [ * , * ]
+           lst: *-1-> [ * , * ]
                       .5|   \____.5________________________________
 			V                                         |
 	              [ E, / , * ]                                |
@@ -63,7 +63,7 @@ var push = function data, !lst {
 			                   |   /          |             |
 				           \-.5           \-.5->   <-.5-/
      */
-    return new_lst;
+    return lst;
   }
 };
 

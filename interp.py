@@ -22,8 +22,6 @@ class Number(Value):
           return self
       else:
           return Number(False, self.value)
-    def copy(self):
-        return Number(True, self.value)
     def duplicate(self, percentage):
         return Number(True, self.value)
     def return_copy(self, kind, location):
@@ -49,8 +47,6 @@ class Boolean(Value):
           return self
       else:
           return Boolean(False, self.value)
-    def copy(self):
-        return Boolean(True, self.value)
     def duplicate(self, percentage):
         return Boolean(True, self.value)
     def return_copy(self, kind, location):
@@ -111,14 +107,6 @@ class Pointer(Value):
         other.privilege -= amount
         self.privilege += amount
         
-    def copy(self):
-        if True:
-            # take all the privilege
-            return self.duplicate(1)
-        else:
-            # take 1/2 the privilege
-            return self.duplicate(Fraction(1,2))
-
     def duplicate(self, percentage):
         other_priv = self.privilege * percentage
         self.privilege -= other_priv
@@ -289,7 +277,7 @@ def write(ptr, index, val, mem, location):
     if val.temporary:
         mem[ptr.address][index] = val
     else:
-        mem[ptr.address][index] = val.copy()
+        mem[ptr.address][index] = val.duplicate(1)
     mem[ptr.address][index].temporary = False
 
 def delete(ptr, mem, location):
