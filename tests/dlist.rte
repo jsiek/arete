@@ -11,40 +11,31 @@ var push = function data, !lst {
   var !first = new data , null , null;
   if lst[front] == lst[back] then { // lst is a 1 element list
     /*
-      lst: * -> [ * , * ]    --> [ D , / , / ]
-                  |.5 |.5   /
-                   \__|____/
-
-      first: * -1-> [ E , / , / ]
+      first: * -1-> [ A , / , / ]
+      
+      lst: * -> [ * , * ]
+                  |.5 |.5
+                  V   V
+		  [ B , / , / ]
     */
     var !n = join(lst[front], lst[back]);
+    delete lst;
     n @ prev = first;
-    /*
-      n: *-1->[ D, * , / ]
-                  1|
-                   V
-      first: *-0-> [ E, / , / ]
-    */
     first <= 1 of n[prev];
     first @ next = n;
-    /*
-      n: *-0-> [ D, * , / ]<-|
-                   0|        |1
-                    V       /
-      first: *-1->[ E, / , * ]
-    */
     n <= 1/2 of first[next];
     n[prev] <= 1/2 of first;
     /*
-      n: -.5-> [ D, * , / ]<-|
-		    |        |.5
-                  .5|        |
-                    V        |
-      first: *-.5-> [ E, / , * ]
+      first: *-.5-> [ A , / , * ]
+                    ^         |
+                    |.5       |.5
+      n: -.5-> [ B, * , / ]<--|
     */
     return new !first, !n;
   } else { // lst has at least 2 elements
     /*
+      first: *-1-> [ E, / , / ]
+      
       lst: *-1->[ * , * ]
 		.5|  .5\____________________________
 		  |           /--.5---             |
@@ -52,45 +43,27 @@ var push = function data, !lst {
 		  [ A , / , * ]  [ B , * , * ] ... [ Z , * , / ]
 		            |___/          |             |   
 			      .5            \-.5->  <-.5-/
-      first: *-1-> [ E, / , / ]
      */
-    // transfer privilege from prev of next of front of lst
     lst[front] <= 1 of lst[front][next][prev];
-    // set the prev of front of lst to first
     lst[front] @ prev = first;
-    // transfer 1 back to first
     first <= 1 of lst[front][prev];
-    // trasfer 1/2 privilege back to prev pointer
     lst[front][next][prev] <= 1/2 of lst[front];
-    /*                 __________________
-		      /.5                \
-      lst: *-1->[ * , * ]                 \______________________
-		.5|_________________                             \___
-				    |           |--.5--\             |
-				    V           V       \            V
-				    [ A , * , * ]  [ B , * , * ] ... [ Z , * , / ]
-					  |   |   /          |             |
-			 _________________/   \-.5           \-.5->   <-.5-/
-		      0 |
-			V
-      first: *-1-> [ E, / , / ]
-     */
-    // set the next pointer of first to front of lst
     first @ next = lst[front];
-    // transfer 1/2 privilege from first back to the next's prev pointer
     first[next][prev] <= 1/2 of first;
-    /*                 __________________
-                    .5/                  \
-      lst: *-1->[ * , * ]                 \______________________
-                 0|_________________                             \___
-				    |           |--.5---             |
-				    V           V       \            V
-				 |->[ A , * , * ]  [ B , * , * ] ... [ Z , * , / ]
-			       .5|        |   |   /          |             |
-				 |      .5|   \-.5           \-.5->   <-.5-/
-	  first: *-.5-> [ E, / , * ]<----/
+    var !new_lst = new !first, !lst[back];
+    delete lst;
+    /*
+      new_list: *-1-> [ * , * ]
+                      .5|   \____.5________________________________
+			V                                         |
+	              [ E, / , * ]                                |
+				 |           |--.5---             |
+				 V           V       \            V
+				 [ A , * , * ]  [ B , * , * ] ... [ Z , * , / ]
+			                   |   /          |             |
+				           \-.5           \-.5->   <-.5-/
      */
-    return new !first, !lst[back];
+    return new_lst;
   }
 };
 
@@ -128,10 +101,8 @@ var delete_list = function !list {
 var three = listof(3);
 check_list_permissions(three);
 var two_three = push(2, three);
-delete three;
 check_list_permissions(two_three);
 var one_two_three = push(1, two_three);
-delete two_three;
 check_list_permissions(one_two_three);
 var one = one_two_three[front][data];
 delete_list(one_two_three);
