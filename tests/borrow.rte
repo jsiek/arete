@@ -1,7 +1,7 @@
 var !q = new 0;
 { var !p = q;
-  p @ 0 = p[0] + 1; }
-q @ 0 = q[0] + 1;
+  p@0 = p[0] + 1; }
+q@0 = q[0] + 1;
 var a = q[0];
 delete q;
 return a - 2;
