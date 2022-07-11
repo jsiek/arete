@@ -1,10 +1,10 @@
 var !t = new !(new 10);
 {
-  match *t
+  match t[0]
   | case !p:
-    match *t
+    match t[0]
     | case !q:
-      p := 0;
-      q := 42;
+      p @ 0 = 0;
+      q @ 0 = 42;
 }
-return **t;
+return t[0][0];

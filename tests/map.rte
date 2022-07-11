@@ -1,11 +1,29 @@
-var map = function f, ls {
-  match ls
-  | case ⟨⟩:
-    return ⟨⟩;
-  | case ⟨hd, tl⟩:
-    return ⟨f(hd), map(f, tl)⟩;
+var front = function ls {
+  return ls[0];
 };
-var ls = ⟨0, ⟨1, ⟨2, ⟨⟩⟩⟩⟩;
+var rest = function ls {
+  return ls[1];
+};
+var rest! = function !ls {
+  return ls[1];
+};
+var map = function f, ls {
+  if is_null(ls) then
+    return null;
+  else
+    return new f(front(ls)), map(f, rest(ls));
+};
+var delete_list = function !ls {
+  if is_null(ls) then {}
+  else {
+    delete_list(rest!(ls));
+    delete ls;
+  }
+};
+var !ls1 = new 0, (new 1, (new 2, null));
 var inc = function x { return x + 1; };
-var ls2 = map(inc, ls);
-return ls2[1][1][0] - 3;
+var !ls2 = map(inc, ls1);
+delete_list(ls1);
+var three = front(rest(rest(ls2)));
+delete_list(ls2);
+return three - 3;

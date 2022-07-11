@@ -38,6 +38,9 @@ def parse_tree_to_param(e):
     else:
         return Param(e.meta, e.data, e.children[0].value)
 
+primitive_ops = {'add', 'sub', 'mul', 'div', 'neg', 'and', 'or', 'not', 'null',
+                 'is_null', 'split', 'join', 'equal', 'not_equal', 'permission'}
+    
 def parse_tree_to_ast(e):
     e.meta.filename = filename
     # expressions
@@ -49,20 +52,10 @@ def parse_tree_to_ast(e):
         return Bool(e.meta, True)
     elif e.data == 'false':
         return Bool(e.meta, False)
-    elif e.data == 'add':
-        e1, e2 = e.children
-        return Prim(e.meta, 'add', [parse_tree_to_ast(e1),
-                                    parse_tree_to_ast(e2)])
-    elif e.data == 'sub':
-        e1, e2 = e.children
-        return Prim(e.meta, 'sub', [parse_tree_to_ast(e1),
-                                    parse_tree_to_ast(e2)])
-    elif e.data == 'neg':
-        return Prim(e.meta, 'neg', [parse_tree_to_ast(e.children[0])])
+    elif e.data in primitive_ops:
+        return Prim(e.meta, e.data, [parse_tree_to_ast(c) for c in e.children])
     elif e.data == 'new':
         return New(e.meta, parse_tree_to_ast(e.children[0]))
-    elif e.data == 'deref':
-        return Deref(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'lambda':
         return Lambda(e.meta,
                       parse_tree_to_param(e.children[0]),
@@ -71,8 +64,6 @@ def parse_tree_to_ast(e):
     elif e.data == 'call':
         e1, e2 = e.children
         return Call(e.meta, parse_tree_to_ast(e1), parse_tree_to_ast(e2))
-    elif e.data == 'tuple':
-        return TupleExp(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'index':
         e1, e2 = e.children
         return Index(e.meta, parse_tree_to_ast(e1), parse_tree_to_ast(e2))
@@ -93,10 +84,18 @@ def parse_tree_to_ast(e):
                        parse_tree_to_ast(e.children[2]))
     elif e.data == 'write':
         return Write(e.meta,
-                     str(e.children[0].value),
-                     parse_tree_to_ast(e.children[1]))
+                     parse_tree_to_ast(e.children[0]),
+                     parse_tree_to_ast(e.children[1]),
+                     parse_tree_to_ast(e.children[2]))
+    elif e.data == 'transfer':
+        return Transfer(e.meta,
+                        parse_tree_to_ast(e.children[0]),
+                        parse_tree_to_ast(e.children[1]),
+                        parse_tree_to_ast(e.children[2]))
     elif e.data == 'expr':
         return Expr(e.meta, parse_tree_to_ast(e.children[0]))
+    elif e.data == 'assert':
+        return Assert(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'return':
         return Return(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'pass':

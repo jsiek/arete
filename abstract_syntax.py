@@ -44,51 +44,35 @@ class Call(Exp):
     def __repr__(self):
         return str(self)
 
-def op_str(op):
-    if op == 'add':
-        return '+'
-    elif op == 'sub':
-        return '-'
-    elif op == 'neg':
-        return '-'
-    else:
-        raise Exception('unhandled op ' + op)
-    
 @dataclass
 class Prim(Exp):
     op: str
     args: List[Exp]
     __match_args__ = ("op", "args")
     def __str__(self):
-        if len(self.args) == 1:
-            return op_str(self.op) + str(self.args[0])
-        elif len(self.args) == 2:
-            return str(self.args[0]) + " " + op_str(self.op) + " " + \
-                str(self.args[1])
-        else:
-            return self.op + \
-                "(" + ", ".join([str(arg) for arg in self.args]) + ")"
+        # if len(self.args) == 1:
+        #     return self.op + " " + str(self.args[0])
+        # elif len(self.args) == 2:
+        #     return str(self.args[0]) + " " + self.op + " " + \
+        #         str(self.args[1])
+        # else:
+        #     return self.op + \
+        #         "(" + ", ".join([str(arg) for arg in self.args]) + ")"
+        return self.op + \
+            "(" + ", ".join([str(arg) for arg in self.args]) + ")"
+        
     def __repr__(self):
         return str(self)
 
 @dataclass
 class New(Exp):
-    init: Any
-    __match_args__ = ("init",)
+    inits: List[Exp]
+    __match_args__ = ("inits",)
     def __str__(self):
-        return "new " + str(self.init)
+        return "new " + ", ".join([str(e) for e in self.inits])
     def __repr__(self):
         return str(self)
 
-@dataclass
-class Deref(Exp):
-    arg: Exp
-    __match_args__ = ("arg",)
-    def __str__(self):
-        return "*" + str(self.arg)
-    def __repr__(self):
-        return str(self)
-    
 @dataclass
 class Var(Exp):
     ident: str
@@ -116,15 +100,6 @@ class Bool(Exp):
     def __repr__(self):
         return str(self)
     
-@dataclass
-class TupleExp(Exp):
-    elts: List[Exp]
-    __match_args__ = ("elts",)
-    def __str__(self):
-        return "⟨" + ", ".join([str(e) for e in self.elts]) + "⟩"
-    def __repr__(self):
-        return str(self)
-
 @dataclass
 class Index(Exp):
     arg: Exp
@@ -163,11 +138,24 @@ class VarInit(Stmt):
 
 @dataclass
 class Write(Stmt):
-    lhs: Exp
+    ptr: Exp
+    index: Exp
     rhs: Exp
-    __match_args__ = ("lhs", "rhs")
+    __match_args__ = ("ptr", "index", "rhs")
     def __str__(self):
-        return str(self.lhs) + " := " + str(self.rhs) + ";"
+        return str(self.ptr) + " @ " + str(self.index) + " = " + str(self.rhs) + ";"
+    def __repr__(self):
+        return str(self)
+
+@dataclass
+class Transfer(Stmt):
+    lhs: Exp
+    percent: Exp
+    rhs: Exp
+    __match_args__ = ("lhs", "percent", "rhs")
+    def __str__(self):
+        return str(self.lhs) + " <= " + str(self.percent) + " of " \
+            + str(self.rhs) + ";"
     def __repr__(self):
         return str(self)
     
@@ -233,6 +221,15 @@ class Match(Stmt):
     __match_args__ = ("arg", "cases")
     def __str__(self):
         return "match " + str(self.arg) + " " + "..."
+    def __repr__(self):
+        return str(self)
+
+@dataclass
+class Assert(Stmt):
+    exp: Exp
+    __match_args__ = ("exp",)
+    def __str__(self):
+        return "assert " + str(self.exp) + ";"
     def __repr__(self):
         return str(self)
 

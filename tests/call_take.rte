@@ -1,6 +1,6 @@
 var inc = function !p {
-            p := *p + 1;
-	    return *p;
+            p @ 0 = p[0] + 1;
+	    return p[0];
           };
 var !q = new 0;
 var a = inc(q);

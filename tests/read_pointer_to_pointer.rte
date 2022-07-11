@@ -1,8 +1,8 @@
 var f = function y {
     var !x = new y;
-    var z = *x;
+    var z = x[0];
     delete x;
-    return *z - *y;
+    return z[0] - y[0];
 };
 var !y = new 42;
 var a = f(y);

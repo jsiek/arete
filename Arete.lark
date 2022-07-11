@@ -2,50 +2,67 @@ DIGIT: /[0-9]/
 INT: DIGIT+
 UPPER: /[A-Z]/
 LOWER: /[a-z]/
-IDENT: (UPPER|LOWER) (/_/|UPPER|LOWER|DIGIT|/[₀₁₂₃₄₅₆₇₈₉]/)*
+IDENT: (UPPER|LOWER) (/_/|UPPER|LOWER|DIGIT|/[₀₁₂₃₄₅₆₇₈₉!?]/)*
 NEWLINE: (/\r/? /\n/)+
 WS: /[ \t\f\r\n]/+
-COMMENT: "//" /[^\n]*/ NEWLINE
+LINECOMMENT: "//" /[^\n]*/ NEWLINE
+COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 
 ?ret_priv:                       -> return_read
          | "->" "!"              -> return_write
 
-?exp: exp_add
+?exp: exp_logic
 
-?exp_add: exp "+" exp_hi         -> add
-        | exp "-" exp_hi         -> sub
-        | exp_hi
-    
-exp_hi: INT                      -> int
-      | IDENT                    -> var
-      | "-" exp_hi               -> neg
-      | "*" exp_hi               -> deref
-      | "(" exp ")"              -> paren
-      | "function" param_list ret_priv "{" stmt "}" -> lambda
-      | exp_hi "(" exp_list ")"  -> call
-      | "new" init               -> new
-      | "⟨" init_list "⟩"        -> tuple
-      | exp_hi "[" exp "]"       -> index
-      | "true"                   -> true
-      | "false"                  -> false
+?exp_logic: exp_logic "and" exp_eq  -> and
+    | exp_logic "or" exp_eq         -> or
+    | exp_eq
+
+?exp_eq: exp_eq "==" exp_add       -> equal
+    | exp_eq "!=" exp_add          -> not_equal
+    | exp_add
+
+?exp_add: exp_add "+" exp_med      -> add
+    | exp_add "-" exp_med          -> sub
+    | exp_med
+
+?exp_med: exp_med "/" exp_hi       -> div
+    | exp_med "*" exp_hi       -> mul
+    | exp_hi
+
+?exp_hi: INT                   -> int
+    | "is_null" "(" exp ")"    -> is_null
+    | "null"                   -> null
+    | "split" "(" exp ")"      -> split
+    | "join" "(" exp "," exp ")" -> join
+    | "permission" "(" exp ")"   -> permission
+    | IDENT                    -> var
+    | exp_hi "[" exp "]"       -> index
+    | "-" exp_hi               -> neg
+    | "not" exp_hi             -> not
+    | "(" exp ")"              -> paren
+    | "function" param_list ret_priv "{" stmt "}" -> lambda
+    | exp_hi "(" exp_list ")"  -> call
+    | "new" init_list          -> new
+    | "true"                   -> true
+    | "false"                  -> false
       
 ?exp_list:                  -> empty
-      | exp                 -> single
-      | exp "," exp_list    -> push
+    | exp                 -> single
+    | exp "," exp_list    -> push
 
 ?init: exp                       -> read_init
     | "!" exp                    -> write_init
 
 ?init_list:                  -> empty
-      | init                 -> single
-      | init "," init_list   -> push
+    | init                 -> single
+    | init "," init_list   -> push
 
 param: IDENT                 -> read
-     | "!" IDENT             -> write
+    | "!" IDENT             -> write
 
 ?param_list:                     -> empty
-     | param                     -> single
-     | param "," param_list      -> push
+    | param                     -> single
+    | param "," param_list      -> push
 
 ?pat: "⟨" pat_list "⟩"            -> tuple_pat
     | IDENT                       -> read_pat
@@ -59,12 +76,14 @@ param: IDENT                 -> read
 ?case: "case" pat ":" stmt        -> case
 
 ?case_list: "|" case              -> single
-   | "|" case case_list           -> push
+    | "|" case case_list           -> push
    
-?basic_stmt: IDENT ":=" exp ";"   -> write
-    | exp ";"                     -> expr
-    | "{" stmt "}"                -> block
-    | "delete" exp ";"            -> delete
+?basic_stmt: exp "@" exp "=" exp ";" -> write
+    | exp "<=" exp "of" exp ";"      -> transfer
+    | exp ";"                        -> expr
+    | "{" stmt "}"                   -> block
+    | "delete" exp ";"               -> delete
+    | "assert" exp ";"               -> assert
 
 ?stmt: "var" param "=" exp ";" stmt   -> var_init
     | "return" exp ";"                 -> return
@@ -76,4 +95,5 @@ param: IDENT                 -> read
 arete: stmt
 
 %ignore COMMENT
+%ignore LINECOMMENT
 %ignore WS

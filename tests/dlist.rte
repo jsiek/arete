@@ -1,0 +1,138 @@
+var front = 0;
+var back = 1;
+var data = 0;
+var prev = 1;
+var next = 2;
+var listof = function data {
+  var !p = new data, null, null;
+  return split(p);
+};
+var push = function data, !lst {
+  var !first = new data , null , null;
+  if lst[front] == lst[back] then { // lst is a 1 element list
+    /*
+      lst: * -> [ * , * ]    --> [ D , / , / ]
+                  |.5 |.5   /
+                   \__|____/
+
+      first: * -1-> [ E , / , / ]
+    */
+    var !n = join(lst[front], lst[back]);
+    n @ prev = first;
+    /*
+      n: *-1->[ D, * , / ]
+                  1|
+                   V
+      first: *-0-> [ E, / , / ]
+    */
+    first <= 1 of n[prev];
+    first @ next = n;
+    /*
+      n: *-0-> [ D, * , / ]<-|
+                   0|        |1
+                    V       /
+      first: *-1->[ E, / , * ]
+    */
+    n <= 1/2 of first[next];
+    n[prev] <= 1/2 of first;
+    /*
+      n: -.5-> [ D, * , / ]<-|
+		    |        |.5
+                  .5|        |
+                    V        |
+      first: *-.5-> [ E, / , * ]
+    */
+    return new !first, !n;
+  } else { // lst has at least 2 elements
+    /*
+      lst: *-1->[ * , * ]
+		.5|  .5\____________________________
+		  |           /--.5---             |
+		  V           V       \            V
+		  [ A , / , * ]  [ B , * , * ] ... [ Z , * , / ]
+		            |___/          |             |   
+			      .5            \-.5->  <-.5-/
+      first: *-1-> [ E, / , / ]
+     */
+    // transfer privilege from prev of next of front of lst
+    lst[front] <= 1 of lst[front][next][prev];
+    // set the prev of front of lst to first
+    lst[front] @ prev = first;
+    // transfer 1 back to first
+    first <= 1 of lst[front][prev];
+    // trasfer 1/2 privilege back to prev pointer
+    lst[front][next][prev] <= 1/2 of lst[front];
+    /*                 __________________
+		      /.5                \
+      lst: *-1->[ * , * ]                 \______________________
+		.5|_________________                             \___
+				    |           |--.5--\             |
+				    V           V       \            V
+				    [ A , * , * ]  [ B , * , * ] ... [ Z , * , / ]
+					  |   |   /          |             |
+			 _________________/   \-.5           \-.5->   <-.5-/
+		      0 |
+			V
+      first: *-1-> [ E, / , / ]
+     */
+    // set the next pointer of first to front of lst
+    first @ next = lst[front];
+    // transfer 1/2 privilege from first back to the next's prev pointer
+    first[next][prev] <= 1/2 of first;
+    /*                 __________________
+                    .5/                  \
+      lst: *-1->[ * , * ]                 \______________________
+                 0|_________________                             \___
+				    |           |--.5---             |
+				    V           V       \            V
+				 |->[ A , * , * ]  [ B , * , * ] ... [ Z , * , / ]
+			       .5|        |   |   /          |             |
+				 |      .5|   \-.5           \-.5->   <-.5-/
+	  first: *-.5-> [ E, / , * ]<----/
+     */
+    return new !first, !lst[back];
+  }
+};
+
+var check_nodes_permissions = function !node {
+  if not is_null(node[next]) then {
+    assert permission(node[next]) == 1/2;
+    check_nodes_permissions(node[next]);
+  } else {}
+  if not is_null(node[prev]) then {
+    assert permission(node[prev]) == 1/2;
+  } else {}
+};
+var check_list_permissions = function !list {
+  var !first = list[front];
+  var !last = list[back];
+  assert permission(first) == 1/2;
+  assert permission(last) == 1/2;
+  check_nodes_permissions(first);
+};
+
+var delete_nodes = function !node, !last {
+  if node == last then {
+    delete join(node, last);
+  } else {
+    node <= 1 of node[next][prev];
+    delete_nodes(node[next], last);
+    delete node;
+  }
+};
+var delete_list = function !list {
+  delete_nodes(list[front], list[back]);
+  delete list;
+};
+
+var three = listof(3);
+check_list_permissions(three);
+var two_three = push(2, three);
+delete three;
+check_list_permissions(two_three);
+var one_two_three = push(1, two_three);
+delete two_three;
+check_list_permissions(one_two_three);
+var one = one_two_three[front][data];
+delete_list(one_two_three);
+return one - 1;

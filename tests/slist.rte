@@ -1,23 +1,18 @@
-var null = function -> ! { return new ⟨⟩; };
-var push = function data, !list -> ! {
-  return new ⟨ data, !list ⟩;
+var listof = function data {
+  return new data, null;
+};
+var push = function data, !list {
+  return new data, !list;
 };
 var head = function list {
-  return (*list)[0];
+  return list[0];
 };
 var tail = function list {
-  return (*list)[1];
+  return list[1];
 };
 // mutable access to the tail
-var mtail = function list -> ! {
-  return (*list)[1];
-};
-var is_null = function ptr {
-  match *ptr
-  | case ⟨⟩:
-    return true;
-  | case ⟨_, _⟩:
-    return false;
+var mtail = function !list {
+  return list[1];
 };
 var is_last = function n {
   if is_null(n) then
@@ -28,26 +23,26 @@ var is_last = function n {
 };
 // Split the list into two parts, with the second
 // part just containing the last element.
-var remove_last = function !n -> ! {
+var remove_last = function !n {
   if is_null(n) then
     return 0;
   else if is_last(tail(n)) then {
       var !q = mtail(n);
-      n := ⟨head(n), !null()⟩;
+      n @ 1 = null;
       return q;
   } else {
     return remove_last(mtail(n));
   }
 };
 var delete_list = function !n {
-  if is_null(n) then
+  if not is_null(n) then {
+    if not is_null(tail(n)) then {
+      delete_list(mtail(n));
+    } else {}
     delete n;
-  else {
-    delete_list(mtail(n));
-    delete n;
-  }
+  } else {}
 };
-var !one_two = push(1, push(2, null()));
+var !one_two = push(1, listof(2));
 var !two_null = remove_last(one_two);
 var one = head(one_two);
 var two = head(two_null);
