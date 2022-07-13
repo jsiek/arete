@@ -88,20 +88,20 @@ def priv_str(priv):
 @dataclass
 class Pointer(Value):
     address: int
-    privilege: Fraction    # none is 0, read is 1/n, write is 1/1
+    permission: Fraction    # none is 0, read is 1/n, write is 1/1
     lender: Value          # who this pointer borrowed from, if any
     
-    __match_args__ = ("temporary", "address", "privilege")
+    __match_args__ = ("temporary", "address", "permission")
 
     def equals(self, other):
         return self.address == other.address
     
     def __str__(self):
-        # return "⦅ " + str(self.address) + " @" + priv_str(self.privilege) \
+        # return "⦅ " + str(self.address) + " @" + priv_str(self.permission) \
         #     + ", " + ("tmp" if self.temporary else "prm") \
         #     + (" from: " +str(self.lender) if not self.lender is None else "") \
         #     + "⦆" 
-        return "⦅ " + str(self.address) + " @" + priv_str(self.privilege) \
+        return "⦅ " + str(self.address) + " @" + priv_str(self.permission) \
             + ", " + str(id(self)) \
             + "⦆"
     def __repr__(self):
@@ -111,32 +111,37 @@ class Pointer(Value):
         return str(self.address)
 
     def node_label(self):
-        return str(self.privilege) + ' of ' + str(self.address) \
+        return str(self.address) + ' @' + str(self.permission) + ' ' \
             + '(' + str(id(self)) + ')' 
 
     def transfer(self, percent, other, location):
+        if not isinstance(other, Pointer):
+            error(location, "in transfer, expected pointer, not " + str(other))
         if self.address != other.address:
             error(location, "cannot transfer between different addresses: "
                   + str(self.address) + " != " + str(other.address))
-        amount = other.privilege * percent
-        other.privilege -= amount
-        self.privilege += amount
+        amount = other.permission * percent
+        other.permission -= amount
+        self.permission += amount
         
     def duplicate(self, percentage):
         if trace:
             print('duplicating ' + str(percentage) + ' of ' + str(self))
-        other_priv = self.privilege * percentage
-        self.privilege -= other_priv
-        ptr = Pointer(True, self.address, other_priv, self)
+        if self.address is None:
+            ptr = Pointer(True, None, Fraction(1,1), self)
+        else:
+            other_priv = self.permission * percentage
+            self.permission -= other_priv
+            ptr = Pointer(True, self.address, other_priv, self)
         if trace:
             print('producing ' + str(ptr))
         return ptr
     
     # self: the pointer being initialized from
-    # kind: the privilege of the pointer to return
+    # kind: the permission of the pointer to return
     def initialize(self, kind, location, ret=False):
       if kind == 'write':
-          # if not writable(self.privilege):
+          # if not writable(self.permission):
           #     error(location, 'initializing writable pointer requires writable pointer, not ' + str(self))
           if self.temporary:
               self.temporary = False
@@ -159,10 +164,10 @@ class Pointer(Value):
               ptr.temporary = False
               return ptr
       else:
-          raise Exception('initialize unexpected privilege: ' + priv)
+          raise Exception('initialize unexpected permission: ' + priv)
 
     # self: the pointer being initialized from
-    # percent: the amount of privilege to take from self
+    # percent: the amount of permission to take from self
     def init(self, percent, location):
       if self.temporary:
         self.temporary = False
@@ -185,18 +190,19 @@ class Pointer(Value):
         if trace:
             print('kill ' + str(self))
         self.lender = find_lender(self.lender)
-        if self.lender is None:
-            if self.privilege != Fraction(0,1):
-                warning(location, 'memory leak, killing nonempty pointer'
-                        + ' without lender')
-        else:
+        if self.lender is None and not (self.address is None) \
+           and self.permission != Fraction(0,1):
+            warning(location, 'memory leak, killing nonempty pointer'
+                    + ' without lender ' + str(self))
+        if (not self.lender is None) and (not self.address is None):
             if trace:
-                print('giving back from ' + str(self))
-            self.lender.privilege += self.privilege
+                print('giving back ' + str(self.permission) \
+                      + '  from ' + str(self))
+            self.lender.permission += self.permission
             if trace:
                 print('to ' + str(self.lender))
         self.address = None
-        self.privilege = Fraction(0,1)
+        self.permission = Fraction(1,1) # all of nothing! -Jeremy
 
 # find the first ptr in the lender chain that is not yet killed,
 # i.e. that has a non-None address.
@@ -239,7 +245,7 @@ def readable(frac):
 def none(frac):
     return frac == Fraction(0, 1)
 
-def check_privilege(frac: Fraction, kind: str):
+def check_permission(frac: Fraction, kind: str):
     if kind == 'write':
         return writable(frac)
     elif kind == 'read':
@@ -247,9 +253,9 @@ def check_privilege(frac: Fraction, kind: str):
     elif kind == 'none':
         return none(frac)
     else:
-        raise Exception('unrecognized privilege kind: ' + str(kind))
+        raise Exception('unrecognized permission kind: ' + str(kind))
 
-def privilege_to_fraction(priv):
+def permission_to_fraction(priv):
     if priv == 'write':
         return Fraction(1, 1)
     elif priv == 'read':
@@ -257,7 +263,7 @@ def privilege_to_fraction(priv):
     elif priv == 'none':
         return Fraction(0, 1)
     else:
-        raise Exception('unrecognized privilege: ' + priv)
+        raise Exception('unrecognized permission: ' + priv)
     
 @dataclass
 class Closure(Value):
@@ -330,12 +336,12 @@ def allocate(vals, mem):
 def read(ptr, index, mem, location, dup):
     if not isinstance(ptr, Pointer):
         error(location, 'in read expected a pointer, not ' + str(ptr))
-    if none(ptr.privilege):
-        error(location, 'pointer does not have read privilege: ' + str(ptr))
+    if none(ptr.permission):
+        error(location, 'pointer does not have read permission: ' + str(ptr))
     # whether to copy here or not?
     # see tests/fail_indirect_write
     if dup:
-        retval = mem[ptr.address][index].duplicate(ptr.privilege)
+        retval = mem[ptr.address][index].duplicate(ptr.permission)
     else:
         retval = mem[ptr.address][index]
     if False:
@@ -348,8 +354,8 @@ def read(ptr, index, mem, location, dup):
 def write(ptr, index, val, mem, location):
     if not isinstance(ptr, Pointer):
         error(location, 'in write expected a pointer, not ' + str(ptr))
-    if not writable(ptr.privilege):
-        error(location, 'pointer does not have write privilege: ' + str(ptr))
+    if not writable(ptr.permission):
+        error(location, 'pointer does not have write permission: ' + str(ptr))
     mem[ptr.address][index].kill(mem, location)
     if val.temporary:
         mem[ptr.address][index] = val
@@ -367,14 +373,21 @@ def delete(ptr, mem, location):
         for val in mem[addr]:
             val.kill(mem, location)
         del mem[addr]
-        ptr.privilege = Fraction(0,1)
+        ptr.permission = Fraction(0,1)
         ptr.kill(mem, location)
     
 def allocate_locals(vars_kinds, vals, env, location):
     if trace:
         print('allocating ' + ', '.join([v for (v,k) in vars_kinds]))
     for ((var,kind), val) in zip(vars_kinds, vals):
-        env[var] = val.initialize(kind, location)
+        if kind == 'write' and isinstance(val, Pointer) \
+           and val.permission != Fraction(1,1):
+            error(location, 'need writable pointer, not ' + str(val))
+        elif kind == 'read' and isinstance(val, Pointer) \
+                  and (not val.address is None) \
+                  and val.permission == Fraction(0,1):
+            error(location, 'need readable pointer, not ' + str(val))
+        env[var] = val
     if trace:
         print('finish allocating ' + ', '.join([v for (v,k) in vars_kinds]))
 
@@ -393,7 +406,7 @@ def kill_temp(val, mem, location):
         
 def call_function(fun, args, env, mem, location):
     f = interp_exp(fun, env, mem)
-    vals = [interp_exp(arg, env, mem) for arg in args]
+    vals = [interp_init(arg, env, mem) for arg in args]
     match f:
       case Closure(tmp, params, return_priv, body, clos_env):
         body_env = clos_env.copy()
@@ -418,6 +431,7 @@ def call_function(fun, args, env, mem, location):
             print('return from ' + str(fun) + ' with ' + str(retval))
             print(env)
             print(mem)
+            log_graphviz(env, mem)
             print()
         return retval
       case _:
@@ -518,7 +532,8 @@ def interp_exp(e, env, mem, dup=True, ret=False, lhs=False):
         val = to_boolean(interp_exp(args[0], env, mem), e.location)
         return Boolean(True, not val)
       case Prim('null'):
-        return Pointer(True, None, Fraction(0,1), None)
+        # fraction is 1/1 because null has all of nothing! -Jeremy
+        return Pointer(True, None, Fraction(1,1), None)
       case Prim('is_null', args):
         ptr = interp_exp(args[0], env, mem)
         match ptr:
@@ -535,7 +550,10 @@ def interp_exp(e, env, mem, dup=True, ret=False, lhs=False):
         return allocate([ptr1, ptr2], mem)
       case Prim('permission', args):
         ptr = interp_exp(args[0], env, mem, dup=False)
-        return Number(True, ptr.privilege)
+        if not isinstance(ptr, Pointer):
+            error(e.location, "permission operation requires pointer, not "
+                  + str(ptr))
+        return Number(True, ptr.permission)
       case Prim('join', args):
         ptr1 = interp_exp(args[0], env, mem)
         ptr2 = interp_exp(args[1], env, mem)
@@ -581,8 +599,8 @@ def pattern_match(pat, val, matches):
     match pat:
       case WildCard():
         return True
-      case VarPat(kind, id):
-        matches[id] = (kind, val)
+      case ParamPat(param):
+        matches[id] = (param.kind, val)
         return True
       case _:
         raise Exception('error in pattern match, unhandled: ' + repr(pat))
@@ -619,7 +637,7 @@ def interp_stmt(s, env, mem, return_priv):
         # allow recursion
         rest_env = env.copy()
         rest_env[var.ident] = None
-        val = interp_exp(init, rest_env, mem)
+        val = interp_init(init, rest_env, mem)
         vars_kinds = [(var.ident, var.kind)]
         allocate_locals(vars_kinds, [val], rest_env, s.location)
         retval = interp_stmt(rest, rest_env, mem, return_priv)
@@ -695,8 +713,6 @@ def interp_stmt(s, env, mem, return_priv):
         error(s.location, 'no case was a match for ' + str(val))
       case Delete(arg):
         ptr = interp_exp(arg, env, mem)
-        if trace:
-            print('delete ' + str(ptr))
         delete(ptr, mem, s.location)
         kill_temp(ptr, mem, s.location)
         if trace:

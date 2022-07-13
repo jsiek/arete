@@ -45,33 +45,31 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "not" exp_hi             -> not
     | "(" exp ")"              -> paren
     | "function" param_list ret_priv "{" stmt "}" -> lambda
-    | exp_hi "(" exp_list ")"  -> call
-    | "new" init_list          -> new
-    | "true"                   -> true
-    | "false"                  -> false
+    | exp_hi "(" init_list ")"  -> call
+    | "new" init_list           -> new
+    | "true"                    -> true
+    | "false"                   -> false
       
-?exp_list:                  -> empty
-    | exp                 -> single
-    | exp "," exp_list    -> push
+?exp_list:                      -> empty
+    | exp                       -> single
+    | exp "," exp_list          -> push
 
-?init: exp                       -> read_init
-    | "!" exp                    -> write_init
-    | exp "of" exp               -> frac_init
+?init: exp                      -> half_init
+    | exp "of" exp              -> frac_init
 
-?init_list:                  -> empty
-    | init                 -> single
-    | init "," init_list   -> push
+?init_list:                     -> empty
+    | init                      -> single
+    | init "," init_list        -> push
 
-param: IDENT                 -> read
-    | "!" IDENT             -> write
+param: IDENT                    -> read
+    | "!" IDENT                 -> write
 
-?param_list:                     -> empty
+?param_list:                    -> empty
     | param                     -> single
     | param "," param_list      -> push
 
 ?pat: "⟨" pat_list "⟩"            -> tuple_pat
-    | IDENT                       -> read_pat
-    | "!"     IDENT               -> write_pat
+    | param                       -> param_pat
     | "_"                         -> wildcard_pat
 
 ?pat_list:                        -> empty
@@ -93,7 +91,7 @@ param: IDENT                 -> read
     | "if" exp "{" stmt "}" "else" "{" stmt "}" -> if_else
     | "match" exp case_list            -> match
 
-?stmt: "var" param "=" exp ";" stmt   -> var_init
+?stmt: "var" param "=" init ";" stmt   -> var_init
     | "return" exp ";"                 -> return
     | basic_stmt stmt                  -> seq
     |                                  -> pass

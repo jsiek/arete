@@ -1,4 +1,4 @@
-var p = new 0;
+var !p = 1 of new 0;
 if true {
   p[0] = p[0] + 1;
 }

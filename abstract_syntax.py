@@ -32,12 +32,36 @@ class Param:
     def __repr__(self):
         return str(self)
 
+# Miscelaneous
+
+@dataclass
+class Initializer:
+    location: Meta
+    percentage: Exp
+    arg: Exp
+    __match_args__ = ("location", "percentage", "arg")
+    def __str__(self):
+        return str(self.percentage) + " of " + str(self.arg)
+    def __repr__(self):
+        return str(self)
+    
+@dataclass
+class Case:
+    location: Meta
+    pat: Pat
+    body: Stmt
+    __match_args__ = ("pat", "body")
+    def __str__(self):
+        return "case " + str(self.pat) + ": " + str(self.body)
+    def __repr__(self):
+        return str(self)
+
 # Expressions
 
 @dataclass
 class Call(Exp):
     fun: Exp
-    args: List[Exp]
+    args: List[Initializer]
     __match_args__ = ("fun", "args")
     def __str__(self):
         return str(self.fun) \
@@ -138,7 +162,7 @@ class Lambda(Exp):
 @dataclass
 class VarInit(Stmt):
     var: Param
-    init: Exp
+    init: Initializer
     rest: Stmt
     __match_args__ = ("var", "init", "rest")
     def __str__(self):
@@ -245,12 +269,11 @@ class Assert(Stmt):
 # Patterns
 
 @dataclass
-class VarPat(Pat):
-    kind: str  # read, write
-    ident: str
-    __match_args__ = ("kind", "ident")
+class ParamPat(Pat):
+    param: Param
+    __match_args__ = ("param",)
     def __str__(self):
-        return self.kind + " " + self.ident
+        return str(self.param)
     def __repr__(self):
         return str(self)
 
@@ -271,26 +294,3 @@ class WildCard(Pat):
         return str(self)
     
     
-# Miscelaneous
-
-@dataclass
-class Initializer:
-    location: Meta
-    percentage: Exp
-    arg: Exp
-    __match_args__ = ("location", "percentage", "arg")
-    def __str__(self):
-        return str(self.percentage) + " of " + str(self.arg)
-    def __repr__(self):
-        return str(self)
-    
-@dataclass
-class Case:
-    location: Meta
-    pat: Pat
-    body: Stmt
-    __match_args__ = ("pat", "body")
-    def __str__(self):
-        return "case " + str(self.pat) + ": " + str(self.body)
-    def __repr__(self):
-        return str(self)

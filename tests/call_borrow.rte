@@ -2,8 +2,8 @@ var inc = function !p {
             p[0] = p[0] + 1;
 	    return 0;
           };
-var !q = new 0;
-inc(q);
+var !q = 1 of new 0;
+inc(1 of q);
 q[0] = q[0] + 1;
 var a = q[0];
 delete q;

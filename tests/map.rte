@@ -16,14 +16,14 @@ var map = function f, ls {
 };
 var delete_list = function !ls {
   if not is_null(ls) {
-    delete_list(rest!(ls));
+    delete_list(1 of ls[1]);
     delete ls;
   }
 };
-var !ls1 = new 0, (new 1, (new 2, null));
+var !ls1 = 1 of new 0, (new 1, (new 2, null));
 var inc = function x { return x + 1; };
 var !ls2 = map(inc, ls1);
-delete_list(ls1);
+delete_list(1 of ls1);
 var three = front(rest(rest(ls2)));
-delete_list(ls2);
+delete_list(1 of ls2);
 return three - 3;

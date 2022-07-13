@@ -13,37 +13,20 @@ var none = 0;
 var half = 1/2;
 var all = 1;
 
-var find = function key, !node, !parent {
+var find = function key, node, parent {
   if is_null(node) {
     return parent;
   }
   if key < node[data] {
-    return find(key, node[left], node);
+    return find(key, all of node[left], all of node);
   }
   if node[data] < key {
-    return find(key, node[right], node);
+    return find(key, all of node[right], all of node);
   }
   return node;
 };
 
-var check_node_permissions = function !node {
-  var !p = new permission(node);
-  if not is_null(node[left]) {
-    p[0] = p[0] + permission(node[left][parent]);
-  }
-  if not is_null(node[right]) {
-    p[0] = p[0] + permission(node[right][parent]);
-  }
-  assert p[0] == 1;
-  if not is_null(node[left]) {
-    check_node_permissions(node[left]);
-  }
-  if not is_null(node[right]) {
-    check_node_permissions(node[right]);
-  }
-  delete p;
-};
-var gather_permission = function !node {
+var gather_permission = function node {
   if not is_null(node[left]) {
     node <- 1 of node[left][parent];
   }
@@ -52,7 +35,7 @@ var gather_permission = function !node {
   }
   assert permission(node) == 1;
 };
-var scatter_permission = function !node {
+var scatter_permission = function node {
   if not is_null(node[left]) {
     node[left][parent] <- half of node;
   }
@@ -64,7 +47,7 @@ var scatter_permission = function !node {
 var set_left = function !node, !new_left {
   assert permission(node) == 1;
   assert permission(new_left) == 1;
-  node[left] = new_left;
+  node[left] = all of new_left;
   if not is_null(new_left) {
     node[left][parent] = half of node;
   }
@@ -72,7 +55,7 @@ var set_left = function !node, !new_left {
 var set_right = function !node, !new_right {
   assert permission(node) == 1;
   assert permission(new_right) == 1;
-  node[right] = new_right;
+  node[right] = all of new_right;
   if not is_null(node[right]) {
     node[right][parent] = half of node;
   }
@@ -82,42 +65,39 @@ var insert = function key, !tree {
   if is_null(tree[root]) {
     tree[root] = all of new key, null, null, null, 0;
   } else {
-    var !node = find(key, tree[root], null);
+    var node = all of find(key, all of tree[root], null);
     if key < node[data] {
-      var !new_node = new key, null, null, null, 0;
-      gather_permission(node);
-      set_left(node, new_node);
-      scatter_permission(node);
+      var !new_node = all of new key, null, null, null, 0;
+      gather_permission(all of node);
+      set_left(all of node, all of new_node);
+      scatter_permission(all of node);
     }
     if node[data] < key {
-      var !new_node = new key, null, null, null, 0;
-      gather_permission(node);
-      set_right(node, new_node);
-      scatter_permission(node);
+      var !new_node = all of new key, null, null, null, 0;
+      gather_permission(all of node);
+      set_right(all of node, all of new_node);
+      scatter_permission(all of node);
     }
   }
 };
 
-var delete_node = function !node {
+var delete_node = function node {
   if not is_null(node) {
-    gather_permission(node);
-    delete_node(node[left]);
-    delete_node(node[right]);
+    gather_permission(all of node);
+    delete_node(all of node[left]);
+    delete_node(all of node[right]);
     delete node;
   }
 };
 var delete_tree = function !tree {
-  delete_node(tree[root]);
+  delete_node(all of tree[root]);
   delete tree;
 };
 
-var !tree = new null;
-insert(5, tree);
-check_node_permissions(tree[root]);
-insert(10, tree);
-check_node_permissions(tree[root]);
-insert(1, tree);
-check_node_permissions(tree[root]);
+var !tree = all of new null;
+insert(5, all of tree);
+insert(10, all of tree);
+insert(1, all of tree);
 var ten = find(10, tree[root])[data];
-delete_tree(tree);
+delete_tree(all of tree);
 return ten - 10;

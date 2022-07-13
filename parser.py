@@ -125,10 +125,8 @@ def parse_tree_to_ast(e):
         return Delete(e.meta, parse_tree_to_ast(e.children[0]))
     
     # patterns
-    elif e.data == 'read_pat':
-        return VarPat(e.meta, 'read', str(e.children[0].value))
-    elif e.data == 'write_pat':
-        return VarPat(e.meta, 'write', str(e.children[0].value))
+    elif e.data == 'param_pat':
+        return ParamPat(e.meta, e.children[0])
     elif e.data == 'tuple_pat':
         return TuplePat(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'wildcard_pat':
@@ -139,10 +137,8 @@ def parse_tree_to_ast(e):
         return Case(e.meta,
                     parse_tree_to_ast(e.children[0]),
                     parse_tree_to_ast(e.children[1]))
-    elif e.data == 'read_init':
+    elif e.data == 'half_init':
         return Initializer(e.meta, Frac(e.meta, Fraction(1,2)), parse_tree_to_ast(e.children[0]))
-    elif e.data == 'write_init':
-        return Initializer(e.meta, Frac(e.meta, Fraction(1,1)), parse_tree_to_ast(e.children[0]))
     elif e.data == 'frac_init':
         return Initializer(e.meta, parse_tree_to_ast(e.children[0]), parse_tree_to_ast(e.children[1]))
     elif e.data == 'return_read':

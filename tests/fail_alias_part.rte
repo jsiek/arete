@@ -1,4 +1,4 @@
-var !t = new !(new 10);
+var !t = new 1 of (new 10);
 {
   match t[0]
   | case !p: {
