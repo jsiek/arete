@@ -4,48 +4,40 @@ var listof = function data {
 var push = function data, !list {
   return new data, !list;
 };
-var head = function list {
-  return list[0];
-};
-var tail = function list {
-  return list[1];
-};
-// mutable access to the tail
-var mtail = function !list {
-  return list[1];
-};
-var is_last = function n {
-  if is_null(n) then
+var head = 0;
+var tail = 1;
+var is_last = function node {
+  if is_null(node) {
     return false;
-  else {
-    return is_null(tail(n));
+  } else {
+    return is_null(node[tail]);
   }
 };
 // Split the list into two parts, with the second
 // part just containing the last element.
 var remove_last = function !n {
-  if is_null(n) then
+  if is_null(n) {
     return 0;
-  else if is_last(tail(n)) then {
-      var !q = mtail(n);
-      n @ 1 = null;
-      return q;
   } else {
-    return remove_last(mtail(n));
+    if is_last(n[tail]) {
+      var !q = n[tail];
+      n[tail] = null;
+      return q;
+    } else {
+      return remove_last(n[tail]);
+    }
   }
 };
 var delete_list = function !n {
-  if not is_null(n) then {
-    if not is_null(tail(n)) then {
-      delete_list(mtail(n));
-    } else {}
+  if not is_null(n) {
+    delete_list(n[tail]);
     delete n;
-  } else {}
+  }
 };
 var !one_two = push(1, listof(2));
 var !two_null = remove_last(one_two);
-var one = head(one_two);
-var two = head(two_null);
+var one = one_two[head];
+var two = two_null[head];
 delete_list(one_two);
 delete_list(two_null);
 return one + one - two;

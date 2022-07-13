@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import List, Set, Dict, Tuple, Any
 from lark.tree import Meta
+from fractions import Fraction
 
 @dataclass
 class AST:
@@ -92,6 +93,15 @@ class Int(Exp):
         return str(self)
 
 @dataclass
+class Frac(Exp):
+    value: Fraction
+    __match_args__ = ("value",)
+    def __str__(self):
+        return str(self.value)
+    def __repr__(self):
+        return str(self)
+    
+@dataclass
 class Bool(Exp):
     value: bool
     __match_args__ = ("value",)
@@ -138,12 +148,11 @@ class VarInit(Stmt):
 
 @dataclass
 class Write(Stmt):
-    ptr: Exp
-    index: Exp
+    lhs: Exp
     rhs: Exp
-    __match_args__ = ("ptr", "index", "rhs")
+    __match_args__ = ("lhs", "rhs")
     def __str__(self):
-        return str(self.ptr) + " @ " + str(self.index) + " = " + str(self.rhs) + ";"
+        return str(self.lhs) + " = " + str(self.rhs) + ";"
     def __repr__(self):
         return str(self)
 
@@ -267,11 +276,11 @@ class WildCard(Pat):
 @dataclass
 class Initializer:
     location: Meta
-    kind: str # read, write
+    percentage: Exp
     arg: Exp
-    __match_args__ = ("kind", "arg")
+    __match_args__ = ("location", "percentage", "arg")
     def __str__(self):
-        return self.kind + " " + str(self.arg)
+        return str(self.percentage) + " of " + str(self.arg)
     def __repr__(self):
         return str(self)
     

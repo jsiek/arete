@@ -10,7 +10,11 @@ import copy
 @dataclass
 class Value:
     temporary: bool
-
+    def node_name(self):
+        return str(self)
+    def node_label(self):
+        return str(self)
+    
 @dataclass
 class Number(Value):
     value: numbers.Number
@@ -22,6 +26,8 @@ class Number(Value):
           return self
       else:
           return Number(False, self.value)
+    def init(self, percent, location):
+        return self.initialize('read', location, False)
     def duplicate(self, percentage):
         return Number(True, self.value)
     def return_copy(self, kind, location):
@@ -32,9 +38,9 @@ class Number(Value):
     def kill(self, mem, location):
         pass
     def __str__(self):
-        return repr(self.value)
+        return str(self.value)
     def __repr__(self):
-        return repr(self.value)
+        return str(self)
 
 @dataclass
 class Boolean(Value):
@@ -47,6 +53,8 @@ class Boolean(Value):
           return self
       else:
           return Boolean(False, self.value)
+    def init(self, percent, location):
+        return self.initialize('read', location, False)
     def duplicate(self, percentage):
         return Boolean(True, self.value)
     def return_copy(self, kind, location):
@@ -59,7 +67,7 @@ class Boolean(Value):
     def __str__(self):
         return repr(self.value)
     def __repr__(self):
-        return repr(self.value)
+        return str(self)
     
 def priv_str(priv):
   if priv == 'none':
@@ -82,7 +90,6 @@ class Pointer(Value):
     address: int
     privilege: Fraction    # none is 0, read is 1/n, write is 1/1
     lender: Value          # who this pointer borrowed from, if any
-    borrowers: List[Value] # who borrowed from this pointer
     
     __match_args__ = ("temporary", "address", "privilege")
 
@@ -94,10 +101,18 @@ class Pointer(Value):
         #     + ", " + ("tmp" if self.temporary else "prm") \
         #     + (" from: " +str(self.lender) if not self.lender is None else "") \
         #     + "⦆" 
-        return "⦅ " + str(self.address) + " @" + priv_str(self.privilege) + "⦆" 
-    
+        return "⦅ " + str(self.address) + " @" + priv_str(self.privilege) \
+            + ", " + str(id(self)) \
+            + "⦆"
     def __repr__(self):
         return str(self)
+
+    def node_name(self):
+        return str(self.address)
+
+    def node_label(self):
+        return str(self.privilege) + ' of ' + str(self.address) \
+            + '(' + str(id(self)) + ')' 
 
     def transfer(self, percent, other, location):
         if self.address != other.address:
@@ -108,10 +123,13 @@ class Pointer(Value):
         self.privilege += amount
         
     def duplicate(self, percentage):
+        if trace:
+            print('duplicating ' + str(percentage) + ' of ' + str(self))
         other_priv = self.privilege * percentage
         self.privilege -= other_priv
-        ptr = Pointer(True, self.address, other_priv, self, [])
-        self.borrowers.append(ptr)
+        ptr = Pointer(True, self.address, other_priv, self)
+        if trace:
+            print('producing ' + str(ptr))
         return ptr
     
     # self: the pointer being initialized from
@@ -137,11 +155,23 @@ class Pointer(Value):
               return ptr
           else:
               ptr = self.duplicate(Fraction(1,2))
+              #ptr = self.duplicate(Fraction(1,1))
               ptr.temporary = False
               return ptr
       else:
           raise Exception('initialize unexpected privilege: ' + priv)
 
+    # self: the pointer being initialized from
+    # percent: the amount of privilege to take from self
+    def init(self, percent, location):
+      if self.temporary:
+        self.temporary = False
+        return self
+      else:
+        ptr = self.duplicate(percent)
+        ptr.temporary = False
+        return ptr
+      
     # Copy the return value of a function.
     # Similar to initialize with respect to permissions, but
     # produces a temporary value.
@@ -151,49 +181,54 @@ class Pointer(Value):
       else:
           return self.duplicate(1)
           
-      # if kind == 'write':
-      #     if not writable(self.privilege):
-      #         error(location, 'initializing writable pointer requires writable pointer, not ' + str(self))
-      #     if self.temporary:
-      #         return self
-      #     else:
-      #         self.privilege = Fraction(0,1)
-      #         ptr = Pointer(True, self.address, Fraction(1, 1), self, [])
-      #         self.borrowers.append(ptr)
-      #         return ptr
-      # elif kind == 'read':
-      #     if self.temporary:
-      #         return self
-      #     else:
-      #         half = self.privilege / 2
-      #         self.privilege = half
-      #         ptr = Pointer(True, self.address, half, self, [])
-      #         self.borrowers.append(ptr)
-      #         return ptr
-      # else:
-      #     raise Exception('initialize unexpected privilege: ' + priv)
-      
     def kill(self, mem, location):
         if trace:
             print('kill ' + str(self))
+        self.lender = find_lender(self.lender)
         if self.lender is None:
-            # consider automatically deleting
-            # if self.privilege == Fraction(1,1):
-            #     delete(self, mem, location)
             if self.privilege != Fraction(0,1):
                 warning(location, 'memory leak, killing nonempty pointer'
                         + ' without lender')
-            for b in self.borrowers:
-                b.lender = None
         else:
-            # redirect my borrowers to my lender
-            if not (self.lender.address is None):
-                self.lender.privilege += self.privilege
-                for b in self.borrowers:
-                    b.lender = self.lender
+            if trace:
+                print('giving back from ' + str(self))
+            self.lender.privilege += self.privilege
+            if trace:
+                print('to ' + str(self.lender))
         self.address = None
         self.privilege = Fraction(0,1)
-        self.lender = None
+
+# find the first ptr in the lender chain that is not yet killed,
+# i.e. that has a non-None address.
+def find_lender(ptr):
+   if ptr is None:
+       return None
+   elif ptr.address is None:
+       lender = find_lender(ptr.lender)
+       ptr.lender = lender
+       return lender
+   else:
+       return ptr
+           
+@dataclass
+class Offset(Value):
+    ptr: Pointer
+    offset: int
+    def __str__(self):
+        return str(self.ptr) + "[" + str(self.offset) + "]"
+    def __repr__(self):
+        return str(self)
+    def equals(self, other):
+        return self.ptr == other.ptr and self.offset == other.offset
+    def duplicate(self, percentage):
+        return Offset(True, self.ptr.duplicate(percentage), self.offset)
+    def return_copy(self, kind, location):
+      if self.temporary:
+          return self
+      else:
+          return Offset(True, self.ptr.duplicate(percentage), self.offset)
+    def kill(self, mem, location):
+        self.ptr.kill(mem, location)
 
 def writable(frac):
     return frac == Fraction(1, 1)
@@ -231,24 +266,66 @@ class Closure(Value):
     body: Stmt
     env: Any # needs work
     __match_args__ = ("temporary", "params", "return_priv", "body", "env")
+    def duplicate(self, percentage):
+        return self
     def initialize(self, kind, location, ret=False):
         return self # ???
+    def init(self, percent, location):
+        return self.initialize('read', location, False)
     def kill(self, mem, location):
         pass # ???
     def __str__(self):
         return "closure"
     def __repr__(self):
-        return "closure"
+        return str(self)
     
 trace = False
 next_address = 0
 
+def generate_graphviz(env, mem):
+    result = 'digraph {\n'
+    # nodes
+    for var, val in env.items():
+        if isinstance(val, Pointer):
+            result += val.node_name() + '[label="' \
+                + var + ':' + val.node_label() + '"];\n'
+    for addr, vals in mem.items():
+        result += 'struct' + str(addr) + ' [shape=record,label="' \
+            + str(addr) + ':|' \
+            + '|'.join(['<' + val.node_name() + '>' + val.node_label() for val in vals]) \
+            + '"];\n'
+    # edges
+    for var, val in env.items():
+        if isinstance(val, Pointer):
+            if not (val.address is None):
+                result += val.node_name() + ' -> ' \
+                    + 'struct' + str(val.address) + ';\n'
+    for addr, vals in mem.items():
+        for val in vals:
+            if isinstance(val, Pointer) and not (val.address is None):
+                result += 'struct' + str(addr) + ':' + val.node_name() \
+                    + ' -> ' + 'struct' + str(val.address) + ';\n'
+    result += '}\n'
+    return result
+
+def log_graphviz(env, mem):
+    global graph_number
+    filename = "env_mem_" + str(graph_number) + ".dot"
+    graph_number += 1
+    file = open(filename, 'w')
+    file.write(generate_graphviz(env, mem))
+    file.close()
+    print('log graphviz: ' + filename)
+    
 def allocate(vals, mem):
     global next_address
     addr = next_address
     next_address += 1
     mem[addr] = vals
-    return Pointer(True, addr, Fraction(1,1), None, [])
+    ptr = Pointer(True, addr, Fraction(1,1), None)
+    if trace:
+        print('allocated new pointer ' + str(ptr))
+    return ptr
 
 def read(ptr, index, mem, location, dup):
     if not isinstance(ptr, Pointer):
@@ -261,10 +338,10 @@ def read(ptr, index, mem, location, dup):
         retval = mem[ptr.address][index].duplicate(ptr.privilege)
     else:
         retval = mem[ptr.address][index]
-    if trace:
-        print('read ' + str(ptr) + ' @ ' + str(index))
-        print('    from: ' + str(mem[ptr.address][index]))
-        print('    to: ' + str(retval))
+    if False:
+        print('read from ' + str(ptr) + '[' + str(index) + ']')
+        print('    value: ' + str(mem[ptr.address][index]))
+        print('    producing: ' + str(retval))
     return retval
     #return mem[ptr.address]
 
@@ -283,13 +360,15 @@ def write(ptr, index, val, mem, location):
 def delete(ptr, mem, location):
     match ptr:
       case Pointer(tmp, addr, priv):
+        if trace:
+            print('delete ' + str(ptr))
         if not writable(priv):
           error(location, 'delete needs writable pointer, not ' + str(ptr))
         for val in mem[addr]:
             val.kill(mem, location)
         del mem[addr]
-        ptr.privilege = Fraction(0, 1)
-        ptr.address = None
+        ptr.privilege = Fraction(0,1)
+        ptr.kill(mem, location)
     
 def allocate_locals(vars_kinds, vals, env, location):
     if trace:
@@ -346,9 +425,10 @@ def call_function(fun, args, env, mem, location):
     
 def interp_init(init, env, mem, ret=False):
     match init:
-      case Initializer(kind, arg):
+      case Initializer(loc, percent, arg):
+        percentage = to_number(interp_exp(percent, env, mem), loc)
         val = interp_exp(arg, env, mem)
-        return val.initialize(kind, init.location, ret=ret)
+        return val.init(percentage, init.location)
       case _:
         error(init.location, 'in interp_init, expected an initializer, not '
               + repr(init))
@@ -367,7 +447,12 @@ def to_boolean(val, location):
       case _:
         error(location, 'expected a boolean, not ' + str(val))
 
-def interp_exp(e, env, mem, dup=True, ret=False):
+compare_ops = { 'less': lambda x, y: x < y,
+                'less_equal': lambda x, y: x <= y,
+                'greater': lambda x, y: x > y,
+                'greater_equal': lambda x, y: x >= y}
+        
+def interp_exp(e, env, mem, dup=True, ret=False, lhs=False):
     match e:
       case Var(x):
         if x not in env:
@@ -375,8 +460,19 @@ def interp_exp(e, env, mem, dup=True, ret=False):
         return env[x]
       case Int(n):
         return Number(True, n)
+      case Frac(f):
+        return Number(True, f)
       case Bool(b):
         return Boolean(True, b)
+      case Prim(cmp, args) if cmp in compare_ops.keys():
+        left = interp_exp(args[0], env, mem)
+        right = interp_exp(args[1], env, mem)
+        l = to_number(left, e.location)
+        r = to_number(right, e.location)
+        retval = Boolean(True, compare_ops[cmp](l, r))
+        kill_temp(left, mem, e.location)
+        kill_temp(right, mem, e.location)
+        return retval
       case Prim('equal', args):
         left = interp_exp(args[0], env, mem)
         right = interp_exp(args[1], env, mem)
@@ -422,7 +518,7 @@ def interp_exp(e, env, mem, dup=True, ret=False):
         val = to_boolean(interp_exp(args[0], env, mem), e.location)
         return Boolean(True, not val)
       case Prim('null'):
-        return Pointer(True, None, Fraction(0,1), None, [])
+        return Pointer(True, None, Fraction(0,1), None)
       case Prim('is_null', args):
         ptr = interp_exp(args[0], env, mem)
         match ptr:
@@ -461,14 +557,17 @@ def interp_exp(e, env, mem, dup=True, ret=False):
         ptr = interp_exp(arg, env, mem, dup=dup)
         ind = interp_exp(index, env, mem)
         if trace:
-            print('indexing ptr ' + str(ptr) + ' @ ' + str(ind))
+            print('indexing ptr ' + str(ptr) + '[' + str(ind) + ']')
         match ind:
           case Number(tmp, i):
-            retval = read(ptr, i, mem, e.location, dup)
-            kill_temp(ptr, mem, e.location)
-            kill_temp(ind, mem, e.location)
-            if trace:
-                print('index result: ' + str(retval))
+            if lhs:
+                retval = Offset(ptr.temporary, ptr, i)
+            else:
+                retval = read(ptr, i, mem, e.location, dup)
+                kill_temp(ptr, mem, e.location)
+                kill_temp(ind, mem, e.location)
+                if trace:
+                    print('index result: ' + str(retval))
             return retval
           case _:
             error(e.location, 'index must be an integer, not ' + repr(ind))
@@ -504,12 +603,16 @@ def warning(location, msg):
                 line2=location.end_line, column2=location.end_column)
     print(header + 'warning: ' + msg)
 
+graph_number = 0
+
+    
 def interp_stmt(s, env, mem, return_priv):
     if trace:
         print()
         print('interp_stmt ' + repr(s))
         print(env)
         print(mem)
+        log_graphviz(env, mem)
         print()
     match s:
       case VarInit(var, init, rest):
@@ -522,13 +625,16 @@ def interp_stmt(s, env, mem, return_priv):
         retval = interp_stmt(rest, rest_env, mem, return_priv)
         deallocate_locals(vars_kinds, [val], rest_env, mem, s.location)
         return retval
-      case Write(lhs, index, rhs):
-        ptr = interp_exp(lhs, env, mem, dup=False)
-        i = interp_exp(index, env, mem)
-        val = interp_exp(rhs, env, mem)
-        write(ptr, to_number(i, s.location), val, mem, s.location)
-        kill_temp(ptr, mem, s.location)
-        kill_temp(i, mem, s.location)
+      case Write(lhs, rhs):
+        offset = interp_exp(lhs, env, mem, dup=False, lhs=True)
+        val = interp_init(rhs, env, mem)
+        if not isinstance(offset, Offset):
+            error(s.location, "expected pointer offset on left-hand side of " 
+                  + "assignment, not " + str(offset))
+        write(offset.ptr, offset.offset, val, mem, s.location)
+        if trace:
+            print('kill offset temp')
+        kill_temp(offset, mem, s.location)
         kill_temp(val, mem, s.location)
       case Transfer(lhs, percent, rhs):
         dest_ptr = interp_exp(lhs, env, mem, dup=False)
@@ -623,7 +729,7 @@ if __name__ == "__main__":
     if 'trace' in sys.argv:
         trace = True
     p = file.read()
-    ast = parse(p, trace)
+    ast = parse(p, False)
     try:
         retval = interp(ast)
         if expect_fail:

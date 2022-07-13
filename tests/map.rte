@@ -8,14 +8,14 @@ var rest! = function !ls {
   return ls[1];
 };
 var map = function f, ls {
-  if is_null(ls) then
+  if is_null(ls) {
     return null;
-  else
+  } else {
     return new f(front(ls)), map(f, rest(ls));
+  }
 };
 var delete_list = function !ls {
-  if is_null(ls) then {}
-  else {
+  if not is_null(ls) {
     delete_list(rest!(ls));
     delete ls;
   }

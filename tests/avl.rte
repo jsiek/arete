@@ -1,0 +1,123 @@
+// AVL Tree (UNDER CONSTRUCTION)
+// tree layout: [root]
+var root = 0;
+// node layout: [data, left, right, parent, height]
+var data = 0;
+var left = 1;
+var right = 2;
+var parent = 3;
+var height = 4;
+
+// Common fractions
+var none = 0;
+var half = 1/2;
+var all = 1;
+
+var find = function key, !node, !parent {
+  if is_null(node) {
+    return parent;
+  }
+  if key < node[data] {
+    return find(key, node[left], node);
+  }
+  if node[data] < key {
+    return find(key, node[right], node);
+  }
+  return node;
+};
+
+var check_node_permissions = function !node {
+  var !p = new permission(node);
+  if not is_null(node[left]) {
+    p[0] = p[0] + permission(node[left][parent]);
+  }
+  if not is_null(node[right]) {
+    p[0] = p[0] + permission(node[right][parent]);
+  }
+  assert p[0] == 1;
+  if not is_null(node[left]) {
+    check_node_permissions(node[left]);
+  }
+  if not is_null(node[right]) {
+    check_node_permissions(node[right]);
+  }
+  delete p;
+};
+var gather_permission = function !node {
+  if not is_null(node[left]) {
+    node <- 1 of node[left][parent];
+  }
+  if not is_null(node[right]) {
+    node <- 1 of node[right][parent];
+  }
+  assert permission(node) == 1;
+};
+var scatter_permission = function !node {
+  if not is_null(node[left]) {
+    node[left][parent] <- half of node;
+  }
+  if not is_null(node[right]) {
+    node[right][parent] <- half of node;
+  }
+};
+
+var set_left = function !node, !new_left {
+  assert permission(node) == 1;
+  assert permission(new_left) == 1;
+  node[left] = new_left;
+  if not is_null(new_left) {
+    node[left][parent] = half of node;
+  }
+};
+var set_right = function !node, !new_right {
+  assert permission(node) == 1;
+  assert permission(new_right) == 1;
+  node[right] = new_right;
+  if not is_null(node[right]) {
+    node[right][parent] = half of node;
+  }
+};
+
+var insert = function key, !tree {
+  if is_null(tree[root]) {
+    tree[root] = all of new key, null, null, null, 0;
+  } else {
+    var !node = find(key, tree[root], null);
+    if key < node[data] {
+      var !new_node = new key, null, null, null, 0;
+      gather_permission(node);
+      set_left(node, new_node);
+      scatter_permission(node);
+    }
+    if node[data] < key {
+      var !new_node = new key, null, null, null, 0;
+      gather_permission(node);
+      set_right(node, new_node);
+      scatter_permission(node);
+    }
+  }
+};
+
+var delete_node = function !node {
+  if not is_null(node) {
+    gather_permission(node);
+    delete_node(node[left]);
+    delete_node(node[right]);
+    delete node;
+  }
+};
+var delete_tree = function !tree {
+  delete_node(tree[root]);
+  delete tree;
+};
+
+var !tree = new null;
+insert(5, tree);
+check_node_permissions(tree[root]);
+insert(10, tree);
+check_node_permissions(tree[root]);
+insert(1, tree);
+check_node_permissions(tree[root]);
+var ten = find(10, tree[root])[data];
+delete_tree(tree);
+return ten - 10;

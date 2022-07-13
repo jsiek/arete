@@ -39,7 +39,9 @@ def parse_tree_to_param(e):
         return Param(e.meta, e.data, e.children[0].value)
 
 primitive_ops = {'add', 'sub', 'mul', 'div', 'neg', 'and', 'or', 'not', 'null',
-                 'is_null', 'split', 'join', 'equal', 'not_equal', 'permission'}
+                 'is_null', 'split', 'join', 'equal', 'not_equal',
+                 'less', 'greater', 'less_equal', 'greater_equal',
+                 'permission'}
     
 def parse_tree_to_ast(e):
     e.meta.filename = filename
@@ -85,8 +87,7 @@ def parse_tree_to_ast(e):
     elif e.data == 'write':
         return Write(e.meta,
                      parse_tree_to_ast(e.children[0]),
-                     parse_tree_to_ast(e.children[1]),
-                     parse_tree_to_ast(e.children[2]))
+                     parse_tree_to_ast(e.children[1]))
     elif e.data == 'transfer':
         return Transfer(e.meta,
                         parse_tree_to_ast(e.children[0]),
@@ -114,6 +115,11 @@ def parse_tree_to_ast(e):
         return IfStmt(e.meta,
                       parse_tree_to_ast(e.children[0]),
                       parse_tree_to_ast(e.children[1]),
+                      Pass(e.meta))
+    elif e.data == 'if_else':
+        return IfStmt(e.meta,
+                      parse_tree_to_ast(e.children[0]),
+                      parse_tree_to_ast(e.children[1]),
                       parse_tree_to_ast(e.children[2]))
     elif e.data == 'delete':
         return Delete(e.meta, parse_tree_to_ast(e.children[0]))
@@ -134,9 +140,11 @@ def parse_tree_to_ast(e):
                     parse_tree_to_ast(e.children[0]),
                     parse_tree_to_ast(e.children[1]))
     elif e.data == 'read_init':
-        return Initializer(e.meta, 'read', parse_tree_to_ast(e.children[0]))
+        return Initializer(e.meta, Frac(e.meta, Fraction(1,2)), parse_tree_to_ast(e.children[0]))
     elif e.data == 'write_init':
-        return Initializer(e.meta, 'write', parse_tree_to_ast(e.children[0]))
+        return Initializer(e.meta, Frac(e.meta, Fraction(1,1)), parse_tree_to_ast(e.children[0]))
+    elif e.data == 'frac_init':
+        return Initializer(e.meta, parse_tree_to_ast(e.children[0]), parse_tree_to_ast(e.children[1]))
     elif e.data == 'return_read':
         return 'read'
     elif e.data == 'return_write':

@@ -3,13 +3,16 @@ var back = 1;
 var data = 0;
 var prev = 1;
 var next = 2;
+var none = 0;
+var half = 1/2;
+var all = 1;
 var listof = function data {
   var !p = new data, null, null;
   return split(p);
 };
 var push = function data, !lst {
   var !first = new data , null , null;
-  if lst[front] == lst[back] then { // lst is a 1 element list
+  if lst[front] == lst[back] { // lst is a 1 element list
     /*
       first: * -1-> [ A , / , / ]
       
@@ -19,76 +22,75 @@ var push = function data, !lst {
 		  [ B , / , / ]
     */
     var !n = join(lst[front], lst[back]);
-    n @ prev = first;
-    first <= 1 of n[prev];
-    first @ next = n;
-    n <= 1/2 of first[next];
-    n[prev] <= 1/2 of first;
+    n[prev] = none of first;
+    first[next] = half of n;
+    n[prev] <- half of first;
     /*
       first: *-.5-> [ A , / , * ]
                     ^         |
                     |.5       |.5
       n: -.5-> [ B, * , / ]<--|
     */
-    lst @ front = first;
-    lst @ back = n;
+    lst[front] = all of first;
+    lst[back] = all of n;
     return lst;
   } else { // lst has at least 2 elements
     /*
-      first: *-1-> [ E, / , / ]
+      first: *-1-> [ A, / , / ]
       
       lst: *-1->[ * , * ]
 		.5|  .5\____________________________
-		  |           /--.5---             |
+		  |           ___.5___             |
 		  V           V       \            V
-		  [ A , / , * ]  [ B , * , * ] ... [ Z , * , / ]
+		  [ B , / , * ]  [ C , * , * ] ... [ Z , * , / ]
+		            |    ^         |             |
 		            |___/          |             |   
 			      .5            \-.5->  <-.5-/
      */
-    lst[front] <= 1 of lst[front][next][prev];
-    lst[front] @ prev = first;
-    first <= 1 of lst[front][prev];
-    lst[front][next][prev] <= 1/2 of lst[front];
-    first @ next = lst[front];
-    first[next][prev] <= 1/2 of first;
-    lst @ front = first;
+    lst[front] <- all of lst[front][next][prev];
+    lst[front][prev] = none of first;
+    lst[front][next][prev] <- half of lst[front];
+    first[next] = all of lst[front];
+    first[next][prev] <- half of first;
+    lst[front] = all of first;
     /*
            lst: *-1-> [ * , * ]
-                      .5|   \____.5________________________________
+                      .5|   \____.5_______________________________
 			V                                         |
-	              [ E, / , * ]                                |
+	              [ A, / , * ]                                |
 				 |           |--.5---             |
 				 V           V       \            V
-				 [ A , * , * ]  [ B , * , * ] ... [ Z , * , / ]
-			                   |   /          |             |
-				           \-.5           \-.5->   <-.5-/
+				 [ B , * , * ]  [ C , * , * ] ... [ Z , * , / ]
+				           |    ^         |             |
+			                   |    |         |             |
+				           \-.5-/         \-.5->   <-.5-/
      */
     return lst;
   }
 };
 
 var check_nodes_permissions = function !node {
-  if not is_null(node[next]) then {
-    assert permission(node[next]) == 1/2;
+  if not is_null(node[next]) {
+    assert permission(node[next]) == half;
     check_nodes_permissions(node[next]);
-  } else {}
-  if not is_null(node[prev]) then {
-    assert permission(node[prev]) == 1/2;
-  } else {}
+  }
+  if not is_null(node[prev]) {
+    assert permission(node[prev]) == half;
+  }
 };
 var check_list_permissions = function !list {
   var !first = list[front];
   var !last = list[back];
-  assert permission(first) == 1/2;
-  assert permission(last) == 1/2;
+  assert permission(first) == half;
+  assert permission(last) == half;
   check_nodes_permissions(first);
 };
 
 var delete_nodes = function !node, !last {
-  if node == last then {
+  if node == last {
     delete join(node, last);
   } else {
-    node <= 1 of node[next][prev];
+    node <- all of node[next][prev];
     delete_nodes(node[next], last);
     delete node;
   }

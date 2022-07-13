@@ -1,0 +1,10 @@
+var p = new 0;
+if true {
+  p[0] = p[0] + 1;
+}
+if true {
+  p[0] = p[0] + 2;
+}
+var three = p[0];
+delete p;
+return three - 3;
