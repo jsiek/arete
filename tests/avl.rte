@@ -63,17 +63,17 @@ var set_right = function !node, !new_right {
 
 var insert = function key, !tree {
   if is_null(tree[root]) {
-    tree[root] = all of new key, null, null, null, 0;
+    tree[root] = new key, null, null, null, 0;
   } else {
     var node = all of find(key, all of tree[root], null);
     if key < node[data] {
-      var !new_node = all of new key, null, null, null, 0;
+      var !new_node = new key, null, null, null, 0;
       gather_permission(all of node);
       set_left(all of node, all of new_node);
       scatter_permission(all of node);
     }
     if node[data] < key {
-      var !new_node = all of new key, null, null, null, 0;
+      var !new_node = new key, null, null, null, 0;
       gather_permission(all of node);
       set_right(all of node, all of new_node);
       scatter_permission(all of node);
@@ -94,7 +94,7 @@ var delete_tree = function !tree {
   delete tree;
 };
 
-var !tree = all of new null;
+var !tree = new null;
 insert(5, all of tree);
 insert(10, all of tree);
 insert(1, all of tree);

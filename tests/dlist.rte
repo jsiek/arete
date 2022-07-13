@@ -7,11 +7,11 @@ var none = 0;
 var half = 1/2;
 var all = 1;
 var listof = function data {
-  var !p = all of new data, null, null;
+  var !p = new data, null, null;
   return split(p);
 };
 var push = function data, !lst {
-  var !first = all of new data , null , null;
+  var !first = new data , null , null;
   if lst[front] == lst[back] { // lst is a 1 element list
     /*
       first: * -1-> [ A , / , / ]

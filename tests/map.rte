@@ -17,7 +17,7 @@ var map = function f, ls {
 var all = 1;
 var delete_list = function !ls {
   if not is_null(ls) {
-    delete_list(all of ls[1]);
+    delete_list(all of rest!(all of ls));
     delete ls;
   }
 };
