@@ -1,5 +1,5 @@
 var !q = new 1;
-{ var !p = 1 of q;
+{ var !p = q;
   p[0] = p[0] + 1; }
 q[0] = q[0] + 1;
 var a = q[0];

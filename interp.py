@@ -406,9 +406,10 @@ def kill_temp(val, mem, location):
         
 def call_function(fun, args, env, mem, location):
     f = interp_exp(fun, env, mem)
-    vals = [interp_init(arg, env, mem) for arg in args]
     match f:
       case Closure(tmp, params, return_priv, body, clos_env):
+        vals = [interp_init(arg, env, mem, param.kind) \
+                for (arg,param) in zip(args,params)]
         body_env = clos_env.copy()
         vars_kinds = [(param.ident, param.kind) for param in params]
         allocate_locals(vars_kinds, vals, body_env, location)
@@ -437,10 +438,18 @@ def call_function(fun, args, env, mem, location):
       case _:
         error(location, 'expected function in call, not ' + repr(f))
     
-def interp_init(init, env, mem, ret=False):
+def interp_init(init, env, mem, privilege):
     match init:
       case Initializer(loc, percent, arg):
-        percentage = to_number(interp_exp(percent, env, mem), loc)
+        if percent is None:
+            if privilege == 'read':
+                percentage = Fraction(1,2)
+            elif privilege == 'write':
+                percentage = Fraction(1,1)
+            else:
+                error(init.location, "unexpected privilege " + privilege)
+        else:
+            percentage = to_number(interp_exp(percent, env, mem), loc)
         val = interp_exp(arg, env, mem)
         return val.init(percentage, init.location)
       case _:
@@ -565,7 +574,7 @@ def interp_exp(e, env, mem, dup=True, ret=False, lhs=False):
             print('into ' + str(ptr))
         return ptr
       case New(inits):
-        vals = [interp_init(init, env, mem) for init in inits]
+        vals = [interp_init(init, env, mem, 'read') for init in inits]
         return allocate(vals, mem)
       case Lambda(params, return_priv, body):
         return Closure(True, params, return_priv, body, env)
@@ -637,7 +646,7 @@ def interp_stmt(s, env, mem, return_priv):
         # allow recursion
         rest_env = env.copy()
         rest_env[var.ident] = None
-        val = interp_init(init, rest_env, mem)
+        val = interp_init(init, rest_env, mem, var.kind)
         vars_kinds = [(var.ident, var.kind)]
         allocate_locals(vars_kinds, [val], rest_env, s.location)
         retval = interp_stmt(rest, rest_env, mem, return_priv)
@@ -645,7 +654,7 @@ def interp_stmt(s, env, mem, return_priv):
         return retval
       case Write(lhs, rhs):
         offset = interp_exp(lhs, env, mem, dup=False, lhs=True)
-        val = interp_init(rhs, env, mem)
+        val = interp_init(rhs, env, mem, 'read')
         if not isinstance(offset, Offset):
             error(s.location, "expected pointer offset on left-hand side of " 
                   + "assignment, not " + str(offset))

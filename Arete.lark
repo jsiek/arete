@@ -54,7 +54,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | exp                       -> single
     | exp "," exp_list          -> push
 
-?init: exp                      -> half_init
+?init: exp                      -> default_init
     | exp "of" exp              -> frac_init
 
 ?init_list:                     -> empty

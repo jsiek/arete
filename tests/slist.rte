@@ -35,9 +35,9 @@ var delete_list = function !n {
   }
 };
 var !one_two = push(1, listof(2));
-var !two_null = remove_last(1 of one_two);
+var !two_null = remove_last(one_two);
 var one = one_two[head];
 var two = two_null[head];
-delete_list(1 of one_two);
-delete_list(1 of two_null);
+delete_list(one_two);
+delete_list(two_null);
 return one + one - two;

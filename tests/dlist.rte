@@ -11,7 +11,7 @@ var listof = function data {
   return split(p);
 };
 var push = function data, !lst {
-  var !first = new data , null , null;
+  var !first = new data, null , null;
   if lst[front] == lst[back] { // lst is a 1 element list
     /*
       first: * -1-> [ A , / , / ]
@@ -21,7 +21,7 @@ var push = function data, !lst {
                   V   V
 		  [ B , / , / ]
     */
-    var !n = all of join(lst[front], lst[back]);
+    var !n = join(lst[front], lst[back]);
     n[prev] = none of first;
     first[next] = half of n;
     n[prev] <- half of first;
@@ -100,12 +100,10 @@ var delete_list = function !list {
   delete list;
 };
 
-var three = all of listof(3);
-check_list_permissions(all of three);
-var two_three = all of push(2, all of three);
-check_list_permissions(all of two_three);
-var one_two_three = push(1, all of two_three);
+var !three = listof(3);
+var !two_three = push(2, three);
+var !one_two_three = push(1, two_three);
 check_list_permissions(all of one_two_three);
 var one = one_two_three[front][data];
-delete_list(all of one_two_three);
+delete_list(one_two_three);
 return one - 1;

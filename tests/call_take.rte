@@ -3,7 +3,7 @@ var inc = function !p {
 	    return p[0];
           };
 var !q = new 0;
-var a = inc(1 of q);
+var a = inc(q);
 delete q;
 return a - 1;
 

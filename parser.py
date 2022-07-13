@@ -137,8 +137,8 @@ def parse_tree_to_ast(e):
         return Case(e.meta,
                     parse_tree_to_ast(e.children[0]),
                     parse_tree_to_ast(e.children[1]))
-    elif e.data == 'half_init':
-        return Initializer(e.meta, Frac(e.meta, Fraction(1,2)), parse_tree_to_ast(e.children[0]))
+    elif e.data == 'default_init':
+        return Initializer(e.meta, None, parse_tree_to_ast(e.children[0]))
     elif e.data == 'frac_init':
         return Initializer(e.meta, parse_tree_to_ast(e.children[0]), parse_tree_to_ast(e.children[1]))
     elif e.data == 'return_read':
