@@ -26,6 +26,16 @@ lark_parser = Lark(open("./Arete.lark").read(), start='arete', parser='lalr',
 # Parsing Concrete to Abstract Syntax
 ##################################################
 
+def parse_tree_to_str_list(e):
+    if e.data == 'empty':
+        return []
+    elif e.data == 'single':
+        return [e.children[0].value]
+    elif e.data == 'push':
+        return [e.children[0].value] + parse_tree_to_str_list(e.children[1])
+    else:
+        raise Exception('parse_tree_to_str_list, unexpected ' + str(e))
+
 def parse_tree_to_param(e):
     e.meta.filename = filename
     if e.data == 'empty':
@@ -77,6 +87,9 @@ def parse_tree_to_ast(e):
         return 'read'
     elif e.data == 'none_priv':
         return 'none'
+    elif e.data == 'member':
+        return Member(e.meta, parse_tree_to_param(e.children[0]),
+                      e.children[1].value)
     
     # statements
     elif e.data == 'var_init':
@@ -123,6 +136,11 @@ def parse_tree_to_ast(e):
                       parse_tree_to_ast(e.children[2]))
     elif e.data == 'delete':
         return Delete(e.meta, parse_tree_to_ast(e.children[0]))
+    elif e.data == 'module':
+        return Module(e.meta,
+                      e.children[0].value,
+                      parse_tree_to_str_list(e.children[1]),
+                      parse_tree_to_ast(e.children[2]))
     
     # patterns
     elif e.data == 'param_pat':

@@ -46,7 +46,21 @@ which should copy the pointer, changing y to read only,
 and then changing y back to write when x goes out of
 scope.
 
+# Permission Groups
 
+Group several pointers together.
+
+
+# Upgrade Permission
+
+Idea from Sam TH:
+
+Suppose you duplicate a pointer and take 1/2 the permission, but
+latter on decide you wanted all of it. (Think `cdr`.)  The idea is to
+have an operation that takes the rest of the permissions from the
+origin, and raises an error if it does not obtain a total of 1.
+(Which would happen if the original pointer had been duplicated
+again.)
 
 
 # Related Literature
@@ -94,6 +108,29 @@ scope.
   
   precursor to "Dynamic Ownership in a Dynamic Language"
 
+* Gradual typestate
+  Wolff, Roger and Garcia, Ronald and Tanter, \'{E}ric and Aldrich, Jonathan
+  ECOOP 2011
+  Wolff:2011hc
+
+  access permissions:
+  * full (write, unique)
+  * shared (write)
+  * pure 
+
+  temporarily holding permissions: the `hold` feature, 
+    use within a lexical scope
+	
+  dynamic assert
+  
+  release a reference
+  
+  each memory cell maintains a list of outstanding permissions, like a
+    generalized reference count
+
+* Gradual Ownership Types
+  I. Sergey, D. Clarke In ESOP 2012, LNCS, vol. 7211, pp. 579–599, 2012.
+
 * Robust Composition ("E" language)
   Mark Miller
   Ph.D. Thesis 2006, Johns Hopkins Univ.
@@ -115,11 +152,4 @@ scope.
 
   Deep copy
 
-* Gradual typestate
-  Wolff, Roger and Garcia, Ronald and Tanter, \'{E}ric and Aldrich, Jonathan
-  ECOOP 2011
-  Wolff:2011hc
-
-* Gradual Ownership Types
-  I. Sergey, D. Clarke In ESOP 2012, LNCS, vol. 7211, pp. 579–599, 2012.
   

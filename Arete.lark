@@ -41,6 +41,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "permission" "(" exp ")"   -> permission
     | IDENT                    -> var
     | exp_hi "[" exp "]"       -> index
+    | exp_hi "." IDENT         -> member
     | "-" exp_hi               -> neg
     | "not" exp_hi             -> not
     | "(" exp ")"              -> paren
@@ -81,6 +82,10 @@ param: IDENT                    -> read
 ?case_list: "|" case                 -> single
     | "|" case case_list             -> push
    
+?ident_list:                    -> empty
+    | IDENT                     -> single
+    | IDENT "," ident_list      -> push
+    
 ?basic_stmt: exp "=" init ";"        -> write
     | exp "<-" exp "of" exp ";"      -> transfer
     | exp ";"                        -> expr
@@ -90,6 +95,7 @@ param: IDENT                    -> read
     | "if" exp "{" stmt "}"          -> if
     | "if" exp "{" stmt "}" "else" "{" stmt "}" -> if_else
     | "match" exp case_list            -> match
+    | "module" IDENT "exports" ident_list "{" stmt "}" -> module
 
 ?stmt: "var" param "=" init ";" stmt   -> var_init
     | "return" exp ";"                 -> return

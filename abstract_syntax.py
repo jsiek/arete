@@ -75,20 +75,22 @@ class Prim(Exp):
     args: List[Exp]
     __match_args__ = ("op", "args")
     def __str__(self):
-        # if len(self.args) == 1:
-        #     return self.op + " " + str(self.args[0])
-        # elif len(self.args) == 2:
-        #     return str(self.args[0]) + " " + self.op + " " + \
-        #         str(self.args[1])
-        # else:
-        #     return self.op + \
-        #         "(" + ", ".join([str(arg) for arg in self.args]) + ")"
         return self.op + \
             "(" + ", ".join([str(arg) for arg in self.args]) + ")"
         
     def __repr__(self):
         return str(self)
 
+@dataclass
+class Member(Exp):
+    arg: Exp
+    field: str
+    __match_args__ = ("arg", "field")
+    def __str__(self):
+        return str(self.arg) + "." + self.field
+    def __repr__(self):
+        return str(self)
+    
 @dataclass
 class New(Exp):
     inits: List[Exp]
@@ -266,6 +268,19 @@ class Assert(Stmt):
     def __repr__(self):
         return str(self)
 
+@dataclass
+class Module(Stmt):
+    name: str
+    exports: List[str]
+    body: List[Stmt]
+    __match_args__ = ("name", "exports", "body")
+    def __str__(self):
+        return 'module ' + self.name \
+            + ' exports ' + ", ".join(ex for ex in self.exports) + ' {\n' \
+            + '\n'.join([str(s) for s in self.body]) + '}\n'
+    def __repr__(self):
+        return str(self)
+    
 # Patterns
 
 @dataclass
