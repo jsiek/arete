@@ -3,7 +3,7 @@ module M
 {
   var all = 1;
   var empty = null;
-  var push = function data, !rest {
+  var push = function data, rest {
    return new data, all of rest;
   };
   var front = function ls { return ls[0]; };
