@@ -1,9 +1,10 @@
-module SList
+module M
   exports empty, push, front, rest, map, delete_list
 {
+  var all = 1;
   var empty = null;
   var push = function data, !rest {
-   return new data, rest;
+   return new data, all of rest;
   };
   var front = function ls { return ls[0]; };
   var rest = function ls { return ls[1]; };
@@ -14,19 +15,18 @@ module SList
       return new f(front(ls)), map(f, rest(ls));
     }
   };
-  var all = 1;
   var delete_list = function !ls {
     if not is_null(ls) {
-      delete_list(all of rest!(all of ls));
+      delete_list(rest(all of ls));
       delete ls;
     }
   };
 }
 
-var !ls1 = push(0, push(1, push(2, empty)));
+var !ls1 = M.push(0, M.push(1, M.push(2, M.empty)));
 var inc = function x { return x + 1; };
-var !ls2 = map(inc, ls1);
-delete_list(ls1);
-var three = front(rest(rest(ls2)));
-delete_list(ls2);
+var !ls2 = M.map(inc, ls1);
+M.delete_list(ls1);
+var three = M.front(M.rest(M.rest(ls2)));
+M.delete_list(ls2);
 return three - 3;

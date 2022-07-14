@@ -16,6 +16,19 @@ class Value:
         return str(self)
     
 @dataclass
+class Module(Value):
+    name: str
+    members: dict[str, Value]
+    __match_args__ = ("name", "members")
+    def __str__(self):
+      return self.name
+    def __repr__(self):
+        return str(self)
+    def kill(self, mem, location):
+        for member in members.values:
+            member.kill(mem, location)
+
+@dataclass
 class Number(Value):
     value: numbers.Number
     def equals(self, other):
@@ -376,28 +389,28 @@ def delete(ptr, mem, location):
         ptr.permission = Fraction(0,1)
         ptr.kill(mem, location)
     
-def allocate_locals(vars_kinds, vals, env, location):
+def allocate_locals(var_priv_vals, env, location):
     if trace:
-        print('allocating ' + ', '.join([v for (v,k) in vars_kinds]))
-    for ((var,kind), val) in zip(vars_kinds, vals):
-        if kind == 'write' and isinstance(val, Pointer) \
+        print('allocating ' + ', '.join([x for x,p,v in var_priv_vals]))
+    for var, priv, val in var_priv_vals:
+        if priv == 'write' and isinstance(val, Pointer) \
            and val.permission != Fraction(1,1):
             error(location, 'need writable pointer, not ' + str(val))
-        elif kind == 'read' and isinstance(val, Pointer) \
+        elif priv == 'read' and isinstance(val, Pointer) \
                   and (not val.address is None) \
                   and val.permission == Fraction(0,1):
             error(location, 'need readable pointer, not ' + str(val))
         env[var] = val
     if trace:
-        print('finish allocating ' + ', '.join([v for (v,k) in vars_kinds]))
+        print('finish allocating ' + ', '.join([x for x,p,v in var_priv_vals]))
 
-def deallocate_locals(vars_kinds, vals, env, mem, location):
+def deallocate_locals(vars, env, mem, location):
     if trace:
-        print('deallocating ' + ', '.join([v for (v,k) in vars_kinds]))
-    for (var,kind) in vars_kinds:
+        print('deallocating ' + ', '.join([v for v in vars]))
+    for var in vars:
         env[var].kill(mem, location)
     if trace:
-        print('finished deallocating ' + ', '.join([v for (v,k) in vars_kinds]))
+        print('finished deallocating ' + ', '.join([v for v in vars]))
 
 def kill_temp(val, mem, location):
     if not (val is None):
@@ -411,20 +424,25 @@ def call_function(fun, args, env, mem, location):
         vals = [interp_init(arg, env, mem, param.kind) \
                 for (arg,param) in zip(args,params)]
         body_env = clos_env.copy()
-        vars_kinds = [(param.ident, param.kind) for param in params]
-        allocate_locals(vars_kinds, vals, body_env, location)
+        var_priv_vals = [(p.ident, p.kind, val) for p,val in zip(params, vals)]
+        allocate_locals(var_priv_vals, body_env, location)
         if trace:
             print('call ' + str(Call(location, fun, args)))
             print()
             
         try:
-          retval = interp_stmt(body, body_env, mem, return_priv)
+          (local_vars, retval) = interp_stmt(body, body_env, mem, return_priv)
         except Exception as ex:
           raise Exception(error_header(location) + ' in call ' + str(Call(location, fun, args)) + '\n' + str(ex))
         
         if trace:
+            print('deallocate params from call to ' + str(fun))
+        deallocate_locals([p.ident for p in params], body_env, mem, location)
+        if trace:
             print('deallocate locals from call to ' + str(fun))
-        deallocate_locals(vars_kinds, vals, body_env, mem, location)
+        deallocate_locals(local_vars, body_env, mem, location)
+        if trace:
+            print('killing temporary operator from call to ' + str(fun))
         kill_temp(f, mem, location)
         for val in vals:
             kill_temp(val, mem, location)
@@ -434,6 +452,8 @@ def call_function(fun, args, env, mem, location):
             print(mem)
             log_graphviz(env, mem)
             print()
+        if trace:
+            print('finished call ' + str(Call(location, fun, args)))
         return retval
       case _:
         error(location, 'expected function in call, not ' + repr(f))
@@ -563,6 +583,17 @@ def interp_exp(e, env, mem, dup=True, ret=False, lhs=False):
             error(e.location, "permission operation requires pointer, not "
                   + str(ptr))
         return Number(True, ptr.permission)
+      case Member(arg, field):
+        val = interp_exp(arg, env, mem)
+        match val:
+          case Module(name, members):
+            if field in members.keys():
+                return members[field]
+            else:
+                error(e.location, 'no member ' + field + ' in module ' + name)
+          case _:
+            error(e.location, "expected a module, not " + str(val))
+      # remove join? can transfer instead -Jeremy
       case Prim('join', args):
         ptr1 = interp_exp(args[0], env, mem)
         ptr2 = interp_exp(args[1], env, mem)
@@ -632,7 +663,6 @@ def warning(location, msg):
 
 graph_number = 0
 
-    
 def interp_stmt(s, env, mem, return_priv):
     if trace:
         print()
@@ -642,16 +672,13 @@ def interp_stmt(s, env, mem, return_priv):
         log_graphviz(env, mem)
         print()
     match s:
-      case VarInit(var, init, rest):
+      case VarInit(var, init):
         # allow recursion
-        rest_env = env.copy()
-        rest_env[var.ident] = None
-        val = interp_init(init, rest_env, mem, var.kind)
-        vars_kinds = [(var.ident, var.kind)]
-        allocate_locals(vars_kinds, [val], rest_env, s.location)
-        retval = interp_stmt(rest, rest_env, mem, return_priv)
-        deallocate_locals(vars_kinds, [val], rest_env, mem, s.location)
-        return retval
+        env[var.ident] = None
+        val = interp_init(init, env, mem, var.kind)
+        var_priv_vals = [(var.ident, var.kind, val)]
+        allocate_locals(var_priv_vals, env, s.location)
+        return {var.ident}, None
       case Write(lhs, rhs):
         offset = interp_exp(lhs, env, mem, dup=False, lhs=True)
         val = interp_init(rhs, env, mem, 'read')
@@ -663,6 +690,7 @@ def interp_stmt(s, env, mem, return_priv):
             print('kill offset temp')
         kill_temp(offset, mem, s.location)
         kill_temp(val, mem, s.location)
+        return set(), None
       case Transfer(lhs, percent, rhs):
         dest_ptr = interp_exp(lhs, env, mem, dup=False)
         amount = to_number(interp_exp(percent, env, mem), s.location)
@@ -673,24 +701,28 @@ def interp_stmt(s, env, mem, return_priv):
         dest_ptr.transfer(amount, src_ptr, s.location)
         if trace:
             print('after, src= ' + str(src_ptr) + ' dest= ' + str(dest_ptr))
+        return set(), None
       case Expr(e):
         val = interp_exp(e, env, mem)
         kill_temp(val, mem, s.location)
+        return set(), None
       case Assert(e):
         val = to_boolean(interp_exp(e, env, mem), s.location)
         if not val:
           error(e.location, "assertion failed: " + str(e))
+        return set(), None
       case Return(e):
         retval = interp_exp(e, env, mem, ret=True)
-        return retval.return_copy(return_priv, e.location)
+        return set(), retval.return_copy(return_priv, e.location)
       case Seq(first, rest):
-        retval = interp_stmt(first, env, mem, return_priv)
+        (vars1,retval) = interp_stmt(first, env, mem, return_priv)
         if retval is None:
-            return interp_stmt(rest, env, mem, return_priv)
+            (vars2,retval2) = interp_stmt(rest, env, mem, return_priv)
+            return vars1 | vars2, retval2
         else:
-            return retval
+            return vars1, retval
       case Pass():
-        pass
+        return set(), None
       case IfStmt(cond, thn, els):
         c = to_boolean(interp_exp(cond, env, mem), cond.location)
         if c:
@@ -700,7 +732,7 @@ def interp_stmt(s, env, mem, return_priv):
       case Match(arg, cases):
         val = interp_exp(arg, env, mem)
         for c in cases:
-           matches = {}
+           matches = set()
            if pattern_match(c.pat, val, matches):
                kill_temp(val, mem, arg.location)
                body_env = env.copy()
@@ -708,16 +740,16 @@ def interp_stmt(s, env, mem, return_priv):
                    print('matches')
                    print(matches)
                    print()
-               vals = [v for x, (kind,v) in matches.items()]
-               vars_kinds = [(x,kind) for x, (kind,v) in matches.items()]
-               allocate_locals(vars_kinds, vals, body_env, c.location)
+               var_priv_vals = [(x,p,v) for x, (p,v) in matches.items()]
+               allocate_locals(var_priv_vals, body_env, c.location)
                if trace:
                    print('case body_env')
                    print(body_env)
                    print(mem)
                    print()
-               retval = interp_stmt(c.body, body_env, mem, return_priv)
-               deallocate_locals(vars_kinds, vals, body_env, mem, c.location)
+               (vars,retval) = interp_stmt(c.body, body_env, mem, return_priv)
+               deallocate_locals(matches.keys(), body_env, mem, c.location)
+               deallocate_locals(vars, body_env, mem, c.location)
                return retval
         error(s.location, 'no case was a match for ' + str(val))
       case Delete(arg):
@@ -728,13 +760,26 @@ def interp_stmt(s, env, mem, return_priv):
             print(env)
             print(mem)
             print()
+        return set(), None
+      case Block(body):
+        body_env = env.copy()
+        (vars, retval) = interp_stmt(body, body_env, mem, return_priv)
+        deallocate_locals(vars, body_env, mem, s.location)
+        return set(), retval
+      case ModuleDecl(name, exports, body):
+        body_env = env.copy()
+        vars, retval = interp_stmt(body, body_env, mem, return_priv)
+        members = {n: body_env[n] for n in exports}
+        env[name] = Module(False, name, members)
+        deallocate_locals(vars, body_env, mem, s.location)
+        return set(), None
       case _:
         raise Exception('error in interp_stmt, unhandled: ' + repr(s)) 
 
 def interp(p):
     env = {}
     mem = {}
-    retval = interp_stmt(p, env, mem, 'read')
+    locals, retval = interp_stmt(p, env, mem, 'read')
     if trace:
         print(env)
         print(mem)

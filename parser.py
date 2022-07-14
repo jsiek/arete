@@ -88,15 +88,15 @@ def parse_tree_to_ast(e):
     elif e.data == 'none_priv':
         return 'none'
     elif e.data == 'member':
-        return Member(e.meta, parse_tree_to_param(e.children[0]),
-                      e.children[1].value)
+        return Member(e.meta,
+                      parse_tree_to_ast(e.children[0]),
+                      str(e.children[1].value))
     
     # statements
     elif e.data == 'var_init':
         return VarInit(e.meta,
                        parse_tree_to_param(e.children[0]),
-                       parse_tree_to_ast(e.children[1]),
-                       parse_tree_to_ast(e.children[2]))
+                       parse_tree_to_ast(e.children[1]))
     elif e.data == 'write':
         return Write(e.meta,
                      parse_tree_to_ast(e.children[0]),
@@ -119,7 +119,7 @@ def parse_tree_to_ast(e):
                    parse_tree_to_ast(e.children[0]),
                    parse_tree_to_ast(e.children[1]))
     elif e.data == 'block':
-        return parse_tree_to_ast(e.children[0])
+        return Block(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'match':
         return Match(e.meta,
                      parse_tree_to_ast(e.children[0]),
@@ -137,10 +137,10 @@ def parse_tree_to_ast(e):
     elif e.data == 'delete':
         return Delete(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'module':
-        return Module(e.meta,
-                      e.children[0].value,
-                      parse_tree_to_str_list(e.children[1]),
-                      parse_tree_to_ast(e.children[2]))
+        return ModuleDecl(e.meta,
+                          str(e.children[0].value),
+                          parse_tree_to_str_list(e.children[1]),
+                          parse_tree_to_ast(e.children[2]))
     
     # patterns
     elif e.data == 'param_pat':

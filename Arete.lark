@@ -86,7 +86,8 @@ param: IDENT                    -> read
     | IDENT                     -> single
     | IDENT "," ident_list      -> push
     
-?basic_stmt: exp "=" init ";"        -> write
+?basic_stmt: "var" param "=" init ";" -> var_init
+    | exp "=" init ";"                -> write
     | exp "<-" exp "of" exp ";"      -> transfer
     | exp ";"                        -> expr
     | "{" stmt "}"                   -> block
@@ -97,8 +98,7 @@ param: IDENT                    -> read
     | "match" exp case_list            -> match
     | "module" IDENT "exports" ident_list "{" stmt "}" -> module
 
-?stmt: "var" param "=" init ";" stmt   -> var_init
-    | "return" exp ";"                 -> return
+?stmt: "return" exp ";"                -> return
     | basic_stmt stmt                  -> seq
     |                                  -> pass
 

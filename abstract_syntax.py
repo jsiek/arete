@@ -162,11 +162,19 @@ class Lambda(Exp):
 # Statements
 
 @dataclass
+class Block(Stmt):
+    body: Stmt
+    __match_args__ = ("body",)
+    def __str__(self):
+        return "{ " + str(self.body) + " }"
+    def __repr__(self):
+        return str(self)
+    
+@dataclass
 class VarInit(Stmt):
     var: Param
     init: Initializer
-    rest: Stmt
-    __match_args__ = ("var", "init", "rest")
+    __match_args__ = ("var", "init")
     def __str__(self):
         return "var " + str(self.var) + " = " + str(self.init) + "; ..."
     def __repr__(self):
@@ -269,15 +277,15 @@ class Assert(Stmt):
         return str(self)
 
 @dataclass
-class Module(Stmt):
+class ModuleDecl(Stmt):
     name: str
     exports: List[str]
-    body: List[Stmt]
+    body: Stmt
     __match_args__ = ("name", "exports", "body")
     def __str__(self):
-        return 'module ' + self.name \
-            + ' exports ' + ", ".join(ex for ex in self.exports) + ' {\n' \
-            + '\n'.join([str(s) for s in self.body]) + '}\n'
+        return 'module ' + self.name + '\n'\
+            + '  exports ' + ", ".join(ex for ex in self.exports) + ' {\n' \
+            + str(self.body) + '\n}\n'
     def __repr__(self):
         return str(self)
     
