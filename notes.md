@@ -1,54 +1,9 @@
 
 
-for parameters, local variables, pattern variables
-need to say 
-* how much priviledge: read, write
-* how long: temporary, forever
-
-alternative: what does return mean for pointers?
-Do we need an annotation on functions to declare read/write or share/take?
-
-Does return create a copy of the pointer?
-If so, when is the copy killed?
-Should interp_exp also return a boolean that says whether the result
-is a temporary object. And the caller can kill the result after it is used?
-Or should we pass the destination to interp_exp?
-
-Or should interp_exp always create a copy, a temporary, and
-the caller should always kill the result after using it?
-
-some expressions create a temporary pointer:
-* new 10
-other expressions don't
-* y
-
-How to handle difference between
-
-	{
-	  var x = take new 10;
-	}
-
-which should not copy the pointer, 
-and delete the pointer when x goes out of scope
-
-versus
-
-	{
-	  var y = take new 10;
-	  {
-		var x = share y;
-	  }
-	  y := 0;
-	  return y;
-	}
-
-which should copy the pointer, changing y to read only,
-and then changing y back to write when x goes out of
-scope.
 
 # Permission Groups
 
-Group several pointers together.
+Group several pointers together?
 
 
 # Upgrade Permission
