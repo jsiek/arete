@@ -1,4 +1,6 @@
-var x = new 42;
-var y = x;
-x[0] = 0; // error: pointer does not have write privilege
-return y[0];
+function main() {
+  var x = new 42;
+  var y = x;
+  x[0] = 0; // error: pointer does not have write privilege
+  return y[0];
+}

@@ -1,5 +1,7 @@
-var !x = new 10;
-x[0] = 20;
-var y = x[0];
-delete x;
-return y - 20;
+function main() {
+  var !x = new 10;
+  x[0] = 20;
+  var y = x[0];
+  delete x;
+  return y - 20;
+}

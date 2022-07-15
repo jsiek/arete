@@ -1,9 +1,11 @@
-var inc = function !p {
-            p[0] = p[0] + 1;
-	    return p[0];
-          };
-var !q = new 0;
-var a = inc(q);
-delete q;
-return a - 1;
+function inc(!p) {
+  p[0] = p[0] + 1;
+  return p[0];
+}
 
+function main() {
+  var !q = new 0;
+  var a = inc(q);
+  delete q;
+  return a - 1;
+}

@@ -84,13 +84,25 @@ def parse_tree_to_ast(e):
         return Member(e.meta,
                       parse_tree_to_ast(e.children[0]),
                       str(e.children[1].value))
+    elif e.data == 'condition':
+        return IfExp(e.meta,
+                     parse_tree_to_ast(e.children[0]),
+                     parse_tree_to_ast(e.children[1]),
+                     parse_tree_to_ast(e.children[2]))
+    elif e.data == 'let':
+        return Let(e.meta,
+                   parse_tree_to_param(e.children[0]),
+                   parse_tree_to_ast(e.children[1]),
+                   parse_tree_to_ast(e.children[2]))
+    
+    # statements
     elif e.data == 'var_init':
         return VarInit(e.meta,
                        parse_tree_to_param(e.children[0]),
                        parse_tree_to_ast(e.children[1]),
                        parse_tree_to_ast(e.children[2]))
-    
-    # statements
+    elif e.data == 'return':
+        return Return(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'write':
         return Write(e.meta,
                      parse_tree_to_ast(e.children[0]),
@@ -110,6 +122,8 @@ def parse_tree_to_ast(e):
         return Seq(e.meta,
                    parse_tree_to_ast(e.children[0]),
                    parse_tree_to_ast(e.children[1]))
+    elif e.data == 'last_stmt':
+        return parse_tree_to_ast(e.children[0])
     elif e.data == 'if':
         return IfStmt(e.meta,
                       parse_tree_to_ast(e.children[0]),
@@ -122,6 +136,8 @@ def parse_tree_to_ast(e):
                       parse_tree_to_ast(e.children[2]))
     elif e.data == 'delete':
         return Delete(e.meta, parse_tree_to_ast(e.children[0]))
+    elif e.data == 'block':
+        return Block(e.meta, body=parse_tree_to_ast(e.children[0]))
 
     # declarations
     elif e.data == 'global':
@@ -139,17 +155,9 @@ def parse_tree_to_ast(e):
                           parse_tree_to_str_list(e.children[1]),
                           parse_tree_to_ast(e.children[2]))
     
-    # patterns
-    elif e.data == 'param_pat':
-        return ParamPat(e.meta, e.children[0])
-    elif e.data == 'tuple_pat':
-        return TuplePat(e.meta, parse_tree_to_ast(e.children[0]))
-    elif e.data == 'wildcard_pat':
-        return WildCard(e.meta)
-    
     # miscelaneous
     elif e.data == 'default_init':
-        return Initializer(e.meta, None, parse_tree_to_ast(e.children[0]))
+        return Initializer(e.meta, 'default', parse_tree_to_ast(e.children[0]))
     elif e.data == 'frac_init':
         return Initializer(e.meta, parse_tree_to_ast(e.children[0]), parse_tree_to_ast(e.children[1]))
     

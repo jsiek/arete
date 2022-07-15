@@ -1,4 +1,6 @@
-var !x = new 42;
-var y = x; // error: read privilege requires no writers
-x[0] = 0;
-return y[0];
+function main() {
+  var !x = new 42;
+  var y = x; // error: read privilege requires no writers
+  x[0] = 0;
+  return y[0];
+}

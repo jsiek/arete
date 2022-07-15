@@ -3,30 +3,34 @@ module M
 {
   var all = 1;
   var empty = null;
-  var push = function data, rest {
-   return new data, all of rest;
-  };
-  var front = function ls { return ls[0]; };
-  var rest = function ls { return ls[1]; };
-  var map = function f, ls {
-    if is_null(ls) {
+  function push(data, rest) {
+    return new data, all of rest;
+  }
+  function front(ls) { return ls[0]; }
+  function rest(ls) { return ls[1]; }
+  
+  function map(f, ls) {
+    if (is_null(ls)) {
       return null;
     } else {
       return new f(front(ls)), map(f, rest(ls));
     }
-  };
-  var delete_list = function !ls {
-    if not is_null(ls) {
-      delete_list(rest(all of ls));
+  }
+  
+  function delete_list(!ls) {
+    if (not is_null(ls)) {
+      ! delete_list(rest(all of ls));
       delete ls;
     }
-  };
+  }
 }
 
-var !ls1 = M.push(0, M.push(1, M.push(2, M.empty)));
-var inc = function x { return x + 1; };
-var !ls2 = M.map(inc, ls1);
-M.delete_list(ls1);
-var three = M.front(M.rest(M.rest(ls2)));
-M.delete_list(ls2);
-return three - 3;
+function main() {
+  var !ls1 = M.push(0, M.push(1, M.push(2, M.empty)));
+  var inc = function (x) { return x + 1; };
+  var !ls2 = M.map(inc, ls1);
+  ! M.delete_list(ls1);
+  var three = M.front(M.rest(M.rest(ls2)));
+  ! M.delete_list(ls2);
+  return three - 3;
+}

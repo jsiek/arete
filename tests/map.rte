@@ -1,27 +1,31 @@
-var front = function ls {
-  return ls[0];
-};
-var rest = function ls {
-  return ls[1];
-};
-var map = function f, ls {
-  if is_null(ls) {
+function front(ls) { return ls[0]; }
+
+function rest(ls) { return ls[1]; }
+
+function map(f, ls) {
+  if (is_null(ls)) {
     return null;
   } else {
     return new f(front(ls)), map(f, rest(ls));
   }
-};
+}
+
 var all = 1;
-var delete_list = function !ls {
-  if not is_null(ls) {
-    delete_list(rest(all of ls));
+
+function delete_list(!ls) {
+  if (not is_null(ls)) {
+    ! delete_list(rest(all of ls));
     delete ls;
   }
-};
-var !ls1 = new 0, (new 1, (new 2, null));
-var inc = function x { return x + 1; };
-var !ls2 = map(inc, ls1);
-delete_list(all of ls1);
-var three = front(rest(rest(ls2)));
-delete_list(ls2);
-return three - 3;
+}
+
+function inc(x) { return x + 1; }
+
+function main() {
+  var !ls1 = new 0, (new 1, (new 2, null));
+  var !ls2 = map(inc, ls1);
+  ! delete_list(all of ls1);
+  var three = front(rest(rest(ls2)));
+  ! delete_list(ls2);
+  return three - 3;
+}

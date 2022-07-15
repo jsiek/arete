@@ -6,13 +6,15 @@ var next = 2;
 var none = 0;
 var half = 1/2;
 var all = 1;
-var listof = function data {
+
+function listof(data) {
   var !p = new data, null, null;
   return split(p);
-};
-var push = function data, !lst {
+}
+
+function push(data, !lst) {
   var !first = new data, null , null;
-  if lst[front] == lst[back] { // lst is a 1 element list
+  if (lst[front] == lst[back]) { // lst is a 1 element list
     /*
       first: * -1-> [ A , / , / ]
       
@@ -67,43 +69,47 @@ var push = function data, !lst {
      */
     return lst;
   }
-};
+}
 
-var check_nodes_permissions = function node {
-  if not is_null(node[next]) {
+function check_nodes_permissions(node) {
+  if (not is_null(node[next])) {
     assert permission(node[next]) == half;
-    check_nodes_permissions(all of node[next]);
+    ! check_nodes_permissions(all of node[next]);
   }
-  if not is_null(node[prev]) {
+  if (not is_null(node[prev])) {
     assert permission(node[prev]) == half;
   }
-};
-var check_list_permissions = function list {
+}
+
+function check_list_permissions(list) {
   var first = all of list[front];
   var last = all of list[back];
   assert permission(first) == half;
   assert permission(last) == half;
-  check_nodes_permissions(all of first);
-};
+  ! check_nodes_permissions(all of first);
+}
 
-var delete_nodes = function node, last {
-  if node == last {
+function delete_nodes(node, last) {
+  if (node == last) {
     delete join(node, last);
   } else {
     node <- all of node[next][prev];
-    delete_nodes(all of node[next], all of last);
+    ! delete_nodes(all of node[next], all of last);
     delete node;
   }
-};
-var delete_list = function !list {
-  delete_nodes(all of list[front], all of list[back]);
-  delete list;
-};
+}
 
-var !three = listof(3);
-var !two_three = push(2, three);
-var !one_two_three = push(1, two_three);
-check_list_permissions(all of one_two_three);
-var one = one_two_three[front][data];
-delete_list(one_two_three);
-return one - 1;
+function delete_list(!list) {
+  ! delete_nodes(all of list[front], all of list[back]);
+  delete list;
+}
+
+function main() {
+  var !three = listof(3);
+  var !two_three = push(2, three);
+  var !one_two_three = push(1, two_three);
+  ! check_list_permissions(all of one_two_three);
+  var one = one_two_three[front][data];
+  ! delete_list(one_two_three);
+  return one - 1;
+}

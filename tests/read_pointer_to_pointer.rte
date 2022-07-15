@@ -1,11 +1,14 @@
-var f = function y {
-    var !x = new y;
-    var z = x[0];
-    delete x;
-    return z[0] - y[0];
-};
-var !y = new 42;
-var a = f(y);
-delete y;
-return a;
+function f(y) {
+  var !x = new y;
+  var z = x[0];
+  delete x;
+  return z[0] - y[0];
+}
+
+function main() {
+  var !y = new 42;
+  var a = f(y);
+  delete y;
+  return a;
+}
 

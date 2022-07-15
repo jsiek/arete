@@ -8,10 +8,8 @@ WS: /[ \t\f\r\n]/+
 LINECOMMENT: "//" /[^\n]*/ NEWLINE
 COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 
-?exp: "var" param "=" init ";" exp               -> var_init
-    | "if" exp "{" exp "}"                       -> if
-    | "if" exp "{" exp "}" "else" "{" exp "}"    -> if_else
-    | stmt exp                                   -> seq
+?exp: exp_logic "?" exp ":" exp                  -> condition
+    | "var" param "=" init "in" exp              -> let
     | exp_logic
 
 ?exp_logic: exp_logic "and" exp_cmp              -> and
@@ -46,18 +44,27 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "-" exp_hi                                 -> neg
     | "not" exp_hi                               -> not
     | "(" exp ")"                                -> paren
-    | "function" "(" param_list ")" "{" exp "}"  -> lambda
+    | "function" "(" param_list ")" block        -> lambda
+    | "new" init_list                            -> new
     | exp_hi "(" init_list ")"                   -> call
-    | "new" "(" init_list ")"                    -> new
     | "true"                                     -> true
     | "false"                                    -> false
       
-?stmt: 
-    | exp "=" init ";"                           -> write
+?stmt: exp "=" init ";"                          -> write
     | exp "<-" exp "of" exp ";"                  -> transfer
-    | "discard" exp ";"                          -> expr
+    | "!" exp ";"                          -> expr
     | "delete" exp ";"                           -> delete
     | "assert" exp ";"                           -> assert
+    | "if" "(" exp ")" block                     -> if
+    | "if" "(" exp ")" block "else" block        -> if_else
+    | block
+
+?stmt_list: "var" param "=" init ";" stmt_list   -> var_init
+    | stmt stmt_list                             -> seq
+    | stmt                                       -> last_stmt
+    | "return" exp ";"                           -> return
+
+?block: "{" stmt_list "}"                        -> block
 
 ?exp_list:                                       -> empty
     | exp                                        -> single
@@ -81,13 +88,12 @@ param: IDENT                                     -> read
     | IDENT                                      -> single
     | IDENT "," ident_list                       -> push
     
-decl: "var" IDENT "=" exp ";"                    -> global
-    | "function" IDENT "(" param_list ")" "{" exp "}"       -> function
+?decl: "var" IDENT "=" exp ";"                   -> global
+    | "function" IDENT "(" param_list ")" block  -> function
     | "module" IDENT "exports" ident_list "{" decl_list "}" -> module
 
 ?decl_list:                                      -> empty
-    | decl                                       -> single
-    | decl "," decl_list                         -> push
+    | decl decl_list                             -> push
     
 arete: decl_list
 

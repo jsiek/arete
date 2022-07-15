@@ -1,5 +1,7 @@
-if 0 < 1 {
-  return 0;
-} else {
-  return 1;
+function main() {
+  if (0 < 1) {
+    return 0;
+  } else {
+    return 1;
+  }
 }

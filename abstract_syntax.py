@@ -44,6 +44,10 @@ class Initializer:
         return str(self.percentage) + " of " + str(self.arg)
     def __repr__(self):
         return str(self)
+    def free_vars(self):
+        percent_fv = set() if isinstance(self.percentage, str) \
+            else self.percentage.free_vars()
+        return percent_fv | self.arg.free_vars()
     
 # Expressions
 
@@ -58,7 +62,8 @@ class Call(Exp):
     def __repr__(self):
         return str(self)
     def free_vars(self):
-        return self.fun.free_vars() | set().union([arg.free_vars() for arg in self.args])
+        return self.fun.free_vars() \
+            | set().union(*[arg.free_vars() for arg in self.args])
 
 @dataclass
 class Prim(Exp):
@@ -72,7 +77,7 @@ class Prim(Exp):
     def __repr__(self):
         return str(self)
     def free_vars(self):
-        return set().union([arg.free_vars() for arg in self.args])
+        return set().union(*[arg.free_vars() for arg in self.args])
 
 @dataclass
 class Member(Exp):
@@ -95,7 +100,7 @@ class New(Exp):
     def __repr__(self):
         return str(self)
     def free_vars(self):
-        return set().union([init.free_vars() for init in self.inits])
+        return set().union(*[init.free_vars() for init in self.inits])
 
 @dataclass
 class Var(Exp):
@@ -156,7 +161,7 @@ class Index(Exp):
 @dataclass
 class Lambda(Exp):
     params: List[Param]
-    body: Exp
+    body: Stmt
     __match_args__ = ("params", "body")
     def __str__(self):
         return "function " \
@@ -165,18 +170,8 @@ class Lambda(Exp):
     def __repr__(self):
         return str(self)
     def free_vars(self):
-        return body.free_vars() - set([p.ident for p in self.params])
+        return self.body.free_vars() - set([p.ident for p in self.params])
     
-@dataclass
-class Seq(Exp):
-    first: Stmt
-    rest: Exp
-    __match_args__ = ("first", "rest")
-    def __str__(self):
-        return str(self.first) + "..."
-    def __repr__(self):
-        return str(self)
-
 @dataclass
 class IfExp(Exp):
     cond: Exp
@@ -184,27 +179,69 @@ class IfExp(Exp):
     els: Exp
     __match_args__ = ("cond", "thn", "els")
     def __str__(self):
-        return "if " + str(self.cond) + "..."
+        return "(" + str(self.cond) + "?" + str(self.thn) \
+            + " : " + str(self.els) + ")"
     def __repr__(self):
         return str(self)
+    def free_vars(self):
+        return self.cond.free_vars() | self.thn.free_vars() \
+            | self.els.free_vars()
     
 @dataclass
-class VarInit(Exp):
+class Let(Exp):
     var: Param
     init: Initializer
     body: Exp
     __match_args__ = ("var", "init", "body")
     def __str__(self):
-        return "var " + str(self.var) + " = " + str(self.init) + "; ..."
+        return "var " + str(self.var) + " = " + str(self.init) + ";\n" \
+            + str(self.body)
     def __repr__(self):
         return str(self)
     def free_vars(self):
-        return init.free_vars()
-    def local_vars(self):
-        return set([var.ident])
+        return self.init.free_vars() | \
+            (self.body.free_vars() - set([self.var.ident]))
 
 # Statements
 
+@dataclass
+class Seq(Stmt):
+    first: Stmt
+    rest: Stmt
+    __match_args__ = ("first", "rest")
+    def __str__(self):
+        return str(self.first) + "\n" + str(self.rest)
+    def __repr__(self):
+        return str(self)
+    def free_vars(self):
+        return self.first.free_vars() | self.rest.free_vars()
+
+@dataclass
+class VarInit(Exp):
+    var: Param
+    init: Initializer
+    body: Stmt
+    __match_args__ = ("var", "init", "body")
+    def __str__(self):
+        return "var " + str(self.var) + " = " + str(self.init) + ";\n" \
+            + str(self.body)
+    def __repr__(self):
+        return str(self)
+    def free_vars(self):
+        return self.init.free_vars() \
+            | (self.body.free_vars() - set([self.var.ident]))
+
+@dataclass
+class Return(Stmt):
+    arg: Exp
+    __match_args__ = ("arg",)
+    def __str__(self):
+        return "return " + str(self.arg) + ";"
+    def __repr__(self):
+        return str(self)
+    def free_vars(self):
+        return self.arg.free_vars()
+    
 @dataclass
 class Write(Stmt):
     lhs: Exp
@@ -214,6 +251,8 @@ class Write(Stmt):
         return str(self.lhs) + " = " + str(self.rhs) + ";"
     def __repr__(self):
         return str(self)
+    def free_vars(self):
+        return self.lhs.free_vars() | self.rhs.free_vars()
 
 @dataclass
 class Transfer(Stmt):
@@ -226,6 +265,9 @@ class Transfer(Stmt):
             + str(self.rhs) + ";"
     def __repr__(self):
         return str(self)
+    def free_vars(self):
+        return self.lhs.free_vars() | self.percent.free_vars() \
+            | self.rhs.free_vars()
     
 @dataclass
 class Delete(Stmt):
@@ -235,6 +277,8 @@ class Delete(Stmt):
         return "delete " + str(self.arg) + ";"
     def __repr__(self):
         return str(self)
+    def free_vars(self):
+        return self.arg.free_vars()
     
 @dataclass
 class Expr(Stmt):
@@ -244,6 +288,8 @@ class Expr(Stmt):
         return str(self.exp) + ";"
     def __repr__(self):
         return str(self)
+    def free_vars(self):
+        return self.exp.free_vars()
 
 @dataclass
 class Assert(Stmt):
@@ -253,16 +299,53 @@ class Assert(Stmt):
         return "assert " + str(self.exp) + ";"
     def __repr__(self):
         return str(self)
+    def free_vars(self):
+        return self.exp.free_vars()
 
+@dataclass
+class IfStmt(Stmt):
+    cond: Exp
+    thn: Stmt
+    els: Stmt
+    __match_args__ = ("cond", "thn", "els")
+    def __str__(self):
+        return "if " + "(" + str(self.cond) + ")\n" + str(self.thn) \
+            + "else " + str(self.els)
+    def __repr__(self):
+        return str(self)
+    def free_vars(self):
+        return self.cond.free_vars() | self.thn.free_vars() \
+            | self.els.free_vars()
+
+@dataclass
+class Pass(Stmt):
+    def __str__(self):
+        return "pass"
+    def __repr__(self):
+        return str(self)
+    def free_vars(self):
+        return set()
+
+@dataclass
+class Block(Stmt):
+    body: Exp
+    __match_args__ = ("body",)
+    def __str__(self):
+        return "{\n" + str(self.body) + "\n}\n"
+    def __repr__(self):
+        return str(self)
+    def free_vars(self):
+        return self.body.free_vars()
+    
 # Declarations
     
 @dataclass
 class Global(Exp):
-    var: str
+    name: str
     rhs: Exp
-    __match_args__ = ("var", "rhs")
+    __match_args__ = ("name", "rhs")
     def __str__(self):
-        return "var " + str(self.var) + " = " + str(self.rhs) + ";"
+        return "var " + str(self.name) + " = " + str(self.rhs) + ";"
     def __repr__(self):
         return str(self)
     def free_vars(self):

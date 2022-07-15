@@ -20,6 +20,8 @@ class Module(Value):
     name: str
     members: dict[str, Value]
     __match_args__ = ("name", "members")
+    def duplicate(self, percentage):
+        return self # ??
     def __str__(self):
       return self.name
     def __repr__(self):
@@ -428,7 +430,9 @@ def deallocate_locals(vars, env, mem, location):
     if trace:
         print('deallocating ' + ', '.join([v for v in vars]))
     for var in vars:
-        env_get(env, var).kill(mem, location)
+        v = env_get(env, var)
+        if not v is None:
+            v.kill(mem, location)
     if trace:
         print('finished deallocating ' + ', '.join([v for v in vars]))
 
@@ -452,7 +456,7 @@ def call_function(fun, args, env, mem, location):
             print()
             
         try:
-          retval = interp_exp(body, body_env, mem)
+          retval = interp_stmt(body, body_env, mem)
         except Exception as ex:
           raise Exception(error_header(location) + ' in call ' + str(Call(location, fun, args)) + '\n' + str(ex))
         
@@ -479,7 +483,7 @@ def call_function(fun, args, env, mem, location):
 def interp_init(init, env, mem, privilege):
     match init:
       case Initializer(loc, percent, arg):
-        if percent is None:
+        if percent == 'default':
             if privilege == 'read':
                 percentage = Fraction(1,2)
             elif privilege == 'write':
@@ -514,6 +518,8 @@ compare_ops = { 'less': lambda x, y: x < y,
                 'greater_equal': lambda x, y: x >= y}
         
 def interp_exp(e, env, mem, dup=True, ret=False, lhs=False):
+    if trace:
+        print('interp_exp ' + str(e))
     match e:
       case Var(x):
         if x not in env:
@@ -627,12 +633,17 @@ def interp_exp(e, env, mem, dup=True, ret=False, lhs=False):
         return allocate(vals, mem)
       case Lambda(params, body):
         clos_env = {}
-        for x in env.keys():
+        free = body.free_vars() - set([p.ident for p in params])
+        if trace:
+            print('duplicating free vars of lambda: ' + str(free))
+        for x in free:
             v = env_get(env, x)
             if not (v is None):
                 env_init(clos_env, x, v.duplicate(Fraction(1,2)))
             else:
                 clos_env[x] = env[x]
+        if trace:
+            print('finished interp of lambda ' + str(e))
         return Closure(True, params, body, clos_env)
       case Call(fun, args):
         return call_function(fun, args, env, mem, e.location)
@@ -654,28 +665,21 @@ def interp_exp(e, env, mem, dup=True, ret=False, lhs=False):
             return retval
           case _:
             error(e.location, 'index must be an integer, not ' + repr(ind))
-      case VarInit(var, init, body):
-        val = interp_init(init, env, mem, var.kind)
-        body_env = env.copy()
-        declare_locals([var.ident], body_env)
-        var_priv_vals = [(var.ident, var.kind, val)]
-        allocate_locals(var_priv_vals, body_env, s.location)
-        retval = interp_exp(body, body_env, mem, dup, ret, lhs)
-        deallocate_locals([var.indent], body_env)
-        return retval
-      case Seq(first, rest):
-        interp_stmt(first, env, mem)
-        if retval is None:
-            (vars2,retval2) = interp_exp(rest, env, mem, dup, ret, lhs)
-            return vars1 | vars2, retval2
-        else:
-            return vars1, retval
       case IfExp(cond, thn, els):
         c = to_boolean(interp_exp(cond, env, mem), cond.location)
         if c:
             return interp_exp(thn, env, mem, dup, ret, lhs)
         else:
             return interp_exp(els, env, mem, dup, ret, lhs)
+      case Let(var, init, body):
+        val = interp_init(init, env, mem, var.kind)
+        body_env = env.copy()
+        declare_locals([var.ident], body_env)
+        var_priv_vals = [(var.ident, var.kind, val)]
+        allocate_locals(var_priv_vals, body_env, e.location)
+        retval = interp_exp(body, body_env, mem)
+        deallocate_locals([var.ident], body_env, mem, e.location)
+        return retval
       case _:
         error(e.location, 'error in interp_exp, unhandled: ' + repr(e)) 
 
@@ -706,6 +710,26 @@ def interp_stmt(s, env, mem):
         log_graphviz(env, mem)
         print()
     match s:
+      case VarInit(var, init, body):
+        val = interp_init(init, env, mem, var.kind)
+        body_env = env.copy()
+        declare_locals([var.ident], body_env)
+        var_priv_vals = [(var.ident, var.kind, val)]
+        allocate_locals(var_priv_vals, body_env, s.location)
+        retval = interp_stmt(body, body_env, mem)
+        deallocate_locals([var.ident], body_env, mem, s.location)
+        return retval
+      case Seq(first, rest):
+        retval = interp_stmt(first, env, mem)
+        if retval is None:
+            return interp_stmt(rest, env, mem)
+        else:
+            return retval
+      case Return(arg):
+        retval = interp_exp(arg, env, mem)
+        return retval.return_copy()
+      case Pass():
+        pass
       case Write(lhs, rhs):
         offset = interp_exp(lhs, env, mem, dup=False, lhs=True)
         val = interp_init(rhs, env, mem, 'read')
@@ -742,6 +766,14 @@ def interp_stmt(s, env, mem):
             print(env)
             print(mem)
             print()
+      case IfStmt(cond, thn, els):
+        c = to_boolean(interp_exp(cond, env, mem), cond.location)
+        if c:
+            return interp_stmt(thn, env, mem)
+        else:
+            return interp_stmt(els, env, mem)
+      case Block(body):
+        return interp_stmt(body, env, mem)
       case _:
         raise Exception('error in interp_stmt, unhandled: ' + repr(s)) 
 
@@ -755,9 +787,11 @@ def interp_decl(d, env, mem):
       case ModuleDecl(name, exports, body):
         body_env = env.copy()
         for d in body:
-            env_init(body_env, d.name, None)            
-        members = {d.name: interp_decl(d, body_env) for d in body}
-        return Module(False, name, members)
+            env_init(body_env, d.name, None)
+        for d in body:
+            env_set(body_env, d.name, interp_decl(d, body_env, mem))
+        return Module(False, name,
+                      {ex: env_get(body_env, ex) for ex in exports})
     
 def interp(decls):
     env = {}
@@ -783,9 +817,13 @@ def interp(decls):
         error(p.location, 'memory leak, memory size = ' + str(len(mem))) 
     return retval
 
+flags = set(['trace', 'fail'])
+
 if __name__ == "__main__":
     decls = []
     for filename in sys.argv[1:]:
+      if filename in flags:
+          continue
       set_filename(filename)
       file = open(filename, 'r')
       expect_fail = False
@@ -794,7 +832,7 @@ if __name__ == "__main__":
       if 'trace' in sys.argv:
           trace = True
       p = file.read()
-      decls += parse(p, False)
+      decls += parse(p, trace)
       
     try:
         retval = interp(decls)
@@ -810,6 +848,7 @@ if __name__ == "__main__":
             exit(0)
         else:
             #print('unexpected failure: ' + str(ex))
+            raise ex
             print(str(ex))
             print()
 

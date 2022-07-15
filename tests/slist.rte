@@ -1,25 +1,29 @@
-var listof = function data {
+function listof(data) {
   return new data, null;
-};
-var push = function data, !list {
+}
+
+function push(data, !list) {
   return new data, 1 of list;
-};
+}
+
 var head = 0;
 var tail = 1;
-var is_last = function node {
-  if is_null(node) {
+
+function is_last(node) {
+  if (is_null(node)) {
     return false;
   } else {
     return is_null(node[tail]);
   }
-};
+}
+
 // Split the list into two parts, with the second
 // part just containing the last element.
-var remove_last = function !n {
-  if is_null(n) {
+function remove_last(!n) {
+  if (is_null(n)) {
     return 0;
   } else {
-    if is_last(n[tail]) {
+    if (is_last(n[tail])) {
       var !q = n[tail];
       n[tail] = null;
       return q;
@@ -27,17 +31,21 @@ var remove_last = function !n {
       return remove_last(n[tail]);
     }
   }
-};
-var delete_list = function !n {
-  if not is_null(n) {
-    delete_list(n[tail]);
+}
+
+function delete_list(!n) {
+  if (not is_null(n)) {
+    ! delete_list(n[tail]);
     delete n;
   }
-};
-var !one_two = push(1, listof(2));
-var !two_null = remove_last(one_two);
-var one = one_two[head];
-var two = two_null[head];
-delete_list(one_two);
-delete_list(two_null);
-return one + one - two;
+}
+
+function main() {
+  var !one_two = push(1, listof(2));
+  var !two_null = remove_last(one_two);
+  var one = one_two[head];
+  var two = two_null[head];
+  ! delete_list(one_two);
+  ! delete_list(two_null);
+  return one + one - two;
+}
