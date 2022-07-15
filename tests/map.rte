@@ -4,9 +4,6 @@ var front = function ls {
 var rest = function ls {
   return ls[1];
 };
-var rest! = function !ls {
-  return ls[1];
-};
 var map = function f, ls {
   if is_null(ls) {
     return null;

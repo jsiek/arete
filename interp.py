@@ -43,7 +43,7 @@ class Number(Value):
         return self.initialize('read', location, False)
     def duplicate(self, percentage):
         return Number(True, self.value)
-    def return_copy(self, kind, location):
+    def return_copy(self):
       if self.temporary:
           return self
       else:
@@ -70,7 +70,7 @@ class Boolean(Value):
         return self.initialize('read', location, False)
     def duplicate(self, percentage):
         return Boolean(True, self.value)
-    def return_copy(self, kind, location):
+    def return_copy(self):
       if self.temporary:
           return self
       else:
@@ -193,7 +193,7 @@ class Pointer(Value):
     # Copy the return value of a function.
     # Similar to initialize with respect to permissions, but
     # produces a temporary value.
-    def return_copy(self, kind, location):
+    def return_copy(self):
       if self.temporary:
           return self
       else:
@@ -241,7 +241,7 @@ class Offset(Value):
         return self.ptr == other.ptr and self.offset == other.offset
     def duplicate(self, percentage):
         return Offset(True, self.ptr.duplicate(percentage), self.offset)
-    def return_copy(self, kind, location):
+    def return_copy(self):
       if self.temporary:
           return self
       else:
@@ -281,10 +281,9 @@ def permission_to_fraction(priv):
 @dataclass
 class Closure(Value):
     params: List[Any]
-    return_priv: str
     body: Stmt
     env: Any # needs work
-    __match_args__ = ("temporary", "params", "return_priv", "body", "env")
+    __match_args__ = ("temporary", "params", "body", "env")
     def duplicate(self, percentage):
         return self
     def initialize(self, kind, location, ret=False):
@@ -335,7 +334,7 @@ def log_graphviz(env, mem):
     file.write(generate_graphviz(env, mem))
     file.close()
     print('log graphviz: ' + filename)
-    
+
 def allocate(vals, mem):
     global next_address
     addr = next_address
@@ -389,6 +388,27 @@ def delete(ptr, mem, location):
         ptr.permission = Fraction(0,1)
         ptr.kill(mem, location)
     
+def env_init(env, var, val):
+    if trace:
+        print('env_init ' + var)
+    env[var] = [val]
+
+def env_get(env, var):
+    if trace:
+        print('env_get ' + var)
+    return env[var][0]
+
+def env_set(env, var, val):
+    if trace:
+        print('env_set ' + var)
+    env[var][0] = val
+    if trace:
+        print('finished env_set ' + var)
+
+def declare_locals(vars, env):
+    for var in vars:
+        env_init(env, var, None)
+
 def allocate_locals(var_priv_vals, env, location):
     if trace:
         print('allocating ' + ', '.join([x for x,p,v in var_priv_vals]))
@@ -400,7 +420,7 @@ def allocate_locals(var_priv_vals, env, location):
                   and (not val.address is None) \
                   and val.permission == Fraction(0,1):
             error(location, 'need readable pointer, not ' + str(val))
-        env[var] = val
+        env_set(env, var, val)
     if trace:
         print('finish allocating ' + ', '.join([x for x,p,v in var_priv_vals]))
 
@@ -408,7 +428,7 @@ def deallocate_locals(vars, env, mem, location):
     if trace:
         print('deallocating ' + ', '.join([v for v in vars]))
     for var in vars:
-        env[var].kill(mem, location)
+        env_get(env, var).kill(mem, location)
     if trace:
         print('finished deallocating ' + ', '.join([v for v in vars]))
 
@@ -420,27 +440,25 @@ def kill_temp(val, mem, location):
 def call_function(fun, args, env, mem, location):
     f = interp_exp(fun, env, mem)
     match f:
-      case Closure(tmp, params, return_priv, body, clos_env):
+      case Closure(tmp, params, body, clos_env):
         vals = [interp_init(arg, env, mem, param.kind) \
                 for (arg,param) in zip(args,params)]
         body_env = clos_env.copy()
         var_priv_vals = [(p.ident, p.kind, val) for p,val in zip(params, vals)]
+        declare_locals([p.ident for p in params], body_env)
         allocate_locals(var_priv_vals, body_env, location)
         if trace:
             print('call ' + str(Call(location, fun, args)))
             print()
             
         try:
-          (local_vars, retval) = interp_stmt(body, body_env, mem, return_priv)
+          retval = interp_exp(body, body_env, mem)
         except Exception as ex:
           raise Exception(error_header(location) + ' in call ' + str(Call(location, fun, args)) + '\n' + str(ex))
         
         if trace:
             print('deallocate params from call to ' + str(fun))
         deallocate_locals([p.ident for p in params], body_env, mem, location)
-        if trace:
-            print('deallocate locals from call to ' + str(fun))
-        deallocate_locals(local_vars, body_env, mem, location)
         if trace:
             print('killing temporary operator from call to ' + str(fun))
         kill_temp(f, mem, location)
@@ -500,7 +518,7 @@ def interp_exp(e, env, mem, dup=True, ret=False, lhs=False):
       case Var(x):
         if x not in env:
             error(e.location, 'use of undefined variable ' + x)
-        return env[x]
+        return env_get(env, x)
       case Int(n):
         return Number(True, n)
       case Frac(f):
@@ -607,8 +625,15 @@ def interp_exp(e, env, mem, dup=True, ret=False, lhs=False):
       case New(inits):
         vals = [interp_init(init, env, mem, 'read') for init in inits]
         return allocate(vals, mem)
-      case Lambda(params, return_priv, body):
-        return Closure(True, params, return_priv, body, env)
+      case Lambda(params, body):
+        clos_env = {}
+        for x in env.keys():
+            v = env_get(env, x)
+            if not (v is None):
+                env_init(clos_env, x, v.duplicate(Fraction(1,2)))
+            else:
+                clos_env[x] = env[x]
+        return Closure(True, params, body, clos_env)
       case Call(fun, args):
         return call_function(fun, args, env, mem, e.location)
       case Index(arg, index):
@@ -629,21 +654,30 @@ def interp_exp(e, env, mem, dup=True, ret=False, lhs=False):
             return retval
           case _:
             error(e.location, 'index must be an integer, not ' + repr(ind))
+      case VarInit(var, init, body):
+        val = interp_init(init, env, mem, var.kind)
+        body_env = env.copy()
+        declare_locals([var.ident], body_env)
+        var_priv_vals = [(var.ident, var.kind, val)]
+        allocate_locals(var_priv_vals, body_env, s.location)
+        retval = interp_exp(body, body_env, mem, dup, ret, lhs)
+        deallocate_locals([var.indent], body_env)
+        return retval
+      case Seq(first, rest):
+        interp_stmt(first, env, mem)
+        if retval is None:
+            (vars2,retval2) = interp_exp(rest, env, mem, dup, ret, lhs)
+            return vars1 | vars2, retval2
+        else:
+            return vars1, retval
+      case IfExp(cond, thn, els):
+        c = to_boolean(interp_exp(cond, env, mem), cond.location)
+        if c:
+            return interp_exp(thn, env, mem, dup, ret, lhs)
+        else:
+            return interp_exp(els, env, mem, dup, ret, lhs)
       case _:
         error(e.location, 'error in interp_exp, unhandled: ' + repr(e)) 
-
-def pattern_match(pat, val, matches):
-    if trace:
-        print('pattern_match(' + str(pat) + "," + str(val) + ")")
-        print()
-    match pat:
-      case WildCard():
-        return True
-      case ParamPat(param):
-        matches[id] = (param.kind, val)
-        return True
-      case _:
-        raise Exception('error in pattern match, unhandled: ' + repr(pat))
 
 def error_header(location):
     return '{file}:{line1}.{column1}-{line2}.{column2}: ' \
@@ -663,7 +697,7 @@ def warning(location, msg):
 
 graph_number = 0
 
-def interp_stmt(s, env, mem, return_priv):
+def interp_stmt(s, env, mem):
     if trace:
         print()
         print('interp_stmt ' + repr(s))
@@ -672,13 +706,6 @@ def interp_stmt(s, env, mem, return_priv):
         log_graphviz(env, mem)
         print()
     match s:
-      case VarInit(var, init):
-        # allow recursion
-        env[var.ident] = None
-        val = interp_init(init, env, mem, var.kind)
-        var_priv_vals = [(var.ident, var.kind, val)]
-        allocate_locals(var_priv_vals, env, s.location)
-        return {var.ident}, None
       case Write(lhs, rhs):
         offset = interp_exp(lhs, env, mem, dup=False, lhs=True)
         val = interp_init(rhs, env, mem, 'read')
@@ -690,7 +717,6 @@ def interp_stmt(s, env, mem, return_priv):
             print('kill offset temp')
         kill_temp(offset, mem, s.location)
         kill_temp(val, mem, s.location)
-        return set(), None
       case Transfer(lhs, percent, rhs):
         dest_ptr = interp_exp(lhs, env, mem, dup=False)
         amount = to_number(interp_exp(percent, env, mem), s.location)
@@ -701,57 +727,13 @@ def interp_stmt(s, env, mem, return_priv):
         dest_ptr.transfer(amount, src_ptr, s.location)
         if trace:
             print('after, src= ' + str(src_ptr) + ' dest= ' + str(dest_ptr))
-        return set(), None
       case Expr(e):
         val = interp_exp(e, env, mem)
         kill_temp(val, mem, s.location)
-        return set(), None
       case Assert(e):
         val = to_boolean(interp_exp(e, env, mem), s.location)
         if not val:
           error(e.location, "assertion failed: " + str(e))
-        return set(), None
-      case Return(e):
-        retval = interp_exp(e, env, mem, ret=True)
-        return set(), retval.return_copy(return_priv, e.location)
-      case Seq(first, rest):
-        (vars1,retval) = interp_stmt(first, env, mem, return_priv)
-        if retval is None:
-            (vars2,retval2) = interp_stmt(rest, env, mem, return_priv)
-            return vars1 | vars2, retval2
-        else:
-            return vars1, retval
-      case Pass():
-        return set(), None
-      case IfStmt(cond, thn, els):
-        c = to_boolean(interp_exp(cond, env, mem), cond.location)
-        if c:
-            return interp_stmt(thn, env, mem, return_priv)
-        else:
-            return interp_stmt(els, env, mem, return_priv)
-      case Match(arg, cases):
-        val = interp_exp(arg, env, mem)
-        for c in cases:
-           matches = set()
-           if pattern_match(c.pat, val, matches):
-               kill_temp(val, mem, arg.location)
-               body_env = env.copy()
-               if trace:
-                   print('matches')
-                   print(matches)
-                   print()
-               var_priv_vals = [(x,p,v) for x, (p,v) in matches.items()]
-               allocate_locals(var_priv_vals, body_env, c.location)
-               if trace:
-                   print('case body_env')
-                   print(body_env)
-                   print(mem)
-                   print()
-               (vars,retval) = interp_stmt(c.body, body_env, mem, return_priv)
-               deallocate_locals(matches.keys(), body_env, mem, c.location)
-               deallocate_locals(vars, body_env, mem, c.location)
-               return retval
-        error(s.location, 'no case was a match for ' + str(val))
       case Delete(arg):
         ptr = interp_exp(arg, env, mem)
         delete(ptr, mem, s.location)
@@ -760,26 +742,38 @@ def interp_stmt(s, env, mem, return_priv):
             print(env)
             print(mem)
             print()
-        return set(), None
-      case Block(body):
-        body_env = env.copy()
-        (vars, retval) = interp_stmt(body, body_env, mem, return_priv)
-        deallocate_locals(vars, body_env, mem, s.location)
-        return set(), retval
-      case ModuleDecl(name, exports, body):
-        body_env = env.copy()
-        vars, retval = interp_stmt(body, body_env, mem, return_priv)
-        members = {n: body_env[n] for n in exports}
-        env[name] = Module(False, name, members)
-        deallocate_locals(vars, body_env, mem, s.location)
-        return set(), None
       case _:
         raise Exception('error in interp_stmt, unhandled: ' + repr(s)) 
 
-def interp(p):
+
+def interp_decl(d, env, mem):
+    match d:
+      case Global(name, rhs):
+        return interp_exp(rhs, env, mem)
+      case Function(name, params, body):
+        return interp_exp(Lambda(d.location, params, body), env, mem)
+      case ModuleDecl(name, exports, body):
+        body_env = env.copy()
+        for d in body:
+            env_init(body_env, d.name, None)            
+        members = {d.name: interp_decl(d, body_env) for d in body}
+        return Module(False, name, members)
+    
+def interp(decls):
     env = {}
     mem = {}
-    locals, retval = interp_stmt(p, env, mem, 'read')
+    for d in decls:
+        env_init(env, d.name, None)
+        if d.name == 'main':
+            main = d
+    for d in decls:
+        env_set(env, d.name, interp_decl(d, env, mem))
+    if 'main' in env.keys():
+        retval = interp_exp(Call(main.location, Var(main.location, 'main'), []),
+                            env, mem)
+    else:
+        raise Exception('program is missing a main function')
+
     if trace:
         print(env)
         print(mem)
@@ -790,18 +784,20 @@ def interp(p):
     return retval
 
 if __name__ == "__main__":
-    filename = sys.argv[1]
-    set_filename(filename)
-    file = open(filename, 'r')
-    expect_fail = False
-    if 'fail' in sys.argv:
-        expect_fail = True
-    if 'trace' in sys.argv:
-        trace = True
-    p = file.read()
-    ast = parse(p, False)
+    decls = []
+    for filename in sys.argv[1:]:
+      set_filename(filename)
+      file = open(filename, 'r')
+      expect_fail = False
+      if 'fail' in sys.argv:
+          expect_fail = True
+      if 'trace' in sys.argv:
+          trace = True
+      p = file.read()
+      decls += parse(p, False)
+      
     try:
-        retval = interp(ast)
+        retval = interp(decls)
         if expect_fail:
             print("expected failure, but didn't")
             exit(-1)

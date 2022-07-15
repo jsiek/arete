@@ -71,8 +71,7 @@ def parse_tree_to_ast(e):
     elif e.data == 'lambda':
         return Lambda(e.meta,
                       parse_tree_to_param(e.children[0]),
-                      parse_tree_to_ast(e.children[1]),
-                      parse_tree_to_ast(e.children[2]))
+                      parse_tree_to_ast(e.children[1]))
     elif e.data == 'call':
         e1, e2 = e.children
         return Call(e.meta, parse_tree_to_ast(e1), parse_tree_to_ast(e2))
@@ -81,22 +80,17 @@ def parse_tree_to_ast(e):
         return Index(e.meta, parse_tree_to_ast(e1), parse_tree_to_ast(e2))
     elif e.data == 'paren':
         return parse_tree_to_ast(e.children[0])
-    elif e.data == 'write_priv':
-        return 'write'
-    elif e.data == 'read_priv':
-        return 'read'
-    elif e.data == 'none_priv':
-        return 'none'
     elif e.data == 'member':
         return Member(e.meta,
                       parse_tree_to_ast(e.children[0]),
                       str(e.children[1].value))
-    
-    # statements
     elif e.data == 'var_init':
         return VarInit(e.meta,
                        parse_tree_to_param(e.children[0]),
-                       parse_tree_to_ast(e.children[1]))
+                       parse_tree_to_ast(e.children[1]),
+                       parse_tree_to_ast(e.children[2]))
+    
+    # statements
     elif e.data == 'write':
         return Write(e.meta,
                      parse_tree_to_ast(e.children[0]),
@@ -112,18 +106,10 @@ def parse_tree_to_ast(e):
         return Assert(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'return':
         return Return(e.meta, parse_tree_to_ast(e.children[0]))
-    elif e.data == 'pass':
-        return Pass(e.meta)
     elif e.data == 'seq':
         return Seq(e.meta,
                    parse_tree_to_ast(e.children[0]),
                    parse_tree_to_ast(e.children[1]))
-    elif e.data == 'block':
-        return Block(e.meta, parse_tree_to_ast(e.children[0]))
-    elif e.data == 'match':
-        return Match(e.meta,
-                     parse_tree_to_ast(e.children[0]),
-                     parse_tree_to_ast(e.children[1]))
     elif e.data == 'if':
         return IfStmt(e.meta,
                       parse_tree_to_ast(e.children[0]),
@@ -136,6 +122,17 @@ def parse_tree_to_ast(e):
                       parse_tree_to_ast(e.children[2]))
     elif e.data == 'delete':
         return Delete(e.meta, parse_tree_to_ast(e.children[0]))
+
+    # declarations
+    elif e.data == 'global':
+        return Global(e.meta,
+                      str(e.children[0].value),
+                      parse_tree_to_ast(e.children[1]))
+    elif e.data == 'function':
+        return Function(e.meta,
+                        str(e.children[0].value),
+                        parse_tree_to_param(e.children[1]),
+                        parse_tree_to_ast(e.children[2]))
     elif e.data == 'module':
         return ModuleDecl(e.meta,
                           str(e.children[0].value),
@@ -151,18 +148,10 @@ def parse_tree_to_ast(e):
         return WildCard(e.meta)
     
     # miscelaneous
-    elif e.data == 'case':
-        return Case(e.meta,
-                    parse_tree_to_ast(e.children[0]),
-                    parse_tree_to_ast(e.children[1]))
     elif e.data == 'default_init':
         return Initializer(e.meta, None, parse_tree_to_ast(e.children[0]))
     elif e.data == 'frac_init':
         return Initializer(e.meta, parse_tree_to_ast(e.children[0]), parse_tree_to_ast(e.children[1]))
-    elif e.data == 'return_read':
-        return 'read'
-    elif e.data == 'return_write':
-        return 'write'
     
     # lists
     elif e.data == 'single':

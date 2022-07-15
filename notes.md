@@ -107,4 +107,14 @@ again.)
 
   Deep copy
 
-  
+
+* Rust
+
+* Cyclone
+
+* Alias Types
+
+* Mezzo
+
+* Swift
+

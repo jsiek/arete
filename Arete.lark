@@ -8,21 +8,22 @@ WS: /[ \t\f\r\n]/+
 LINECOMMENT: "//" /[^\n]*/ NEWLINE
 COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 
-?ret_priv:                       -> return_read
-         | "->" "!"              -> return_write
+?exp: "var" param "=" init ";" exp               -> var_init
+    | "if" exp "{" exp "}"                       -> if
+    | "if" exp "{" exp "}" "else" "{" exp "}"    -> if_else
+    | stmt exp                                   -> seq
+    | exp_logic
 
-?exp: exp_logic
-
-?exp_logic: exp_logic "and" exp_cmp  -> and
-    | exp_logic "or" exp_cmp         -> or
-    | exp_cmp
-
-?exp_cmp: exp_cmp "==" exp_add       -> equal
-    | exp_cmp "!=" exp_add           -> not_equal
-    | exp_cmp "<" exp_add            -> less
-    | exp_cmp ">" exp_add            -> greater
-    | exp_cmp "<=" exp_add           -> less_equal
-    | exp_cmp ">=" exp_add           -> greater_equal
+?exp_logic: exp_logic "and" exp_cmp              -> and
+    | exp_logic "or" exp_cmp                     -> or
+    | exp_cmp			                  
+				                  
+?exp_cmp: exp_cmp "==" exp_add                   -> equal
+    | exp_cmp "!=" exp_add                       -> not_equal
+    | exp_cmp "<" exp_add                        -> less
+    | exp_cmp ">" exp_add                        -> greater
+    | exp_cmp "<=" exp_add                       -> less_equal
+    | exp_cmp ">=" exp_add                       -> greater_equal
     | exp_add
 
 ?exp_add: exp_add "+" exp_med      -> add
@@ -33,76 +34,62 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | exp_med "*" exp_hi       -> mul
     | exp_hi
 
-?exp_hi: INT                   -> int
-    | "is_null" "(" exp ")"    -> is_null
-    | "null"                   -> null
-    | "split" "(" exp ")"      -> split
-    | "join" "(" exp "," exp ")" -> join
-    | "permission" "(" exp ")"   -> permission
-    | IDENT                    -> var
-    | exp_hi "[" exp "]"       -> index
-    | exp_hi "." IDENT         -> member
-    | "-" exp_hi               -> neg
-    | "not" exp_hi             -> not
-    | "(" exp ")"              -> paren
-    | "function" param_list ret_priv "{" stmt "}" -> lambda
-    | exp_hi "(" init_list ")"  -> call
-    | "new" init_list           -> new
-    | "true"                    -> true
-    | "false"                   -> false
+?exp_hi: INT                                     -> int
+    | "is_null" "(" exp ")"                      -> is_null
+    | "null"                                     -> null
+    | "split" "(" exp ")"                        -> split
+    | "join" "(" exp "," exp ")"                 -> join
+    | "permission" "(" exp ")"                   -> permission
+    | IDENT                                      -> var
+    | exp_hi "[" exp "]"                         -> index
+    | exp_hi "." IDENT                           -> member
+    | "-" exp_hi                                 -> neg
+    | "not" exp_hi                               -> not
+    | "(" exp ")"                                -> paren
+    | "function" "(" param_list ")" "{" exp "}"  -> lambda
+    | exp_hi "(" init_list ")"                   -> call
+    | "new" "(" init_list ")"                    -> new
+    | "true"                                     -> true
+    | "false"                                    -> false
       
-?exp_list:                      -> empty
-    | exp                       -> single
-    | exp "," exp_list          -> push
+?stmt: 
+    | exp "=" init ";"                           -> write
+    | exp "<-" exp "of" exp ";"                  -> transfer
+    | "discard" exp ";"                          -> expr
+    | "delete" exp ";"                           -> delete
+    | "assert" exp ";"                           -> assert
 
-?init: exp                      -> default_init
-    | exp "of" exp              -> frac_init
+?exp_list:                                       -> empty
+    | exp                                        -> single
+    | exp "," exp_list                           -> push
 
-?init_list:                     -> empty
-    | init                      -> single
-    | init "," init_list        -> push
+?init: exp                                       -> default_init
+    | exp "of" exp                               -> frac_init
+				                 
+?init_list:                                      -> empty
+    | init                                       -> single
+    | init "," init_list                         -> push
+				                 
+param: IDENT                                     -> read
+    | "!" IDENT                                  -> write
+				                 
+?param_list:                                     -> empty
+    | param                                      -> single
+    | param "," param_list                       -> push
 
-param: IDENT                    -> read
-    | "!" IDENT                 -> write
-
-?param_list:                    -> empty
-    | param                     -> single
-    | param "," param_list      -> push
-
-?pat: "⟨" pat_list "⟩"            -> tuple_pat
-    | param                       -> param_pat
-    | "_"                         -> wildcard_pat
-
-?pat_list:                        -> empty
-    | pat                         -> single
-    | pat "," pat_list            -> push
-
-?case: "case" pat ":" "{" stmt "}"   -> case
-
-?case_list: "|" case                 -> single
-    | "|" case case_list             -> push
-   
-?ident_list:                    -> empty
-    | IDENT                     -> single
-    | IDENT "," ident_list      -> push
+?ident_list:                                     -> empty
+    | IDENT                                      -> single
+    | IDENT "," ident_list                       -> push
     
-?basic_stmt: "var" param "=" init ";" -> var_init
-    | exp "=" init ";"                -> write
-    | exp "<-" exp "of" exp ";"      -> transfer
-    | exp ";"                        -> expr
-    | "{" stmt "}"                   -> block
-    | "delete" exp ";"               -> delete
-    | "assert" exp ";"               -> assert
-    | "if" exp "{" stmt "}"          -> if
-    | "if" exp "{" stmt "}" "else" "{" stmt "}" -> if_else
-    | "match" exp case_list            -> match
-    | "module" IDENT "exports" ident_list "{" stmt "}" -> module
+decl: "var" IDENT "=" exp ";"                    -> global
+    | "function" IDENT "(" param_list ")" "{" exp "}"       -> function
+    | "module" IDENT "exports" ident_list "{" decl_list "}" -> module
 
-?stmt: "return" exp ";"                -> return
-    | basic_stmt stmt                  -> seq
-    |                                  -> pass
-
-arete: stmt
+?decl_list:                                      -> empty
+    | decl                                       -> single
+    | decl "," decl_list                         -> push
+    
+arete: decl_list
 
 %ignore COMMENT
 %ignore LINECOMMENT
