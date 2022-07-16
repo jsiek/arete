@@ -1,9 +1,9 @@
 function main() {
   var !q = new 1;
   { var !p = q;
-    p[0] = p[0] + 1; }
-  q[0] = q[0] + 1;
-  var a = q[0];
+    *p = *p + 1; }
+  *q = *q + 1;
+  var a = *q;
   delete q;
   return a - 3;
 }

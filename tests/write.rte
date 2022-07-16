@@ -1,7 +1,7 @@
 function main() {
   var !x = new 10;
-  x[0] = 20;
-  var y = x[0];
+  *x = 20;
+  var y = *x;
   delete x;
   return y - 20;
 }

@@ -1,10 +1,10 @@
 function main() {
   var !p = new 0;
-  var write1 = function (v) { p[0] = v; };
+  var write1 = function (v) { *p = v; };
   var write2 = write1;
   ! write1(42);
   ! write2(7);
-  var x = p[0];
+  var x = *p;
   delete p;
   return x;
 }

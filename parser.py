@@ -82,6 +82,8 @@ def parse_tree_to_ast(e):
     elif e.data == 'index':
         e1, e2 = e.children
         return Index(e.meta, parse_tree_to_ast(e1), parse_tree_to_ast(e2))
+    elif e.data == 'deref':
+        return Index(e.meta, parse_tree_to_ast(e.children[0]), Int(e.meta, 0))
     elif e.data == 'paren':
         return parse_tree_to_ast(e.children[0])
     elif e.data == 'member':

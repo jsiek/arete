@@ -1,13 +1,13 @@
 function main() {
   var !p = new 0;
   if (true) {
-    p[0] = p[0] + 1;
+    *p = *p + 1;
   }
   if (true) {
-    p[0] = p[0] + 1;
-    p[0] = p[0] + 1;
+    *p = *p + 1;
+    *p = *p + 1;
   }
-  var three = p[0];
+  var three = *p;
   delete p;
   return three - 3;
 }

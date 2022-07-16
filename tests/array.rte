@@ -2,9 +2,9 @@ function main() {
   var n = 10;
   var !a = new [n] 0;
   var !i = new 0;
-  while (i[0] < n) {
-    a[i[0]] = i[0];
-    i[0] = i[0] + 1;
+  while (*i < n) {
+    a[*i] = *i;
+    *i = *i + 1;
   }
   delete i;
   var last = a[9];

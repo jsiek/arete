@@ -40,6 +40,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "permission" "(" exp ")"                   -> permission
     | IDENT                                      -> var
     | exp_hi "[" exp "]"                         -> index
+    | "*" exp_hi                                 -> deref
     | exp_hi "." IDENT                           -> member
     | "-" exp_hi                                 -> neg
     | "not" exp_hi                               -> not

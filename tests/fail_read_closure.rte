@@ -3,7 +3,7 @@ function main() {
   var copy1 = function() { return p; };
   var copy2 = copy1;
   var !q = join(copy1(), copy2());
-  p[0] = 1;
-  q[0] = 2;
-  return p[0];
+  *p = 1;
+  *q = 2;
+  return *p;
 }
