@@ -149,7 +149,7 @@ class Pointer(Value):
             self.permission -= other_priv
             ptr = Pointer(True, self.address, other_priv, self)
         if trace:
-            print('producing ' + str(ptr))
+            print('duplication producing ' + str(ptr))
         return ptr
     
     # self: the pointer being initialized from
@@ -621,12 +621,12 @@ def interp_exp(e, env, mem, dup=True, ret=False, lhs=False):
       case Prim('join', args):
         ptr1 = interp_exp(args[0], env, mem)
         ptr2 = interp_exp(args[1], env, mem)
-        ptr = ptr1.duplicate(1)
         if trace:
-            print('join ' + str(ptr1) + ' ' + str(ptr2))
+            print('join ' + str(ptr1) + ' with ' + str(ptr2))
+        ptr = ptr1.duplicate(1)
         ptr.transfer(1, ptr2, e.location)
         if trace:
-            print('into ' + str(ptr))
+            print('result of join: ' + str(ptr))
         return ptr
       case New(inits):
         vals = [interp_init(init, env, mem, 'read') for init in inits]
@@ -715,7 +715,7 @@ def interp_stmt(s, env, mem):
         body_env = env.copy()
         declare_locals([var.ident], body_env)
         var_priv_vals = [(var.ident, var.kind, val)]
-        allocate_locals(var_priv_vals, body_env, s.location)
+        allocate_locals(var_priv_vals, body_env, init.location)
         retval = interp_stmt(body, body_env, mem)
         deallocate_locals([var.ident], body_env, mem, s.location)
         return retval
@@ -847,8 +847,8 @@ if __name__ == "__main__":
         if expect_fail:
             exit(0)
         else:
-            #print('unexpected failure: ' + str(ex))
-            raise ex
+            print('unexpected failure')
+            #raise ex
             print(str(ex))
             print()
 
