@@ -94,7 +94,6 @@ function delete_node(node) {
 
 function delete_tree(!tree) {
   ! delete_node(all of tree[root]);
-  delete tree;
 }
 
 function main() {

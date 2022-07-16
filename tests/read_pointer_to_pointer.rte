@@ -1,14 +1,12 @@
 function f(y) {
   var !x = new y;
   var z = *x;
-  delete x;
   return *z - *y;
 }
 
 function main() {
   var !y = new 42;
   var a = f(y);
-  delete y;
   return a;
 }
 

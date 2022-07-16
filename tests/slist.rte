@@ -33,19 +33,10 @@ function remove_last(!n) {
   }
 }
 
-function delete_list(!n) {
-  if (not is_null(n)) {
-    ! delete_list(n[tail]);
-    delete n;
-  }
-}
-
 function main() {
   var !one_two = push(1, listof(2));
   var !two_null = remove_last(one_two);
   var one = one_two[head];
   var two = two_null[head];
-  ! delete_list(one_two);
-  ! delete_list(two_null);
   return one + one - two;
 }

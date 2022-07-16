@@ -6,6 +6,5 @@ function inc(!p) {
 function main() {
   var !q = new 0;
   var a = inc(q);
-  delete q;
   return a - 1;
 }

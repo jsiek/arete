@@ -6,8 +6,6 @@ function main() {
     a[*i] = *i;
     *i = *i + 1;
   }
-  delete i;
   var last = a[9];
-  delete a;
   return last - 9;
 }

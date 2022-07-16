@@ -101,7 +101,6 @@ function delete_nodes(node, last) {
 
 function delete_list(!list) {
   ! delete_nodes(all of list[front], all of list[back]);
-  delete list;
 }
 
 function main() {

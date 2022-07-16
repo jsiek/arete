@@ -205,10 +205,13 @@ class Pointer(Value):
         if trace:
             print('kill ' + str(self))
         self.lender = find_lender(self.lender)
-        if self.lender is None and not (self.address is None) \
-           and self.permission != Fraction(0,1):
-            warning(location, 'memory leak, killing nonempty pointer'
-                    + ' without lender ' + str(self))
+        
+        if self.lender is None and (not self.address is None):
+            if self.permission == Fraction(1,1):
+                delete(self, mem, location)
+            elif self.permission != Fraction(0,1):
+                warning(location, 'memory leak, killing nonempty pointer'
+                        + ' without lender ' + str(self))
         if (not self.lender is None) and (not self.address is None):
             if trace:
                 print('giving back ' + str(self.permission) \
@@ -217,7 +220,8 @@ class Pointer(Value):
             if trace:
                 print('to ' + str(self.lender))
         self.address = None
-        self.permission = Fraction(1,1) # all of nothing! -Jeremy
+        #self.permission = Fraction(1,1) # all of nothing! -Jeremy
+        self.permission = Fraction(0,1)
 
 # find the first ptr in the lender chain that is not yet killed,
 # i.e. that has a non-None address.
@@ -383,12 +387,12 @@ def delete(ptr, mem, location):
         if trace:
             print('delete ' + str(ptr))
         if not writable(priv):
-          error(location, 'delete needs writable pointer, not ' + str(ptr))
+            error(location, 'delete needs writable pointer, not ' + str(ptr))
+        if not addr in mem.keys():
+            error(location, 'already deleted address ' + str(addr))
         for val in mem[addr]:
             val.kill(mem, location)
         del mem[addr]
-        ptr.permission = Fraction(0,1)
-        ptr.kill(mem, location)
     
 def env_init(env, var, val):
     if trace:
@@ -737,7 +741,7 @@ def interp_stmt(s, env, mem):
       case Pass():
         pass
       case Write(lhs, rhs):
-        offset = interp_exp(lhs, env, mem, dup=False, lhs=True)
+        offset = interp_exp(lhs, env, mem, dup=True, lhs=True)
         val = interp_init(rhs, env, mem, 'read')
         if not isinstance(offset, Offset):
             error(s.location, "expected pointer offset on left-hand side of " 
@@ -767,7 +771,8 @@ def interp_stmt(s, env, mem):
       case Delete(arg):
         ptr = interp_exp(arg, env, mem)
         delete(ptr, mem, s.location)
-        kill_temp(ptr, mem, s.location)
+        ptr.address = None
+        ptr.permission = Fraction(0,1)
         if trace:
             print(env)
             print(mem)
@@ -789,18 +794,21 @@ def interp_stmt(s, env, mem):
         raise Exception('error in interp_stmt, unhandled: ' + repr(s)) 
 
 
-def interp_decl(d, env, mem):
-    match d:
+def interp_decl(decl, env, mem):
+    match decl:
       case Global(name, rhs):
         return interp_exp(rhs, env, mem)
       case Function(name, params, body):
-        return interp_exp(Lambda(d.location, params, body), env, mem)
+        return interp_exp(Lambda(decl.location, params, body), env, mem)
       case ModuleDecl(name, exports, body):
         body_env = env.copy()
         for d in body:
             env_init(body_env, d.name, None)
         for d in body:
             env_set(body_env, d.name, interp_decl(d, body_env, mem))
+        for ex in exports:
+            if not ex in body_env:
+                error(decl.location, 'export ' + ex + ' not defined in module')
         return Module(False, name,
                       {ex: env_get(body_env, ex) for ex in exports})
     
@@ -825,7 +833,7 @@ def interp(decls):
         print()
     if len(mem) > 0:
         print('result: ' + str(retval.value))
-        error(p.location, 'memory leak, memory size = ' + str(len(mem))) 
+        error(main.location, 'memory leak, memory size = ' + str(len(mem))) 
     return retval
 
 flags = set(['trace', 'fail'])
@@ -848,7 +856,7 @@ if __name__ == "__main__":
     try:
         retval = interp(decls)
         if expect_fail:
-            print("expected failure, but didn't")
+            print("expected failure, but didn't, returned " + str(retval))
             exit(-1)
         else:
             if trace:
@@ -859,8 +867,10 @@ if __name__ == "__main__":
             exit(0)
         else:
             print('unexpected failure')
-            #raise ex
-            print(str(ex))
-            print()
+            if False:
+                raise ex
+            else:
+                print(str(ex))
+                print()
 
 

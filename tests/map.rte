@@ -10,22 +10,11 @@ function map(f, ls) {
   }
 }
 
-var all = 1;
-
-function delete_list(!ls) {
-  if (not is_null(ls)) {
-    ! delete_list(rest(all of ls));
-    delete ls;
-  }
-}
-
 function inc(x) { return x + 1; }
 
 function main() {
   var !ls1 = new 0, (new 1, (new 2, null));
   var !ls2 = map(inc, ls1);
-  ! delete_list(all of ls1);
   var three = front(rest(rest(ls2)));
-  ! delete_list(ls2);
   return three - 3;
 }

@@ -4,6 +4,5 @@ function main() {
     *p = *p + 1; }
   *q = *q + 1;
   var a = *q;
-  delete q;
   return a - 3;
 }

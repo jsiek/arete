@@ -5,6 +5,5 @@ function main() {
   ! write1(42);
   ! write2(7);
   var x = *p;
-  delete p;
   return x;
 }

@@ -7,6 +7,5 @@ function main() {
   ! inc(q);
   *q = *q + 1;
   var a = *q;
-  delete q;
   return a - 2;
 }

@@ -1,5 +1,12 @@
+# TODO list
 
-
+[ ] automatic delete on kill?
+[ ] newtype/seal/reveal
+[ ] standard library
+[ ] future/promise
+[ ] mutable variables (desugar to var + new + * + delete)
+[ ] type checker for permissions
+[ ] compiler
 
 # Permission Groups
 
