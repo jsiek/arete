@@ -103,6 +103,18 @@ class New(Exp):
         return set().union(*[init.free_vars() for init in self.inits])
 
 @dataclass
+class Array(Exp):
+    size: Exp
+    arg: Exp
+    __match_args__ = ("size","arg")
+    def __str__(self):
+        return "new " + "[" + str(self.size) + "]" + str(self.arg)
+    def __repr__(self):
+        return str(self)
+    def free_vars(self):
+        return self.size.free_vars() | self.arg.free_vars()
+    
+@dataclass
 class Var(Exp):
     ident: str
     __match_args__ = ("ident",)
@@ -317,6 +329,18 @@ class IfStmt(Stmt):
         return self.cond.free_vars() | self.thn.free_vars() \
             | self.els.free_vars()
 
+@dataclass
+class While(Stmt):
+    cond: Exp
+    body: Stmt
+    __match_args__ = ("cond", "body")
+    def __str__(self):
+        return "while " + "(" + str(self.cond) + ")\n" + str(self.body) 
+    def __repr__(self):
+        return str(self)
+    def free_vars(self):
+        return self.cond.free_vars() | self.body.free_vars()
+    
 @dataclass
 class Pass(Stmt):
     def __str__(self):

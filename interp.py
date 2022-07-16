@@ -631,6 +631,12 @@ def interp_exp(e, env, mem, dup=True, ret=False, lhs=False):
       case New(inits):
         vals = [interp_init(init, env, mem, 'read') for init in inits]
         return allocate(vals, mem)
+      case Array(size, arg):
+        size = to_number(interp_exp(size, env, mem), e.location)
+        val = interp_exp(arg, env, mem)
+        vals = [val.duplicate(Fraction(1,2)) for i in range(0,size-1)]
+        vals.append(val)
+        return allocate(vals, mem)
       case Lambda(params, body):
         clos_env = {}
         free = body.free_vars() - set([p.ident for p in params])
@@ -772,6 +778,11 @@ def interp_stmt(s, env, mem):
             return interp_stmt(thn, env, mem)
         else:
             return interp_stmt(els, env, mem)
+      case While(cond, body):
+        while to_boolean(interp_exp(cond, env, mem), cond.location):
+            retval = interp_stmt(body, env, mem)
+            if not (retval is None):
+                return retval
       case Block(body):
         return interp_stmt(body, env, mem)
       case _:

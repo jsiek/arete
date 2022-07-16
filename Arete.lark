@@ -46,6 +46,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "(" exp ")"                                -> paren
     | "function" "(" param_list ")" block        -> lambda
     | "new" init_list                            -> new
+    | "new" "[" exp "]" exp                      -> array
     | exp_hi "(" init_list ")"                   -> call
     | "true"                                     -> true
     | "false"                                    -> false
@@ -57,6 +58,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "assert" exp ";"                           -> assert
     | "if" "(" exp ")" block                     -> if
     | "if" "(" exp ")" block "else" block        -> if_else
+    | "while" "(" exp ")" block                  -> while
     | block
 
 ?stmt_list: "var" param "=" init ";" stmt_list   -> var_init

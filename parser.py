@@ -68,6 +68,10 @@ def parse_tree_to_ast(e):
         return Prim(e.meta, e.data, [parse_tree_to_ast(c) for c in e.children])
     elif e.data == 'new':
         return New(e.meta, parse_tree_to_ast(e.children[0]))
+    elif e.data == 'array':
+        return Array(e.meta,
+                     parse_tree_to_ast(e.children[0]),
+                     parse_tree_to_ast(e.children[1]))
     elif e.data == 'lambda':
         return Lambda(e.meta,
                       parse_tree_to_param(e.children[0]),
@@ -134,6 +138,10 @@ def parse_tree_to_ast(e):
                       parse_tree_to_ast(e.children[0]),
                       parse_tree_to_ast(e.children[1]),
                       parse_tree_to_ast(e.children[2]))
+    elif e.data == 'while':
+        return While(e.meta,
+                      parse_tree_to_ast(e.children[0]),
+                      parse_tree_to_ast(e.children[1]))
     elif e.data == 'delete':
         return Delete(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'block':
