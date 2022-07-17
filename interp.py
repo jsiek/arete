@@ -7,16 +7,6 @@ import numbers
 import sys
 import copy
 from utilities import *
-from values import *
-
-def writable(frac):
-    return frac == Fraction(1, 1)
-
-def readable(frac):
-    return Fraction(0, 1) < frac and frac < Fraction(1, 1)
-
-def none(frac):
-    return frac == Fraction(0, 1)
 
 def check_permission(frac: Fraction, kind: str):
     if kind == 'write':
@@ -39,7 +29,6 @@ def permission_to_fraction(priv):
         raise Exception('unrecognized permission: ' + priv)
     
 trace = False
-next_address = 0
 
 def generate_graphviz(env, mem):
     result = 'digraph {\n'
@@ -76,59 +65,6 @@ def log_graphviz(env, mem):
     file.close()
     print('log graphviz: ' + filename)
 
-def allocate(vals, mem):
-    global next_address
-    addr = next_address
-    next_address += 1
-    mem[addr] = vals
-    ptr = Pointer(True, addr, Fraction(1,1), None)
-    if trace:
-        print('allocated new pointer ' + str(ptr))
-    return ptr
-
-def read(ptr, index, mem, location, dup):
-    if not isinstance(ptr, Pointer):
-        error(location, 'in read expected a pointer, not ' + str(ptr))
-    if none(ptr.permission):
-        error(location, 'pointer does not have read permission: ' + str(ptr))
-    # whether to copy here or not?
-    # see tests/fail_indirect_write
-    if dup:
-        retval = mem[ptr.address][index].duplicate(ptr.permission)
-    else:
-        retval = mem[ptr.address][index]
-    if False:
-        print('read from ' + str(ptr) + '[' + str(index) + ']')
-        print('    value: ' + str(mem[ptr.address][index]))
-        print('    producing: ' + str(retval))
-    return retval
-    #return mem[ptr.address]
-
-def write(ptr, index, val, mem, location):
-    if not isinstance(ptr, Pointer):
-        error(location, 'in write expected a pointer, not ' + str(ptr))
-    if not writable(ptr.permission):
-        error(location, 'pointer does not have write permission: ' + str(ptr))
-    mem[ptr.address][index].kill(mem, location)
-    if val.temporary:
-        mem[ptr.address][index] = val
-    else:
-        mem[ptr.address][index] = val.duplicate(1)
-    mem[ptr.address][index].temporary = False
-
-def delete(ptr, mem, location):
-    match ptr:
-      case Pointer(tmp, addr, priv):
-        if trace:
-            print('delete ' + str(ptr))
-        if not writable(priv):
-            error(location, 'delete needs writable pointer, not ' + str(ptr))
-        if not addr in mem.keys():
-            error(location, 'already deleted address ' + str(addr))
-        for val in mem[addr]:
-            val.kill(mem, location)
-        del mem[addr]
-    
 def call_function(fun, args, env, mem, location):
     f = interp_exp(fun, env, mem)
     match f:
@@ -279,22 +215,6 @@ def interp_exp(e, env, mem, dup=True, lhs=False):
         return retval
       case _:
         error(e.location, 'error in interp_exp, unhandled: ' + repr(e)) 
-
-def error_header(location):
-    return '{file}:{line1}.{column1}-{line2}.{column2}: ' \
-        .format(file=location.filename,
-                line1=location.line, column1=location.column,
-                line2=location.end_line, column2=location.end_column)
-            
-def error(location, msg):
-    raise Exception(error_header(location) + msg)
-
-def warning(location, msg):
-    header = '{file}:{line1}.{column1}-{line2}.{column2}: ' \
-        .format(file=location.filename,
-                line1=location.line, column1=location.column,
-                line2=location.end_line, column2=location.end_column)
-    print(header + 'warning: ' + msg)
 
 graph_number = 0
 

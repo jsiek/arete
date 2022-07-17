@@ -3,7 +3,6 @@ from typing import List, Set, Dict, Tuple, Any
 from lark.tree import Meta
 from fractions import Fraction
 from utilities import *
-from values import *
 
 # Parameters
 
@@ -22,19 +21,34 @@ class Param:
 
 @dataclass
 class Initializer:
-    location: Meta
-    percentage: Exp
-    arg: Exp
-    __match_args__ = ("location", "percentage", "arg")
-    def __str__(self):
-        return str(self.percentage) + " of " + str(self.arg)
-    def __repr__(self):
-        return str(self)
-    def free_vars(self):
-        percent_fv = set() if isinstance(self.percentage, str) \
-            else self.percentage.free_vars()
-        return percent_fv | self.arg.free_vars()
-    
+  location: Meta
+  percentage: Exp
+  arg: Exp
+  __match_args__ = ("location", "percentage", "arg")
+  def __str__(self):
+      return str(self.percentage) + " of " + str(self.arg)
+  def __repr__(self):
+      return str(self)
+  def free_vars(self):
+      percent_fv = set() if isinstance(self.percentage, str) \
+          else self.percentage.free_vars()
+      return percent_fv | self.arg.free_vars()
+  def step(self, action, machine):
+    if action.state == 0:
+      if self.percentage == 'default':
+        if action.privilege == 'read':
+          self.percentage = Frac(self.location, Fraction(1,2))
+        elif action.privilege == 'write':
+          self.percentage = Frac(self.location, Fraction(1,1))
+        else:
+          error(self.location, "unexpected privilege " + action.privilege)
+      machine.schedule(self.percentage, action.env)
+    elif action.state == 1:
+      machine.schedule(self.arg, action.env)
+    else:
+      percent, val = action.results
+      machine.finalize(val.init(percent, self.location))
+      
 # Expressions
 
 @dataclass
@@ -54,9 +68,9 @@ class Call(Exp):
     if action.state == 0:
       # evaluate subexpressions
       machine.schedule(self.fun, action.env)
-      for arg in self.args:
-        machine.schedule(arg, action.env)
-    elif action.state == 1:
+    elif action.state <= len(self.args):
+      machine.schedule(args[action.state - 1], action.env)
+    elif action.state == len(self.args) + 1:
       # call the function
       match action.results[0]:
         case Closure(tmp, params, body, clos_env):
@@ -94,9 +108,8 @@ class Prim(Exp):
         return set().union(*[arg.free_vars() for arg in self.args])
     
     def step(self, action, machine):
-      if action.state == 0:
-        for arg in self.args:
-          machine.schedule(arg, action.env)
+      if action.state < len(self.args):
+        machine.schedule(self.args[action.state], action.env)
       else:
         retval = eval_prim(self.op, action.results, machine.memory,
                            self.location)
@@ -125,6 +138,12 @@ class New(Exp):
         return str(self)
     def free_vars(self):
         return set().union(*[init.free_vars() for init in self.inits])
+    def step(self, action, machine):
+      if action.state < len(self.inits):
+        init_act = machine.schedule(self.inits[action.state], action.env)
+        init_act.privilege = 'read'
+      else:
+        machine.finalize(allocate(action.results, machine.memory))
 
 @dataclass
 class Array(Exp):
@@ -203,6 +222,26 @@ class Index(Exp):
         return str(self)
     def free_vars(self):
         return self.arg.free_vars() | self.index.free_vars()
+    def step(self, action, machine):
+      if action.state == 0:
+        machine.schedule(self.arg, action.env)
+      elif action.state == 1:
+        machine.schedule(self.index, action.env)
+      else:
+        ptr, ind = action.results
+        match ind:
+          case Number(tmp, i):
+            if action.lhs:
+                retval = Offset(ptr.temporary, ptr, i)
+            else:
+                retval = read(ptr, i, machine.memory, self.location, action.dup)
+                kill_temp(ptr, machine.memory, self.location)
+                kill_temp(ind, machine.memory, self.location)
+            machine.finalize(retval)
+          case _:
+            error(self.location, 'index must be an integer, not ' + repr(ind))
+        
+        
     
 @dataclass
 class Lambda(Exp):
@@ -252,16 +291,24 @@ class Let(Exp):
 
 @dataclass
 class Seq(Stmt):
-    first: Stmt
-    rest: Stmt
-    __match_args__ = ("first", "rest")
-    def __str__(self):
-        return str(self.first) + "\n" + str(self.rest)
-    def __repr__(self):
-        return str(self)
-    def free_vars(self):
-        return self.first.free_vars() | self.rest.free_vars()
-
+  first: Stmt
+  rest: Stmt
+  __match_args__ = ("first", "rest")
+  def __str__(self):
+    return str(self.first) + "\n" + str(self.rest)
+  def __repr__(self):
+    return str(self)
+  def free_vars(self):
+    return self.first.free_vars() | self.rest.free_vars()
+  def step(self, action, machine):
+    if action.state == 0:
+      machine.schedule(self.first, action.env)
+    elif len(action.results) > 0:
+      machine.finalize(action.results[0])
+    else:
+      machine.finished()
+      machine.schedule(self.rest, action.env)
+    
 @dataclass
 class VarInit(Exp):
     var: Param
@@ -276,6 +323,23 @@ class VarInit(Exp):
     def free_vars(self):
         return self.init.free_vars() \
             | (self.body.free_vars() - set([self.var.ident]))
+    def step(self, action, machine):
+      if action.state == 0:
+        init_act = machine.schedule(self.init, action.env)
+        init_act.privilege = self.var.kind
+      elif action.state == 1:
+        val = action.results[0]
+        action.body_env = action.env.copy()
+        declare_locals([self.var.ident], action.body_env)
+        var_priv_vals = [(self.var.ident, self.var.kind, val)]
+        allocate_locals(var_priv_vals, action.body_env, self.init.location)
+        machine.schedule(self.body, action.body_env)
+      else:
+        deallocate_locals([self.var.ident], action.body_env,
+                          machine.memory, self.location)
+        machine.finished()
+
+        
 
 @dataclass
 class Return(Stmt):
@@ -291,12 +355,13 @@ class Return(Stmt):
       if action.state == 0:
         machine.schedule(self.arg, action.env)
       else:
-        machine.pop_frame(action.results[0])
+        machine.finalize(action.results[0])
+        #machine.pop_frame(action.results[0])
     
 @dataclass
 class Write(Stmt):
     lhs: Exp
-    rhs: Exp
+    rhs: Initializer
     __match_args__ = ("lhs", "rhs")
     def __str__(self):
         return str(self.lhs) + " = " + str(self.rhs) + ";"
@@ -304,6 +369,22 @@ class Write(Stmt):
         return str(self)
     def free_vars(self):
         return self.lhs.free_vars() | self.rhs.free_vars()
+    def step(self, action, machine):
+      if action.state == 0:
+        machine.schedule(self.lhs, action.env, lhs=True)
+      elif action.state == 1:
+        init_act = machine.schedule(self.rhs, action.env)
+        init_act.privilege = 'read'
+      else:
+        offset, val = action.results
+        if not isinstance(offset, Offset):
+            error(self.location,
+                  "expected pointer offset on left-hand side of " 
+                  + "assignment, not " + str(offset))
+        write(offset.ptr, offset.offset, val, machine.memory, self.location)
+        kill_temp(offset, machine.memory, self.location)
+        kill_temp(val, machine.memory, self.location)
+        machine.finished()
 
 @dataclass
 class Transfer(Stmt):
@@ -367,6 +448,15 @@ class IfStmt(Stmt):
     def free_vars(self):
         return self.cond.free_vars() | self.thn.free_vars() \
             | self.els.free_vars()
+    def step(self, action, machine):
+      if action.state == 0:
+        machine.schedule(self.cond, action.env)
+      else:
+        machine.finished()
+        if to_boolean(action.results[0], self.location):
+          machine.schedule(self.thn, action.env)
+        else:
+          machine.schedule(self.els, action.env)
 
 @dataclass
 class While(Stmt):
@@ -402,8 +492,10 @@ class Block(Stmt):
     def step(self, action, machine):
       if action.state == 0:
         machine.schedule(self.body, action.env)
+      elif len(action.results) > 0:
+        machine.finalize(action.results[0])
       else:
-        machine.finalize(None)
+        machine.finished()
     
 # Declarations
     

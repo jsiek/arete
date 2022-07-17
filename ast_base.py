@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from lark.tree import Meta
 
 @dataclass
 class AST:
