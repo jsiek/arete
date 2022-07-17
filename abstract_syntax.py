@@ -51,7 +51,6 @@ class Call(Exp):
       return self.fun.free_vars() \
           | set().union(*[arg.free_vars() for arg in self.args])
   def step(self, action, machine):
-    print('step ' + str(self))
     if action.state == 0:
       # evaluate subexpressions
       machine.schedule(self.fun, action.env)
@@ -99,7 +98,8 @@ class Prim(Exp):
         for arg in self.args:
           machine.schedule(arg, action.env)
       else:
-        retval = eval_prim(op, action.results, machine.memory, self.location)
+        retval = eval_prim(self.op, action.results, machine.memory,
+                           self.location)
         machine.finalize(retval)
             
 

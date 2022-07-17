@@ -23,6 +23,8 @@ from typing import Any
 from interp import *
 from abstract_syntax import AST
 
+trace = False
+
 @dataclass
 class Action:
     ast: AST
@@ -53,13 +55,17 @@ class Machine:
         call_main = Call(loc, Var(loc, 'main'), [])
         self.schedule(call_main, env)
         self.loop()
+        if len(self.memory) > 0:
+            error(main.location, 'memory leak, memory size = '
+                  + str(len(self.memory)))
         return self.result
 
     def loop(self):
         i = 0
         while len(self.stack) > 0 and i < 10:
             i += 1
-            print('configuration: ' + repr(self))
+            if trace:
+                print('configuration: ' + repr(self))
             frame = self.current_frame()
             if len(frame.todo) > 0:
                 action = self.current_action()
@@ -70,7 +76,8 @@ class Machine:
                 
     # Call schedule to start the evaluation of an AST node. 
     def schedule(self, ast, env, dup=True, lhs=False):
-        print('scheduling ' + str(ast))
+        if trace:
+            print('scheduling ' + str(ast))
         action = Action(ast, 0, env, dup, lhs, [])
         self.current_frame().todo.append(action)
 
@@ -96,6 +103,8 @@ class Machine:
 
     def current_action(self):
         return self.current_frame().todo[-1]
+
+flags = set(['trace', 'fail'])
 
 if __name__ == "__main__":
     decls = []
