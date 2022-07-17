@@ -1,4 +1,4 @@
-function main() {
+fun main() {
   var x = 10;
   return x + -10;
 }

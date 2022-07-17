@@ -150,6 +150,10 @@ def parse_tree_to_ast(e):
         return Block(e.meta, body=parse_tree_to_ast(e.children[0]))
 
     # declarations
+    elif e.data == 'import':
+        return Import(e.meta,
+                      parse_tree_to_ast(e.children[0]),
+                      parse_tree_to_str_list(e.children[1]))
     elif e.data == 'global':
         return Global(e.meta,
                       str(e.children[0].value),

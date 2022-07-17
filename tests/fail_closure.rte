@@ -1,6 +1,6 @@
-function main() {
+fun main() {
   var !p = new 0;
-  var write1 = function (v) { *p = v; };
+  var write1 = fun (v) { *p = v; };
   var write2 = write1;
   ! write1(42);
   ! write2(7);

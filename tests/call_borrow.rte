@@ -1,8 +1,8 @@
-function inc(!p) {
+fun inc(!p) {
   *p = *p + 1;
 }
 
-function main() {
+fun main() {
   var !q = new 0;
   ! inc(q);
   *q = *q + 1;

@@ -1,4 +1,4 @@
-function main() {
+fun main() {
   var !q = new 1;
   { var !p = q;
     *p = *p + 1; }

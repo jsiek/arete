@@ -1,5 +1,6 @@
 # TODO list
 
+[ ] import
 [ ] future/promise
 [ ] newtype/seal/reveal
 [ ] standard library

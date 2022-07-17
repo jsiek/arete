@@ -1,9 +1,9 @@
-function inc(!p) {
+fun inc(!p) {
   *p = *p + 1;
   return *p;
 }
 
-function main() {
+fun main() {
   var !q = new 0;
   var a = inc(q);
   return a - 1;

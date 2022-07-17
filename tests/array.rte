@@ -1,4 +1,4 @@
-function main() {
+fun main() {
   var n = 10;
   var !a = new [n] 0;
   var !i = new 0;

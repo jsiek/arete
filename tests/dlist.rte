@@ -7,12 +7,12 @@ var none = 0;
 var half = 1/2;
 var all = 1;
 
-function listof(data) {
+fun listof(data) {
   var !p = new data, null, null;
   return split(p);
 }
 
-function push(data, !lst) {
+fun push(data, !lst) {
   var !first = new data, null , null;
   if (lst[front] == lst[back]) { // lst is a 1 element list
     /*
@@ -71,7 +71,7 @@ function push(data, !lst) {
   }
 }
 
-function check_nodes_permissions(node) {
+fun check_nodes_permissions(node) {
   if (not is_null(node[next])) {
     assert permission(node[next]) == half;
     ! check_nodes_permissions(all of node[next]);
@@ -81,7 +81,7 @@ function check_nodes_permissions(node) {
   }
 }
 
-function check_list_permissions(list) {
+fun check_list_permissions(list) {
   var first = all of list[front];
   var last = all of list[back];
   assert permission(first) == half;
@@ -89,7 +89,7 @@ function check_list_permissions(list) {
   ! check_nodes_permissions(all of first);
 }
 
-function delete_nodes(node, last) {
+fun delete_nodes(node, last) {
   if (node == last) {
     delete join(node, last);
   } else {
@@ -99,11 +99,11 @@ function delete_nodes(node, last) {
   }
 }
 
-function delete_list(!list) {
+fun delete_list(!list) {
   ! delete_nodes(all of list[front], all of list[back]);
 }
 
-function main() {
+fun main() {
   var !three = listof(3);
   var !two_three = push(2, three);
   var !one_two_three = push(1, two_three);

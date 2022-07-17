@@ -404,3 +404,15 @@ class ModuleDecl(Decl):
             + str(self.body) + '\n}\n'
     def __repr__(self):
         return str(self)
+
+@dataclass
+class Import(Decl):
+    module: Exp
+    imports: List[str]
+    __match_args__ = ("module", "imports")
+    def __str__(self):
+        return 'from ' + str(self.module) + ' import ' \
+            + ', '.join(im for im in self.imports) + ';\n'
+    def __repr__(self):
+        return str(self)
+    

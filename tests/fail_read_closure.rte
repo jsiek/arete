@@ -1,6 +1,6 @@
-function main() {
+fun main() {
   var !p = new 0;
-  var copy1 = function() { return p; };
+  var copy1 = fun() { return p; };
   var copy2 = copy1;
   var !q = join(copy1(), copy2());
   *p = 1;

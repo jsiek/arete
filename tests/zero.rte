@@ -1,3 +1,3 @@
-function main() {
+fun main() {
   return 0;
 }

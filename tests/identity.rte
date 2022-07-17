@@ -1,5 +1,5 @@
-function id(x) { return x; }
+fun id(x) { return x; }
 
-function main() {
+fun main() {
   return id(0);
 }

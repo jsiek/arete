@@ -23,7 +23,7 @@ class Module(Value):
     def duplicate(self, percentage):
         return self # ??
     def __str__(self):
-      return self.name
+      return self.name + '{' + ','.join([x + '=' + str(v) for x,v in self.members.items()]) + '}'
     def __repr__(self):
         return str(self)
     def kill(self, mem, location):
@@ -406,7 +406,7 @@ def env_get(env, var):
 
 def env_set(env, var, val):
     if trace:
-        print('env_set ' + var)
+        print('env_set ' + var + ' to ' + str(val))
     env[var][0] = val
     if trace:
         print('finished env_set ' + var)
@@ -793,34 +793,59 @@ def interp_stmt(s, env, mem):
       case _:
         raise Exception('error in interp_stmt, unhandled: ' + repr(s)) 
 
-
+def declare_decl(decl, env, mem):
+    match decl:
+      case Import(module, imports):
+        for x in imports:
+            env_init(env, x, None)
+      case _:
+        env_init(env, decl.name, None)
+    
 def interp_decl(decl, env, mem):
+    if trace:
+        print('interp_decl ' + str(decl))
     match decl:
       case Global(name, rhs):
-        return interp_exp(rhs, env, mem)
+        env_set(env, name, interp_exp(rhs, env, mem))
       case Function(name, params, body):
-        return interp_exp(Lambda(decl.location, params, body), env, mem)
+        env_set(env, name,
+                interp_exp(Lambda(decl.location, params, body), env, mem))
       case ModuleDecl(name, exports, body):
         body_env = env.copy()
         for d in body:
-            env_init(body_env, d.name, None)
+            declare_decl(d, body_env, mem)
         for d in body:
-            env_set(body_env, d.name, interp_decl(d, body_env, mem))
+            interp_decl(d, body_env, mem)
         for ex in exports:
             if not ex in body_env:
                 error(decl.location, 'export ' + ex + ' not defined in module')
-        return Module(False, name,
-                      {ex: env_get(body_env, ex) for ex in exports})
+        mod = Module(False, name,
+                       {ex: env_get(body_env, ex) for ex in exports})
+        if trace:
+            print('finished module ' + str(mod))
+        env_set(env, name, mod)
+      case Import(module, imports):
+        mod = interp_exp(module, env, mem)
+        if trace:
+            print('import from ' + str(mod))
+        if not isinstance(mod, Module):
+            error(decl.location, 'import expected a module, not ' + str(mod))
+        for x in imports:
+            if x in mod.members.keys():
+                env_set(env, x, mod.members[x]) # duplicate?
+            else:
+                error(decl.location, 'module does not export ' + x)
+                
     
 def interp(decls):
     env = {}
     mem = {}
     for d in decls:
-        env_init(env, d.name, None)
-        if d.name == 'main':
+        declare_decl(d, env, mem)
+        if isinstance(d, Function) and d.name == 'main':
             main = d
     for d in decls:
-        env_set(env, d.name, interp_decl(d, env, mem))
+        interp_decl(d, env, mem)
     if 'main' in env.keys():
         retval = interp_exp(Call(main.location, Var(main.location, 'main'), []),
                             env, mem)

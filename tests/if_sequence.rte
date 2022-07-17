@@ -1,4 +1,4 @@
-function main() {
+fun main() {
   var !p = new 0;
   if (true) {
     *p = *p + 1;

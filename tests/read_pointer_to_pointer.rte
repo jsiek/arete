@@ -1,10 +1,10 @@
-function f(y) {
+fun f(y) {
   var !x = new y;
   var z = *x;
   return *z - *y;
 }
 
-function main() {
+fun main() {
   var !y = new 42;
   var a = f(y);
   return a;

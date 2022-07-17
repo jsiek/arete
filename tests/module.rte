@@ -3,13 +3,13 @@ module M
 {
   var all = 1;
   var empty = null;
-  function push(data, rest) {
+  fun push(data, rest) {
     return new data, all of rest;
   }
-  function front(ls) { return ls[0]; }
-  function rest(ls) { return ls[1]; }
+  fun front(ls) { return ls[0]; }
+  fun rest(ls) { return ls[1]; }
   
-  function map(f, ls) {
+  fun map(f, ls) {
     if (is_null(ls)) {
       return null;
     } else {
@@ -18,10 +18,12 @@ module M
   }
 }
 
-function main() {
-  var !ls1 = M.push(0, M.push(1, M.push(2, M.empty)));
-  var inc = function (x) { return x + 1; };
-  var !ls2 = M.map(inc, ls1);
-  var three = M.front(M.rest(M.rest(ls2)));
+from M import empty, push, front, rest;
+
+fun main() {
+  var !ls1 = push(0, push(1, push(2, empty)));
+  var inc = fun (x) { return x + 1; };
+  var !ls2 = M.map(inc, ls1); // test . operator
+  var three = front(rest(rest(ls2)));
   return three - 3;
 }
