@@ -78,6 +78,15 @@ class Prim(Exp):
         return str(self)
     def free_vars(self):
         return set().union(*[arg.free_vars() for arg in self.args])
+    
+    def step(self, state, env, machine):
+        if state == 0:
+            self.subactions = [machine.schedule(arg, env) for arg in args]
+        else:
+            vals = [act.result for act in self.subactions]
+            retval = eval_prim(op, vals)
+            machine.finalize(retval)
+            
 
 @dataclass
 class Member(Exp):

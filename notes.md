@@ -1,6 +1,6 @@
 # TODO list
 
-[ ] future/promise
+[ ] future/promise - abstract machine?
 [ ] newtype/seal/reveal
 [ ] standard library
 [ ] mutable variables (desugar to var + new + * + delete)

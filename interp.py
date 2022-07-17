@@ -520,7 +520,44 @@ compare_ops = { 'less': lambda x, y: x < y,
                 'less_equal': lambda x, y: x <= y,
                 'greater': lambda x, y: x > y,
                 'greater_equal': lambda x, y: x >= y}
-        
+
+def eval_prim(op, vals, mem, location):
+    match op:
+      case 'equal':
+        left, right = vals
+        retval = Boolean(True, left.equals(right))
+        kill_temp(left, mem, location)
+        kill_temp(right, mem, location)
+        return retval
+      case 'not_equal':
+        left, right = vals
+        retval = Boolean(True, not left.equals(right))
+        kill_temp(left, mem, location)
+        kill_temp(right, mem, location)
+        return retval
+      case 'add':
+        left = to_number(vals[0], location)
+        right = to_number(vals[1], location)
+        return Number(True, left + right)
+      case 'sub':
+        left = to_number(vals[0], location)
+        right = to_number(vals[1], location)
+        return Number(True, left - right)
+      case 'mul':
+        left = to_number(vals[0], location)
+        right = to_number(vals[0], location)
+        return Number(True, left * right)
+      case 'div':
+        left = to_number(vals[0], location)
+        right = to_number(vals[1], location)
+        return Number(True, Fraction(left, right))
+      case 'neg':
+        val = to_number(vals[0], location)
+        return Number(True, - val)
+      case _:
+        error(location, 'unknown primitive operator ' + op)
+    
+
 def interp_exp(e, env, mem, dup=True, lhs=False):
     if trace:
         print('interp_exp ' + str(e))
@@ -544,39 +581,6 @@ def interp_exp(e, env, mem, dup=True, lhs=False):
         kill_temp(left, mem, e.location)
         kill_temp(right, mem, e.location)
         return retval
-      case Prim('equal', args):
-        left = interp_exp(args[0], env, mem)
-        right = interp_exp(args[1], env, mem)
-        retval = Boolean(True, left.equals(right))
-        kill_temp(left, mem, e.location)
-        kill_temp(right, mem, e.location)
-        return retval
-      case Prim('not_equal', args):
-        left = interp_exp(args[0], env, mem)
-        right = interp_exp(args[1], env, mem)
-        retval = Boolean(True, not left.equals(right))
-        kill_temp(left, mem, e.location)
-        kill_temp(right, mem, e.location)
-        return retval
-      case Prim('add', args):
-        left = to_number(interp_exp(args[0], env, mem), e.location)
-        right = to_number(interp_exp(args[1], env, mem), e.location)
-        return Number(True, left + right)
-      case Prim('sub', args):
-        left = to_number(interp_exp(args[0], env, mem), e.location)
-        right = to_number(interp_exp(args[1], env, mem), e.location)
-        return Number(True, left - right)
-      case Prim('mul', args):
-        left = to_number(interp_exp(args[0], env, mem), e.location)
-        right = to_number(interp_exp(args[1], env, mem), e.location)
-        return Number(True, left * right)
-      case Prim('div', args):
-        left = to_number(interp_exp(args[0], env, mem), e.location)
-        right = to_number(interp_exp(args[1], env, mem), e.location)
-        return Number(True, Fraction(left, right))
-      case Prim('neg', args):
-        val = to_number(interp_exp(args[0], env, mem), e.location)
-        return Number(True, - val)
       case Prim('and', args):
         left = to_boolean(interp_exp(args[0], env, mem), e.location)
         right = to_boolean(interp_exp(args[1], env, mem), e.location)
@@ -611,17 +615,6 @@ def interp_exp(e, env, mem, dup=True, lhs=False):
             error(e.location, "permission operation requires pointer, not "
                   + str(ptr))
         return Number(True, ptr.permission)
-      case Member(arg, field):
-        val = interp_exp(arg, env, mem)
-        match val:
-          case Module(name, members):
-            if field in members.keys():
-                return members[field]
-            else:
-                error(e.location, 'no member ' + field + ' in module ' + name)
-          case _:
-            error(e.location, "expected a module, not " + str(val))
-      # remove join? can transfer instead -Jeremy
       case Prim('join', args):
         ptr1 = interp_exp(args[0], env, mem)
         ptr2 = interp_exp(args[1], env, mem)
@@ -632,6 +625,19 @@ def interp_exp(e, env, mem, dup=True, lhs=False):
         if trace:
             print('result of join: ' + str(ptr))
         return ptr
+      case Prim(op, args):
+        vals = [interp_exp(arg, env, mem) for arg in args]
+        return eval_prim(op, vals, mem, e.location)
+      case Member(arg, field):
+        val = interp_exp(arg, env, mem)
+        match val:
+          case Module(name, members):
+            if field in members.keys():
+                return members[field]
+            else:
+                error(e.location, 'no member ' + field + ' in module ' + name)
+          case _:
+            error(e.location, "expected a module, not " + str(val))
       case New(inits):
         vals = [interp_init(init, env, mem, 'read') for init in inits]
         return allocate(vals, mem)

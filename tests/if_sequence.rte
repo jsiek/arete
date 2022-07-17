@@ -3,7 +3,7 @@ fun main() {
   if (true) {
     *p = *p + 1;
   }
-  if (true) {
+  if (true != false) {
     *p = *p + 1;
     *p = *p + 1;
   }
