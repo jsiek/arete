@@ -2,22 +2,8 @@ from dataclasses import dataclass
 from typing import List, Set, Dict, Tuple, Any
 from lark.tree import Meta
 from fractions import Fraction
-
-@dataclass
-class AST:
-    location: Meta
-
-@dataclass
-class Exp(AST):
-    pass
-
-@dataclass
-class Stmt(AST):
-    pass
-
-@dataclass
-class Decl(AST):
-    pass
+from utilities import *
+from values import *
 
 # Parameters
 
@@ -53,17 +39,46 @@ class Initializer:
 
 @dataclass
 class Call(Exp):
-    fun: Exp
-    args: List[Initializer]
-    __match_args__ = ("fun", "args")
-    def __str__(self):
-        return str(self.fun) \
-            + "(" + ", ".join([str(arg) for arg in self.args]) + ")"
-    def __repr__(self):
-        return str(self)
-    def free_vars(self):
-        return self.fun.free_vars() \
-            | set().union(*[arg.free_vars() for arg in self.args])
+  fun: Exp
+  args: List[Initializer]
+  __match_args__ = ("fun", "args")
+  def __str__(self):
+      return str(self.fun) \
+          + "(" + ", ".join([str(arg) for arg in self.args]) + ")"
+  def __repr__(self):
+      return str(self)
+  def free_vars(self):
+      return self.fun.free_vars() \
+          | set().union(*[arg.free_vars() for arg in self.args])
+  def step(self, action, machine):
+    print('step ' + str(self))
+    if action.state == 0:
+      # evaluate subexpressions
+      machine.schedule(self.fun, action.env)
+      for arg in self.args:
+        machine.schedule(arg, action.env)
+    elif action.state == 1:
+      # call the function
+      match action.results[0]:
+        case Closure(tmp, params, body, clos_env):
+          action.params = params
+          action.body_env = clos_env.copy()
+          var_priv_vals = [(p.ident, p.kind, val) \
+                           for p,val in zip(params, action.results[1:])]
+          declare_locals([p.ident for p in params], action.body_env)
+          allocate_locals(var_priv_vals, action.body_env, self.location)
+          machine.push_frame()
+          machine.schedule(body, action.body_env)
+        case _:
+          error(location, 'expected function in call, not '
+                + str(self.fun_action.result))
+    else:
+      # return from the function
+      deallocate_locals([p.ident for p in action.params], action.body_env,
+                        machine.memory, self.location)
+      for val in action.results:
+          kill_temp(val, machine.memory, self.location)
+      machine.finalize(action.results[-1])
 
 @dataclass
 class Prim(Exp):
@@ -79,13 +94,13 @@ class Prim(Exp):
     def free_vars(self):
         return set().union(*[arg.free_vars() for arg in self.args])
     
-    def step(self, state, env, machine):
-        if state == 0:
-            self.subactions = [machine.schedule(arg, env) for arg in args]
-        else:
-            vals = [act.result for act in self.subactions]
-            retval = eval_prim(op, vals)
-            machine.finalize(retval)
+    def step(self, action, machine):
+      if action.state == 0:
+        for arg in self.args:
+          machine.schedule(arg, action.env)
+      else:
+        retval = eval_prim(op, action.results, machine.memory, self.location)
+        machine.finalize(retval)
             
 
 @dataclass
@@ -133,6 +148,10 @@ class Var(Exp):
         return str(self)
     def free_vars(self):
         return set([self.ident])
+    def step(self, action, machine):
+        if self.ident not in action.env:
+            error(self.location, 'use of undefined variable ' + self.ident)
+        machine.finalize(env_get(action.env, self.ident))
 
 @dataclass
 class Int(Exp):
@@ -144,6 +163,8 @@ class Int(Exp):
         return str(self)
     def free_vars(self):
         return set()
+    def step(self, action, machine):
+        machine.finalize(Number(True, self.value))
 
 @dataclass
 class Frac(Exp):
@@ -155,6 +176,8 @@ class Frac(Exp):
         return str(self)
     def free_vars(self):
         return set()
+    def step(self, action,  machine):
+        machine.finalize(Number(True, self.value))
     
 @dataclass
 class Bool(Exp):
@@ -166,6 +189,8 @@ class Bool(Exp):
         return str(self)
     def free_vars(self):
         return set()
+    def step(self, action, machine):
+        machine.finalize(Boolean(True, self.value))
     
 @dataclass
 class Index(Exp):
@@ -262,6 +287,11 @@ class Return(Stmt):
         return str(self)
     def free_vars(self):
         return self.arg.free_vars()
+    def step(self, action, machine):
+      if action.state == 0:
+        machine.schedule(self.arg, action.env)
+      else:
+        machine.pop_frame(action.results[0])
     
 @dataclass
 class Write(Stmt):
@@ -369,6 +399,11 @@ class Block(Stmt):
         return str(self)
     def free_vars(self):
         return self.body.free_vars()
+    def step(self, action, machine):
+      if action.state == 0:
+        machine.schedule(self.body, action.env)
+      else:
+        machine.finalize(None)
     
 # Declarations
     

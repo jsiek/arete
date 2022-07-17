@@ -17,8 +17,10 @@
 #   schedule(ast, env) returns the action
 #   finalize(value)
 
+from dataclasses import dataclass
 from typing import Any
-import interp
+
+from interp import *
 from abstract_syntax import AST
 
 @dataclass
@@ -26,7 +28,9 @@ class Action:
     ast: AST
     state: int
     env: dict[str,Value]
-    result: Value
+    dup: bool # default is True
+    lhs: bool # default is False
+    results: list[Value]
     
 @dataclass
 class Frame:
@@ -36,30 +40,77 @@ class Frame:
 class Machine:
     memory: dict[int,Value]
     stack: list[Frame]
+    result: Value
 
-    def run(decls):
-        pass
+    def run(self, decls):
+        env = {}
+        for d in decls:
+            if isinstance(d, Function) and d.name == 'main':
+                main = d
+        interp_decls(decls, env, machine.memory)
+        self.push_frame()
+        loc = main.location
+        call_main = Call(loc, Var(loc, 'main'), [])
+        self.schedule(call_main, env)
+        self.loop()
+        return self.result
 
-    def loop():
-        while len(self.stack) > 0:
-            frame = self.stack[0]
-            if len(frame) > 0:
-                action = frame[0]
-                action.ast.step(action.state, action.env, self)
+    def loop(self):
+        i = 0
+        while len(self.stack) > 0 and i < 10:
+            i += 1
+            print('configuration: ' + repr(self))
+            frame = self.current_frame()
+            if len(frame.todo) > 0:
+                action = self.current_action()
+                action.ast.step(action, self)
                 action.state += 1
             else:
                 self.stack.pop()
                 
     # Call schedule to start the evaluation of an AST node. 
-    def schedule(ast, env):
-        action = Action(ast, 0, env)
-        self.stack.append(action)
-        return action
+    def schedule(self, ast, env, dup=True, lhs=False):
+        print('scheduling ' + str(ast))
+        action = Action(ast, 0, env, dup, lhs, [])
+        self.current_frame().todo.append(action)
 
-    # Calling finalize signals to the machine that the
-    # current action is finished.
-    def finalize(val):
-        frame = self.stack[0]
-        action = frame[0]
-        action.result = val
-        frame.pop()
+    # Call finalize to signal that the current action is finished
+    # and register the result value with the previous action.
+    def finalize(self, val):
+        self.current_frame().todo.pop()
+        if len(self.current_frame().todo) > 0:
+            self.current_action().results.append(val)
+        else:
+            self.result = val
+
+    def push_frame(self):
+        frame = Frame([])
+        self.stack.append(frame)
+
+    def pop_frame(self, val):
+        self.stack.pop()
+        self.current_action().results.append(val)
+        
+    def current_frame(self):
+        return self.stack[-1]
+
+    def current_action(self):
+        return self.current_frame().todo[-1]
+
+if __name__ == "__main__":
+    decls = []
+    for filename in sys.argv[1:]:
+      if filename in flags:
+          continue
+      set_filename(filename)
+      file = open(filename, 'r')
+      expect_fail = False
+      if 'fail' in sys.argv:
+          expect_fail = True
+      if 'trace' in sys.argv:
+          trace = True
+      p = file.read()
+      decls += parse(p, trace)
+    
+    machine = Machine({}, [], None)
+    machine.run(decls)

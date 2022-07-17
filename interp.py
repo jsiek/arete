@@ -6,254 +6,8 @@ from fractions import Fraction
 import numbers
 import sys
 import copy
-
-@dataclass
-class Value:
-    temporary: bool
-    def node_name(self):
-        return str(self)
-    def node_label(self):
-        return str(self)
-    
-@dataclass
-class Module(Value):
-    name: str
-    members: dict[str, Value]
-    __match_args__ = ("name", "members")
-    def duplicate(self, percentage):
-        return self # ??
-    def __str__(self):
-      return self.name + '{' + ','.join([x + '=' + str(v) for x,v in self.members.items()]) + '}'
-    def __repr__(self):
-        return str(self)
-    def kill(self, mem, location):
-        for member in members.values:
-            member.kill(mem, location)
-
-@dataclass
-class Number(Value):
-    value: numbers.Number
-    def equals(self, other):
-        return self.value == other.value
-    def initialize(self, kind, location, ret=False):
-      if self.temporary:
-          self.temporary = False
-          return self
-      else:
-          return Number(False, self.value)
-    def init(self, percent, location):
-        return self.initialize('read', location, False)
-    def duplicate(self, percentage):
-        return Number(True, self.value)
-    def return_copy(self):
-      if self.temporary:
-          return self
-      else:
-          return Number(True, self.value)
-    def kill(self, mem, location):
-        pass
-    def __str__(self):
-        return str(self.value)
-    def __repr__(self):
-        return str(self)
-
-@dataclass
-class Boolean(Value):
-    value: bool
-    def equals(self, other):
-        return self.value == other.value
-    def initialize(self, kind, location, ret=False):
-      if self.temporary:
-          self.temporary = False
-          return self
-      else:
-          return Boolean(False, self.value)
-    def init(self, percent, location):
-        return self.initialize('read', location, False)
-    def duplicate(self, percentage):
-        return Boolean(True, self.value)
-    def return_copy(self):
-      if self.temporary:
-          return self
-      else:
-          return Boolean(True, self.value)
-    def kill(self, mem, location):
-        pass
-    def __str__(self):
-        return repr(self.value)
-    def __repr__(self):
-        return str(self)
-    
-def priv_str(priv):
-  if priv == 'none':
-    return 'N'
-  elif priv == 'read':
-    return 'R'
-  elif priv == 'write':
-    return 'W'
-  elif priv == 'dead':
-    return 'D'
-  elif priv is None:
-    return 'None'
-  elif isinstance(priv, Fraction):
-    return str(priv.numerator) + '/' + str(priv.denominator)
-  else:
-    return str(priv)
-
-@dataclass
-class Pointer(Value):
-    address: int
-    permission: Fraction    # none is 0, read is 1/n, write is 1/1
-    lender: Value          # who this pointer borrowed from, if any
-    
-    __match_args__ = ("temporary", "address", "permission")
-
-    def equals(self, other):
-        return self.address == other.address
-    
-    def __str__(self):
-        # return "⦅ " + str(self.address) + " @" + priv_str(self.permission) \
-        #     + ", " + ("tmp" if self.temporary else "prm") \
-        #     + (" from: " +str(self.lender) if not self.lender is None else "") \
-        #     + "⦆" 
-        return "⦅ " + str(self.address) + " @" + priv_str(self.permission) \
-            + ", " + str(id(self)) \
-            + "⦆"
-    def __repr__(self):
-        return str(self)
-
-    def node_name(self):
-        return str(self.address)
-
-    def node_label(self):
-        return str(self.address) + ' @' + str(self.permission) + ' ' \
-            + '(' + str(id(self)) + ')' 
-
-    def transfer(self, percent, other, location):
-        if not isinstance(other, Pointer):
-            error(location, "in transfer, expected pointer, not " + str(other))
-        if self.address != other.address:
-            error(location, "cannot transfer between different addresses: "
-                  + str(self.address) + " != " + str(other.address))
-        amount = other.permission * percent
-        other.permission -= amount
-        self.permission += amount
-        
-    def duplicate(self, percentage):
-        if trace:
-            print('duplicating ' + str(percentage) + ' of ' + str(self))
-        if self.address is None:
-            ptr = Pointer(True, None, Fraction(1,1), self)
-        else:
-            other_priv = self.permission * percentage
-            self.permission -= other_priv
-            ptr = Pointer(True, self.address, other_priv, self)
-        if trace:
-            print('duplication producing ' + str(ptr))
-        return ptr
-    
-    # self: the pointer being initialized from
-    # kind: the permission of the pointer to return
-    def initialize(self, kind, location, ret=False):
-      if kind == 'write':
-          # if not writable(self.permission):
-          #     error(location, 'initializing writable pointer requires writable pointer, not ' + str(self))
-          if self.temporary:
-              self.temporary = False
-              return self
-          else:
-              ptr = self.duplicate(1)
-              ptr.temporary = False
-              return ptr
-      elif kind == 'read':
-          if self.temporary:
-              self.temporary = False
-              return self
-          elif ret == True:
-              ptr = self.duplicate(1)
-              ptr.temporary = False
-              return ptr
-          else:
-              ptr = self.duplicate(Fraction(1,2))
-              #ptr = self.duplicate(Fraction(1,1))
-              ptr.temporary = False
-              return ptr
-      else:
-          raise Exception('initialize unexpected permission: ' + priv)
-
-    # self: the pointer being initialized from
-    # percent: the amount of permission to take from self
-    def init(self, percent, location):
-      if self.temporary:
-        self.temporary = False
-        return self
-      else:
-        ptr = self.duplicate(percent)
-        ptr.temporary = False
-        return ptr
-      
-    # Copy the return value of a function.
-    # Similar to initialize with respect to permissions, but
-    # produces a temporary value.
-    def return_copy(self):
-      if self.temporary:
-          return self
-      else:
-          return self.duplicate(1)
-          
-    def kill(self, mem, location):
-        if trace:
-            print('kill ' + str(self))
-        self.lender = find_lender(self.lender)
-        
-        if self.lender is None and (not self.address is None):
-            if self.permission == Fraction(1,1):
-                delete(self, mem, location)
-            elif self.permission != Fraction(0,1):
-                warning(location, 'memory leak, killing nonempty pointer'
-                        + ' without lender ' + str(self))
-        if (not self.lender is None) and (not self.address is None):
-            if trace:
-                print('giving back ' + str(self.permission) \
-                      + '  from ' + str(self))
-            self.lender.permission += self.permission
-            if trace:
-                print('to ' + str(self.lender))
-        self.address = None
-        #self.permission = Fraction(1,1) # all of nothing! -Jeremy
-        self.permission = Fraction(0,1)
-
-# find the first ptr in the lender chain that is not yet killed,
-# i.e. that has a non-None address.
-def find_lender(ptr):
-   if ptr is None:
-       return None
-   elif ptr.address is None:
-       lender = find_lender(ptr.lender)
-       ptr.lender = lender
-       return lender
-   else:
-       return ptr
-           
-@dataclass
-class Offset(Value):
-    ptr: Pointer
-    offset: int
-    def __str__(self):
-        return str(self.ptr) + "[" + str(self.offset) + "]"
-    def __repr__(self):
-        return str(self)
-    def equals(self, other):
-        return self.ptr == other.ptr and self.offset == other.offset
-    def duplicate(self, percentage):
-        return Offset(True, self.ptr.duplicate(percentage), self.offset)
-    def return_copy(self):
-      if self.temporary:
-          return self
-      else:
-          return Offset(True, self.ptr.duplicate(percentage), self.offset)
-    def kill(self, mem, location):
-        self.ptr.kill(mem, location)
+from utilities import *
+from values import *
 
 def writable(frac):
     return frac == Fraction(1, 1)
@@ -283,25 +37,6 @@ def permission_to_fraction(priv):
         return Fraction(0, 1)
     else:
         raise Exception('unrecognized permission: ' + priv)
-    
-@dataclass
-class Closure(Value):
-    params: List[Any]
-    body: Stmt
-    env: Any # needs work
-    __match_args__ = ("temporary", "params", "body", "env")
-    def duplicate(self, percentage):
-        return self
-    def initialize(self, kind, location, ret=False):
-        return self # ???
-    def init(self, percent, location):
-        return self.initialize('read', location, False)
-    def kill(self, mem, location):
-        pass # ???
-    def __str__(self):
-        return "closure"
-    def __repr__(self):
-        return str(self)
     
 trace = False
 next_address = 0
@@ -394,57 +129,6 @@ def delete(ptr, mem, location):
             val.kill(mem, location)
         del mem[addr]
     
-def env_init(env, var, val):
-    if trace:
-        print('env_init ' + var)
-    env[var] = [val]
-
-def env_get(env, var):
-    if trace:
-        print('env_get ' + var)
-    return env[var][0]
-
-def env_set(env, var, val):
-    if trace:
-        print('env_set ' + var + ' to ' + str(val))
-    env[var][0] = val
-    if trace:
-        print('finished env_set ' + var)
-
-def declare_locals(vars, env):
-    for var in vars:
-        env_init(env, var, None)
-
-def allocate_locals(var_priv_vals, env, location):
-    if trace:
-        print('allocating ' + ', '.join([x for x,p,v in var_priv_vals]))
-    for var, priv, val in var_priv_vals:
-        if priv == 'write' and isinstance(val, Pointer) \
-           and val.permission != Fraction(1,1):
-            error(location, 'need writable pointer, not ' + str(val))
-        elif priv == 'read' and isinstance(val, Pointer) \
-                  and (not val.address is None) \
-                  and val.permission == Fraction(0,1):
-            error(location, 'need readable pointer, not ' + str(val))
-        env_set(env, var, val)
-    if trace:
-        print('finish allocating ' + ', '.join([x for x,p,v in var_priv_vals]))
-
-def deallocate_locals(vars, env, mem, location):
-    if trace:
-        print('deallocating ' + ', '.join([v for v in vars]))
-    for var in vars:
-        v = env_get(env, var)
-        if not v is None:
-            v.kill(mem, location)
-    if trace:
-        print('finished deallocating ' + ', '.join([v for v in vars]))
-
-def kill_temp(val, mem, location):
-    if not (val is None):
-        if val.temporary:
-            val.kill(mem, location)
-        
 def call_function(fun, args, env, mem, location):
     f = interp_exp(fun, env, mem)
     match f:
@@ -554,10 +238,54 @@ def eval_prim(op, vals, mem, location):
       case 'neg':
         val = to_number(vals[0], location)
         return Number(True, - val)
+      case 'and':
+        left = to_boolean(vals[0], location)
+        right = to_boolean(vals[1], location)
+        return Boolean(True, left and right)
+      case 'or':
+        left = to_boolean(vals[0], location)
+        right = to_boolean(vals[1], location)
+        return Boolean(True, left or right)
+      case 'not':
+        val = to_boolean(vals[0], location)
+        return Boolean(True, not val)
+      case 'null':
+        # fraction is 1/1 because null has all of nothing! -Jeremy
+        return Pointer(True, None, Fraction(1,1), None)
+      case 'is_null':
+        ptr = vals[0]
+        match ptr:
+          case Pointer(tmp, addr, priv):
+            retval = Boolean(True, addr is None)
+          case _:
+            retval = Boolean(True, False)
+        kill_temp(ptr, mem, location)
+        return retval
+      case 'split':
+        ptr = vals[0]
+        ptr1 = ptr.duplicate(Fraction(1, 2))
+        ptr2 = ptr.duplicate(Fraction(1, 1))
+        return allocate([ptr1, ptr2], mem)
+      case 'join':
+        ptr1, ptr2 = vals
+        if trace:
+            print('join ' + str(ptr1) + ' with ' + str(ptr2))
+        ptr = ptr1.duplicate(1)
+        ptr.transfer(1, ptr2, location)
+        if trace:
+            print('result of join: ' + str(ptr))
+        return ptr
+      case cmp if cmp in compare_ops.keys():
+        left, right = vals
+        l = to_number(left, location)
+        r = to_number(right, location)
+        retval = Boolean(True, compare_ops[cmp](l, r))
+        kill_temp(left, mem, location)
+        kill_temp(right, mem, location)
+        return retval
       case _:
         error(location, 'unknown primitive operator ' + op)
     
-
 def interp_exp(e, env, mem, dup=True, lhs=False):
     if trace:
         print('interp_exp ' + str(e))
@@ -572,59 +300,12 @@ def interp_exp(e, env, mem, dup=True, lhs=False):
         return Number(True, f)
       case Bool(b):
         return Boolean(True, b)
-      case Prim(cmp, args) if cmp in compare_ops.keys():
-        left = interp_exp(args[0], env, mem)
-        right = interp_exp(args[1], env, mem)
-        l = to_number(left, e.location)
-        r = to_number(right, e.location)
-        retval = Boolean(True, compare_ops[cmp](l, r))
-        kill_temp(left, mem, e.location)
-        kill_temp(right, mem, e.location)
-        return retval
-      case Prim('and', args):
-        left = to_boolean(interp_exp(args[0], env, mem), e.location)
-        right = to_boolean(interp_exp(args[1], env, mem), e.location)
-        return Boolean(True, left and right)
-      case Prim('or', args):
-        left = to_boolean(interp_exp(args[0], env, mem), e.location)
-        right = to_boolean(interp_exp(args[1], env, mem), e.location)
-        return Boolean(True, left or right)
-      case Prim('not', args):
-        val = to_boolean(interp_exp(args[0], env, mem), e.location)
-        return Boolean(True, not val)
-      case Prim('null'):
-        # fraction is 1/1 because null has all of nothing! -Jeremy
-        return Pointer(True, None, Fraction(1,1), None)
-      case Prim('is_null', args):
-        ptr = interp_exp(args[0], env, mem)
-        match ptr:
-          case Pointer(tmp, addr, priv):
-            retval = Boolean(True, addr is None)
-          case _:
-            retval = Boolean(True, False)
-        kill_temp(ptr, mem, e.location)
-        return retval
-      case Prim('split', args):
-        ptr = interp_exp(args[0], env, mem)
-        ptr1 = ptr.duplicate(Fraction(1, 2))
-        ptr2 = ptr.duplicate(Fraction(1, 1))
-        return allocate([ptr1, ptr2], mem)
       case Prim('permission', args):
         ptr = interp_exp(args[0], env, mem, dup=False)
         if not isinstance(ptr, Pointer):
             error(e.location, "permission operation requires pointer, not "
                   + str(ptr))
         return Number(True, ptr.permission)
-      case Prim('join', args):
-        ptr1 = interp_exp(args[0], env, mem)
-        ptr2 = interp_exp(args[1], env, mem)
-        if trace:
-            print('join ' + str(ptr1) + ' with ' + str(ptr2))
-        ptr = ptr1.duplicate(1)
-        ptr.transfer(1, ptr2, e.location)
-        if trace:
-            print('result of join: ' + str(ptr))
-        return ptr
       case Prim(op, args):
         vals = [interp_exp(arg, env, mem) for arg in args]
         return eval_prim(op, vals, mem, e.location)
@@ -806,7 +487,13 @@ def declare_decl(decl, env, mem):
             env_init(env, x, None)
       case _:
         env_init(env, decl.name, None)
-    
+
+def interp_decls(decls, env, mem):
+    for d in decls:
+        declare_decl(d, env, mem)
+    for d in decls:
+        interp_decl(d, env, mem)
+        
 def interp_decl(decl, env, mem):
     if trace:
         print('interp_decl ' + str(decl))
@@ -818,10 +505,7 @@ def interp_decl(decl, env, mem):
                 interp_exp(Lambda(decl.location, params, body), env, mem))
       case ModuleDecl(name, exports, body):
         body_env = env.copy()
-        for d in body:
-            declare_decl(d, body_env, mem)
-        for d in body:
-            interp_decl(d, body_env, mem)
+        interp_decls(body, body_env, mem)
         for ex in exports:
             if not ex in body_env:
                 error(decl.location, 'export ' + ex + ' not defined in module')
@@ -847,11 +531,9 @@ def interp(decls):
     env = {}
     mem = {}
     for d in decls:
-        declare_decl(d, env, mem)
         if isinstance(d, Function) and d.name == 'main':
             main = d
-    for d in decls:
-        interp_decl(d, env, mem)
+    interp_decls(decls, env, mem)
     if 'main' in env.keys():
         retval = interp_exp(Call(main.location, Var(main.location, 'main'), []),
                             env, mem)
