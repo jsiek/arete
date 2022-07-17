@@ -1,6 +1,5 @@
 # TODO list
 
-[ ] import
 [ ] future/promise
 [ ] newtype/seal/reveal
 [ ] standard library
@@ -9,6 +8,7 @@
 [ ] compiler
 
 [X] automatic delete on kill
+[X] import
 
 # Permission Groups
 

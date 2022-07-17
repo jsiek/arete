@@ -521,7 +521,7 @@ compare_ops = { 'less': lambda x, y: x < y,
                 'greater': lambda x, y: x > y,
                 'greater_equal': lambda x, y: x >= y}
         
-def interp_exp(e, env, mem, dup=True, ret=False, lhs=False):
+def interp_exp(e, env, mem, dup=True, lhs=False):
     if trace:
         print('interp_exp ' + str(e))
     match e:
@@ -678,9 +678,9 @@ def interp_exp(e, env, mem, dup=True, ret=False, lhs=False):
       case IfExp(cond, thn, els):
         c = to_boolean(interp_exp(cond, env, mem), cond.location)
         if c:
-            return interp_exp(thn, env, mem, dup, ret, lhs)
+            return interp_exp(thn, env, mem, dup, lhs)
         else:
-            return interp_exp(els, env, mem, dup, ret, lhs)
+            return interp_exp(els, env, mem, dup, lhs)
       case Let(var, init, body):
         val = interp_init(init, env, mem, var.kind)
         body_env = env.copy()

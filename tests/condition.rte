@@ -1,0 +1,5 @@
+fun main() {
+  var x = true;
+  var y = false;
+  return x ? (y ? 1 : 0) : 1;
+}
