@@ -65,9 +65,7 @@ class Machine:
         return self.result
 
     def loop(self):
-        i = 0
-        while len(self.stack) > 0 and i < 1000:
-            i += 1
+        while len(self.stack) > 0:
             if False:
                 print('configuration: ' + repr(self))
             frame = self.current_frame()

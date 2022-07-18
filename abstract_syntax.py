@@ -345,7 +345,7 @@ class Let(Exp):
       else:
         deallocate_locals([self.var.ident], action.body_env, machine.memory,
                           self.location)
-        machine.finish_expression(action.results[0])
+        machine.finish_expression(action.results[1])
       
 # Statements
 
