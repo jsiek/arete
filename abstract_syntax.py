@@ -47,7 +47,8 @@ class Initializer:
       machine.schedule(self.arg, action.env)
     else:
       percent, val = action.results
-      machine.finalize(val.init(percent, self.location))
+      num = to_number(percent, self.location)
+      machine.finish_expression(val.init(num, self.location))
       
 # Expressions
 
@@ -69,7 +70,11 @@ class Call(Exp):
       # evaluate subexpressions
       machine.schedule(self.fun, action.env)
     elif action.state <= len(self.args):
-      machine.schedule(args[action.state - 1], action.env)
+      clos = action.results[0]
+      if not isinstance(clos, Closure):
+        error(location, 'expected function in call, not ' + str(clos))
+      init_act = machine.schedule(self.args[action.state - 1], action.env)
+      init_act.privilege = clos.params[action.state - 1].kind
     elif action.state == len(self.args) + 1:
       # call the function
       match action.results[0]:
@@ -91,7 +96,7 @@ class Call(Exp):
                         machine.memory, self.location)
       for val in action.results:
           kill_temp(val, machine.memory, self.location)
-      machine.finalize(action.results[-1])
+      machine.finish_expression(action.return_value)
 
 @dataclass
 class Prim(Exp):
@@ -101,21 +106,18 @@ class Prim(Exp):
     def __str__(self):
         return self.op + \
             "(" + ", ".join([str(arg) for arg in self.args]) + ")"
-        
     def __repr__(self):
         return str(self)
     def free_vars(self):
         return set().union(*[arg.free_vars() for arg in self.args])
-    
     def step(self, action, machine):
       if action.state < len(self.args):
         machine.schedule(self.args[action.state], action.env)
       else:
         retval = eval_prim(self.op, action.results, machine.memory,
                            self.location)
-        machine.finalize(retval)
+        machine.finish_expression(retval)
             
-
 @dataclass
 class Member(Exp):
     arg: Exp
@@ -127,7 +129,19 @@ class Member(Exp):
         return str(self)
     def free_vars(self):
         return self.arg.free_vars()
-    
+    def step(self, action, machine):
+      if action.state == 0:
+        machine.schedule(self.arg, action.env)
+      else:
+        mod = action.results[0]
+        if not isinstance(mod, Module):
+          error(e.location, "expected a module, not " + str(val))
+        if field in mod.members.keys():
+          return mod.members[self.field]
+        else:
+          error(self.location, 'no member ' + self.field
+                + ' in module ' + mod.name)
+        
 @dataclass
 class New(Exp):
     inits: List[Initializer]
@@ -143,7 +157,7 @@ class New(Exp):
         init_act = machine.schedule(self.inits[action.state], action.env)
         init_act.privilege = 'read'
       else:
-        machine.finalize(allocate(action.results, machine.memory))
+        machine.finish_expression(allocate(action.results, machine.memory))
 
 @dataclass
 class Array(Exp):
@@ -156,7 +170,18 @@ class Array(Exp):
         return str(self)
     def free_vars(self):
         return self.size.free_vars() | self.arg.free_vars()
-    
+    def step(self, action, machine):
+      if action.state == 0:
+        machine.schedule(self.size, action.env)
+      elif action.state == 1:
+        machine.schedule(self.arg, action.env)
+      else:
+        sz, val = action.results
+        size = to_number(sz, self.location)
+        vals = [val.duplicate(Fraction(1,2)) for i in range(0,size-1)]
+        vals.append(val)
+        machine.finish_expression(allocate(vals, mem))
+      
 @dataclass
 class Var(Exp):
     ident: str
@@ -170,7 +195,7 @@ class Var(Exp):
     def step(self, action, machine):
         if self.ident not in action.env:
             error(self.location, 'use of undefined variable ' + self.ident)
-        machine.finalize(env_get(action.env, self.ident))
+        machine.finish_expression(env_get(action.env, self.ident))
 
 @dataclass
 class Int(Exp):
@@ -183,7 +208,7 @@ class Int(Exp):
     def free_vars(self):
         return set()
     def step(self, action, machine):
-        machine.finalize(Number(True, self.value))
+        machine.finish_expression(Number(True, self.value))
 
 @dataclass
 class Frac(Exp):
@@ -196,7 +221,7 @@ class Frac(Exp):
     def free_vars(self):
         return set()
     def step(self, action,  machine):
-        machine.finalize(Number(True, self.value))
+        machine.finish_expression(Number(True, self.value))
     
 @dataclass
 class Bool(Exp):
@@ -209,7 +234,7 @@ class Bool(Exp):
     def free_vars(self):
         return set()
     def step(self, action, machine):
-        machine.finalize(Boolean(True, self.value))
+        machine.finish_expression(Boolean(True, self.value))
     
 @dataclass
 class Index(Exp):
@@ -237,12 +262,10 @@ class Index(Exp):
                 retval = read(ptr, i, machine.memory, self.location, action.dup)
                 kill_temp(ptr, machine.memory, self.location)
                 kill_temp(ind, machine.memory, self.location)
-            machine.finalize(retval)
+            machine.finish_expression(retval)
           case _:
             error(self.location, 'index must be an integer, not ' + repr(ind))
         
-        
-    
 @dataclass
 class Lambda(Exp):
     params: List[Param]
@@ -256,6 +279,17 @@ class Lambda(Exp):
         return str(self)
     def free_vars(self):
         return self.body.free_vars() - set([p.ident for p in self.params])
+    def step(self, action, machine):
+        clos_env = {}
+        free = self.body.free_vars() - set([p.ident for p in self.params])
+        for x in free:
+            v = env_get(action.env, x)
+            if not (v is None):
+                env_init(clos_env, x, v.duplicate(Fraction(1,2)))
+            else:
+                clos_env[x] = action.env[x]
+        clos = Closure(True, self.params, self.body, clos_env)
+        machine.finish_expression(clos)
     
 @dataclass
 class IfExp(Exp):
@@ -271,6 +305,16 @@ class IfExp(Exp):
     def free_vars(self):
         return self.cond.free_vars() | self.thn.free_vars() \
             | self.els.free_vars()
+    def step(self, action, machine):
+      if action.state == 0:
+        machine.schedule(self.cond, action.env)
+      elif action.state == 1:
+        if to_boolean(action.results[0], self.location):
+          machine.schedule(self.thn, action.env)
+        else:
+          machine.schedule(self.els, action.env)
+      elif action.state == 2:
+        machine.finish_expression(action.results[1])
     
 @dataclass
 class Let(Exp):
@@ -286,7 +330,22 @@ class Let(Exp):
     def free_vars(self):
         return self.init.free_vars() | \
             (self.body.free_vars() - set([self.var.ident]))
-
+    def step(self, action, machine):
+      if action.state == 0:
+        init_act = machine.schedule(self.init, action.env)
+        init_act.privilege = self.var.kind
+      elif action.state == 1:
+        val = action.results[0]
+        action.body_env = action.env.copy()
+        declare_locals([self.var.ident], action.body_env)
+        var_priv_vals = [(self.var.ident, self.var.kind, val)]
+        allocate_locals(var_priv_vals, action.body_env, self.location)
+        machine.schedule(self.body, action.body_env)
+      else:
+        deallocate_locals([self.var.ident], action.body_env, machine.memory,
+                          self.location)
+        machine.finish_expression(action.results[0])
+      
 # Statements
 
 @dataclass
@@ -295,7 +354,10 @@ class Seq(Stmt):
   rest: Stmt
   __match_args__ = ("first", "rest")
   def __str__(self):
-    return str(self.first) + "\n" + str(self.rest)
+    if False:
+      return str(self.first) + "\n" + str(self.rest)
+    else:
+      return str(self.first) + "..."
   def __repr__(self):
     return str(self)
   def free_vars(self):
@@ -303,10 +365,10 @@ class Seq(Stmt):
   def step(self, action, machine):
     if action.state == 0:
       machine.schedule(self.first, action.env)
-    elif len(action.results) > 0:
-      machine.finalize(action.results[0])
+    elif not action.return_value is None:
+      machine.finish_statement()
     else:
-      machine.finished()
+      machine.finish_statement()
       machine.schedule(self.rest, action.env)
     
 @dataclass
@@ -316,8 +378,11 @@ class VarInit(Exp):
     body: Stmt
     __match_args__ = ("var", "init", "body")
     def __str__(self):
+      if False:
         return "var " + str(self.var) + " = " + str(self.init) + ";\n" \
             + str(self.body)
+      else:
+        return "var " + str(self.var) + " = " + str(self.init) + "; ..."
     def __repr__(self):
         return str(self)
     def free_vars(self):
@@ -337,9 +402,7 @@ class VarInit(Exp):
       else:
         deallocate_locals([self.var.ident], action.body_env,
                           machine.memory, self.location)
-        machine.finished()
-
-        
+        machine.finish_statement()
 
 @dataclass
 class Return(Stmt):
@@ -355,8 +418,8 @@ class Return(Stmt):
       if action.state == 0:
         machine.schedule(self.arg, action.env)
       else:
-        machine.finalize(action.results[0])
-        #machine.pop_frame(action.results[0])
+        action.return_value = action.results[0].return_copy()
+        machine.finish_statement()
     
 @dataclass
 class Write(Stmt):
@@ -384,7 +447,7 @@ class Write(Stmt):
         write(offset.ptr, offset.offset, val, machine.memory, self.location)
         kill_temp(offset, machine.memory, self.location)
         kill_temp(val, machine.memory, self.location)
-        machine.finished()
+        machine.finish_statement()
 
 @dataclass
 class Transfer(Stmt):
@@ -400,6 +463,17 @@ class Transfer(Stmt):
     def free_vars(self):
         return self.lhs.free_vars() | self.percent.free_vars() \
             | self.rhs.free_vars()
+    def step(self, action, machine):
+      if action.state == 0:
+        machine.schedule(self.lhs, action.env, dup=False)
+      elif action.state == 1:
+        machine.schedule(self.percent, action.env)
+      elif action.state == 2:
+        machine.schedule(self.rhs, action.env, dup=False)
+      else:
+        dest_ptr, amount, src_ptr = action.results
+        dest_ptr.transfer(amount, src_ptr, self.location)
+        machine.finish_statement()
     
 @dataclass
 class Delete(Stmt):
@@ -411,6 +485,15 @@ class Delete(Stmt):
         return str(self)
     def free_vars(self):
         return self.arg.free_vars()
+    def step(self, action, machine):
+      if action.state == 0:
+        machine.schedule(self.arg, action.env)
+      else:
+        ptr = action.results[0]
+        delete(ptr, machine.memory, self.location)
+        ptr.address = None
+        ptr.permission = Fraction(0,1)
+        machine.finish_statement()
     
 @dataclass
 class Expr(Stmt):
@@ -422,6 +505,11 @@ class Expr(Stmt):
         return str(self)
     def free_vars(self):
         return self.exp.free_vars()
+    def step(self, action, machine):
+      if action.state == 0:
+        machine.schedule(self.exp, action.env)
+      else:
+        machine.finish_statement()
 
 @dataclass
 class Assert(Stmt):
@@ -433,6 +521,14 @@ class Assert(Stmt):
         return str(self)
     def free_vars(self):
         return self.exp.free_vars()
+    def step(self, action, machine):
+      if action.state == 0:
+        machine.schedule(self.exp, action.env)
+      else:
+        val = to_boolean(action.results[0], self.location)
+        if not val:
+          error(e.location, "assertion failed: " + str(e))
+        machine.finish_statement()
 
 @dataclass
 class IfStmt(Stmt):
@@ -441,8 +537,11 @@ class IfStmt(Stmt):
     els: Stmt
     __match_args__ = ("cond", "thn", "els")
     def __str__(self):
+      if False:
         return "if " + "(" + str(self.cond) + ")\n" + str(self.thn) \
             + "else " + str(self.els)
+      else:
+        return "if " + "(" + str(self.cond) + ") ..."
     def __repr__(self):
         return str(self)
     def free_vars(self):
@@ -451,12 +550,13 @@ class IfStmt(Stmt):
     def step(self, action, machine):
       if action.state == 0:
         machine.schedule(self.cond, action.env)
-      else:
-        machine.finished()
+      elif action.state == 1:
         if to_boolean(action.results[0], self.location):
           machine.schedule(self.thn, action.env)
         else:
           machine.schedule(self.els, action.env)
+      else:
+        machine.finish_statement()
 
 @dataclass
 class While(Stmt):
@@ -469,6 +569,18 @@ class While(Stmt):
         return str(self)
     def free_vars(self):
         return self.cond.free_vars() | self.body.free_vars()
+    def step(self, action, machine):
+      if action.state == 0:
+        machine.schedule(self.cond, action.env)
+      elif not action.return_value is None:
+        machine.finish_statement()
+      else:
+        c = to_boolean(action.results[0], self.cond.location)
+        if c:
+          machine.schedule(self, action.env)
+          machine.schedule(self.body, action.env)
+        else:
+          machine.finish_statement()
     
 @dataclass
 class Pass(Stmt):
@@ -478,6 +590,8 @@ class Pass(Stmt):
         return str(self)
     def free_vars(self):
         return set()
+    def step(self, action, machine):
+      machine.finish_statement()
 
 @dataclass
 class Block(Stmt):
@@ -492,10 +606,8 @@ class Block(Stmt):
     def step(self, action, machine):
       if action.state == 0:
         machine.schedule(self.body, action.env)
-      elif len(action.results) > 0:
-        machine.finalize(action.results[0])
       else:
-        machine.finished()
+        machine.finish_statement()
     
 # Declarations
     

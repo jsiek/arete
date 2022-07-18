@@ -15,7 +15,9 @@
 
 # Machine methods:
 #   schedule(ast, env) returns the action
-#   finalize(value)
+#   finish_expression(value)
+#   finish_statement()
+#   finish_and_return(value)
 
 from dataclasses import dataclass
 from typing import Any
@@ -30,9 +32,10 @@ class Action:
     ast: AST
     state: int
     env: dict[str,Value]
-    dup: bool # default is True
-    lhs: bool # default is False
-    results: list[Value]
+    dup: bool # duplicate the value? default is True
+    lhs: bool # left-hand side of an assignment (Write), default is False
+    results: list[Value] # results of subexpressions
+    return_value: Value # result of `return` statement
     privilege: str
     
 @dataclass
@@ -74,6 +77,7 @@ class Machine:
                 action = self.current_action()
                 if trace:
                     print('stepping ' + repr(action))
+                    print(machine.memory)
                 action.ast.step(action, self)
                 action.state += 1
             else:
@@ -84,15 +88,16 @@ class Machine:
     def schedule(self, ast, env, dup=True, lhs=False):
         if trace:
             print('scheduling ' + str(ast))
-        action = Action(ast, 0, env, dup, lhs, [], '???')
+        action = Action(ast, 0, env, dup, lhs, [], None, '???')
         self.current_frame().todo.append(action)
         return action
 
-    # Call finalize to signal that the current action is finished
-    # and register the result value with the previous action.
-    def finalize(self, val):
+    # Call finish_expression to signal that the current expression
+    # action is finished and register the value it produced with the
+    # previous action.
+    def finish_expression(self, val):
         if trace:
-            print('finalize ' + str(val))
+            print('finish_expression ' + str(val))
         self.current_frame().todo.pop()
         if len(self.current_frame().todo) > 0:
             self.current_action().results.append(val)
@@ -103,17 +108,27 @@ class Machine:
                 print('finished execution ' + str(val))
             self.result = val
 
-    # Call finished to signal that the current statement action is done.
-    def finished(self):
+    # Call finish_statement to signal that the current statement action is done.
+    # Propagates the return value if there is one.
+    def finish_statement(self):
+        retval = self.current_action().return_value
+        if trace:
+            print('finish_statement ' + str(retval))
         self.current_frame().todo.pop()
-            
+        if len(self.current_frame().todo) > 0:
+          self.current_action().return_value = retval
+        elif len(self.stack) > 1:
+          self.pop_frame(retval)
+        else:
+          self.result = retval
+
     def push_frame(self):
         frame = Frame([])
         self.stack.append(frame)
 
     def pop_frame(self, val):
         self.stack.pop()
-        self.current_action().results.append(val)
+        self.current_action().return_value = val
         
     def current_frame(self):
         return self.stack[-1]
@@ -139,7 +154,26 @@ if __name__ == "__main__":
       decls += parse(p, trace)
     
     machine = Machine({}, [], None)
-    retval = machine.run(decls)
-    if trace:
-        print('result: ' + str(retval))
-    exit(retval.value)
+    try:
+      retval = machine.run(decls)
+      if trace:
+          print('result: ' + str(retval))
+      if expect_fail:
+          print("expected failure, but didn't, returned " + str(retval))
+          exit(-1)
+      else:
+          if trace:
+              print('result: ' + str(retval.value))
+          exit(retval.value)
+    except Exception as ex:
+        if expect_fail:
+            exit(0)
+        else:
+            print('unexpected failure')
+            if trace:
+                raise ex
+            else:
+                print(str(ex))
+                print()
+
+

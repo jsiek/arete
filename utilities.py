@@ -124,12 +124,8 @@ def eval_prim(op, vals, mem, location):
         return allocate([ptr1, ptr2], mem)
       case 'join':
         ptr1, ptr2 = vals
-        if trace:
-            print('join ' + str(ptr1) + ' with ' + str(ptr2))
         ptr = ptr1.duplicate(1)
         ptr.transfer(1, ptr2, location)
-        if trace:
-            print('result of join: ' + str(ptr))
         return ptr
       case cmp if cmp in compare_ops.keys():
         left, right = vals
@@ -167,6 +163,11 @@ def read(ptr, index, mem, location, dup):
         error(location, 'pointer does not have read permission: ' + str(ptr))
     # whether to copy here or not?
     # see tests/fail_indirect_write
+    if not ptr.address in mem.keys():
+        error(location, 'in read, bad address: ' + str(ptr.address))
+    if not (index < len(mem[ptr.address])):
+        error(location, 'in read, index too big: ' + str(index)
+              + ' for address ' + str(ptr.address))
     if dup:
         retval = mem[ptr.address][index].duplicate(ptr.permission)
     else:
@@ -335,16 +336,12 @@ class Pointer(Value):
         self.permission += amount
         
     def duplicate(self, percentage):
-        if trace:
-            print('duplicating ' + str(percentage) + ' of ' + str(self))
         if self.address is None:
             ptr = Pointer(True, None, Fraction(1,1), self)
         else:
             other_priv = self.permission * percentage
             self.permission -= other_priv
             ptr = Pointer(True, self.address, other_priv, self)
-        if trace:
-            print('duplication producing ' + str(ptr))
         return ptr
     
     # self: the pointer being initialized from
@@ -406,12 +403,7 @@ class Pointer(Value):
                 warning(location, 'memory leak, killing nonempty pointer'
                         + ' without lender ' + str(self))
         if (not self.lender is None) and (not self.address is None):
-            if trace:
-                print('giving back ' + str(self.permission) \
-                      + '  from ' + str(self))
             self.lender.permission += self.permission
-            if trace:
-                print('to ' + str(self.lender))
         self.address = None
         #self.permission = Fraction(1,1) # all of nothing! -Jeremy
         self.permission = Fraction(0,1)
