@@ -346,7 +346,41 @@ class Let(Exp):
         deallocate_locals([self.var.ident], action.body_env, machine.memory,
                           self.location)
         machine.finish_expression(action.results[1])
-      
+
+@dataclass
+class FutureExp(Exp):
+  arg: Exp
+  __match_args__ = ("arg",)
+  def __str__(self):
+    return "future " + str(self.arg)
+  def __repr__(self):
+    return str(self)
+  def free_vars(self):
+    return self.arg.free_vars()
+  def step(self, action, machine):
+    thread = machine.spawn(self.arg, action.env)
+    retval = Future(True, thread)
+    machine.finish_expression(retval)
+
+@dataclass
+class Await(Exp):
+  arg: Exp
+  __match_args__ = ("arg",)
+  def __str__(self):
+    return "await " + str(self.arg)
+  def __repr__(self):
+    return str(self)
+  def free_vars(self):
+    return self.arg.free_vars()
+  def step(self, action, machine):
+    if action.state == 0:
+      machine.schedule(self.arg, action.env)
+    else:
+      future = action.results[0]
+      if not future.thread.result is None:
+        machine.finish_expression(future.thread.result)
+  
+    
 # Statements
 
 @dataclass

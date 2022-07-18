@@ -24,6 +24,7 @@ from typing import Any
 
 from interp import *
 from abstract_syntax import AST
+import random
 
 trace = False
 
@@ -41,99 +42,122 @@ class Action:
 @dataclass
 class Frame:
     todo: list[Action]
+
+@dataclass
+class Thread:
+    stack: list[Frame]
+    result: Value
     
 @dataclass
 class Machine:
-    memory: dict[int,Value]
-    stack: list[Frame]
-    result: Value
+  memory: dict[int,Value]
+  threads: list[Thread]
+  current_thread: Thread
+  main_thread: Thread
+  result: Value
 
-    def run(self, decls):
-        env = {}
-        for d in decls:
-            if isinstance(d, Function) and d.name == 'main':
-                main = d
-        interp_decls(decls, env, machine.memory)
-        self.push_frame()
-        loc = main.location
-        call_main = Call(loc, Var(loc, 'main'), [])
-        self.schedule(call_main, env)
-        self.loop()
-        if len(self.memory) > 0:
-            error(main.location, 'memory leak, memory size = '
-                  + str(len(self.memory)))
-        return self.result
+  def run(self, decls):
+      env = {}
+      for d in decls:
+          if isinstance(d, Function) and d.name == 'main':
+              main = d
+      interp_decls(decls, env, machine.memory)
 
-    def loop(self):
-        while len(self.stack) > 0:
-            if False:
-                print('configuration: ' + repr(self))
-            frame = self.current_frame()
-            if len(frame.todo) > 0:
-                if trace:
-                    print('len(frame.todo) = ' + str(len(frame.todo)))
-                action = self.current_action()
-                if trace:
-                    print('stepping ' + repr(action))
-                    print(machine.memory)
-                action.ast.step(action, self)
-                action.state += 1
-            else:
-                self.stack.pop()
-                
-    # Call schedule to start the evaluation of an AST node.
-    # Returns the new action.
-    def schedule(self, ast, env, dup=True, lhs=False):
-        if trace:
-            print('scheduling ' + str(ast))
-        action = Action(ast, 0, env, dup, lhs, [], None, '???')
-        self.current_frame().todo.append(action)
-        return action
+      self.main_thread = Thread([], None)
+      self.current_thread = self.main_thread
+      self.threads = [self.main_thread]
+      self.push_frame()
+      loc = main.location
+      call_main = Call(loc, Var(loc, 'main'), [])
+      self.schedule(call_main, env)
+      self.loop()
+      if len(self.memory) > 0:
+          error(main.location, 'memory leak, memory size = '
+                + str(len(self.memory)))
+      return self.result
 
-    # Call finish_expression to signal that the current expression
-    # action is finished and register the value it produced with the
-    # previous action.
-    def finish_expression(self, val):
-        if trace:
-            print('finish_expression ' + str(val))
-        self.current_frame().todo.pop()
-        if len(self.current_frame().todo) > 0:
-            self.current_action().results.append(val)
-        elif len(self.stack) > 1:
-            self.pop_frame(val)
-        else:
+  def loop(self):
+      while len(self.threads) > 0:
+          t = random.randint(0, len(self.threads)-1)
+          self.current_thread = self.threads[t]
+          if len(self.current_thread.stack) == 0:
+              self.threads.remove(self.current_thread)
+              if self.current_thread == self.main_thread:
+                  self.result = self.current_thread.result
+              continue
+          frame = self.current_frame()
+          if len(frame.todo) > 0:
             if trace:
-                print('finished execution ' + str(val))
-            self.result = val
+              print('len(frame.todo) = ' + str(len(frame.todo)))
+            action = self.current_action()
+            if trace:
+              print('stepping ' + repr(action))
+              print(machine.memory)
+            action.ast.step(action, self)
+            action.state += 1
+          else:
+            self.current_thread.stack.pop()
 
-    # Call finish_statement to signal that the current statement action is done.
-    # Propagates the return value if there is one.
-    def finish_statement(self):
-        retval = self.current_action().return_value
-        if trace:
-            print('finish_statement ' + str(retval))
-        self.current_frame().todo.pop()
-        if len(self.current_frame().todo) > 0:
-          self.current_action().return_value = retval
-        elif len(self.stack) > 1:
-          self.pop_frame(retval)
-        else:
-          self.result = retval
+  # Call schedule to start the evaluation of an AST node.
+  # Returns the new action.
+  def schedule(self, ast, env, dup=True, lhs=False):
+      if trace:
+          print('scheduling ' + str(ast))
+      action = Action(ast, 0, env, dup, lhs, [], None, '???')
+      self.current_frame().todo.append(action)
+      return action
 
-    def push_frame(self):
-        frame = Frame([])
-        self.stack.append(frame)
+  # Call finish_expression to signal that the current expression
+  # action is finished and register the value it produced with the
+  # previous action.
+  def finish_expression(self, val):
+      if trace:
+          print('finish_expression ' + str(val))
+      self.current_frame().todo.pop()
+      if len(self.current_frame().todo) > 0:
+          self.current_action().results.append(val)
+      elif len(self.current_thread.stack) > 1:
+          self.pop_frame(val)
+      else:
+          if trace:
+              print('finished thread ' + str(val))
+          self.current_thread.result = val
 
-    def pop_frame(self, val):
-        self.stack.pop()
-        self.current_action().return_value = val
-        
-    def current_frame(self):
-        return self.stack[-1]
+  # Call finish_statement to signal that the current statement action is done.
+  # Propagates the return value if there is one.
+  def finish_statement(self):
+      retval = self.current_action().return_value
+      if trace:
+          print('finish_statement ' + str(retval))
+      self.current_frame().todo.pop()
+      if len(self.current_frame().todo) > 0:
+        self.current_action().return_value = retval
+      elif len(self.current_thread.stack) > 1:
+        self.pop_frame(retval)
+      else:
+        self.result = retval
 
-    def current_action(self):
-        return self.current_frame().todo[-1]
+  def push_frame(self):
+      frame = Frame([])
+      self.current_thread.stack.append(frame)
 
+  def pop_frame(self, val):
+      self.current_thread.stack.pop()
+      self.current_action().return_value = val
+
+  def current_frame(self):
+      return self.current_thread.stack[-1]
+
+  def current_action(self):
+      return self.current_frame().todo[-1]
+
+  def spawn(self, exp: Exp, env):
+      act = Action(exp, 0, env, True, False, [], None, 'read')
+      frame = Frame([act])
+      thread = Thread([frame], None)
+      self.threads.append(thread)
+      return thread
+  
 flags = set(['trace', 'fail'])
 
 if __name__ == "__main__":
@@ -151,7 +175,7 @@ if __name__ == "__main__":
       p = file.read()
       decls += parse(p, trace)
     
-    machine = Machine({}, [], None)
+    machine = Machine({}, [], None, None, None)
     try:
       retval = machine.run(decls)
       if trace:

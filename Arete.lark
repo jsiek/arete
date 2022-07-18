@@ -51,6 +51,8 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | exp_hi "(" init_list ")"                   -> call
     | "true"                                     -> true
     | "false"                                    -> false
+    | "future" exp                               -> future
+    | "await" exp                                -> await
       
 ?stmt: exp "=" init ";"                          -> write
     | exp "<-" exp "of" exp ";"                  -> transfer

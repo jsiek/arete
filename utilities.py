@@ -455,8 +455,24 @@ class Closure(Value):
         return "closure"
     def __repr__(self):
         return str(self)
-    
-        
+
+@dataclass
+class Future(Value):
+    thread: Any
+    __match_args__ = ("thread",)
+    def duplicate(self, percentage):
+        return self
+    def initialize(self, kind, location, ret=False):
+        return self # ???
+    def init(self, percent, location):
+        return self.initialize('read', location, False)
+    def kill(self, mem, location):
+        pass # ???
+    def __str__(self):
+        return "future"
+    def __repr__(self):
+        return str(self)
+
 def to_number(val, location):
     match val:
       case Number(tmp, value):

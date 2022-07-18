@@ -1,0 +1,9 @@
+fun main() {
+  var a = future (1 + 2); // 3
+  var b = future (3 + 4); // 7
+  var c = future (await a) + (await b); // 10
+  var d = future (5 + 6); // 11
+  var e = future (7 + 8); // 15
+  var f = future (await d) + (await e); // 26
+  return (await c) + (await f) - 36;
+}
