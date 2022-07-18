@@ -127,6 +127,12 @@ def eval_prim(op, vals, mem, location):
         ptr = ptr1.duplicate(1)
         ptr.transfer(1, ptr2, location)
         return ptr
+      case 'permission':
+        ptr = vals[0]
+        if not isinstance(ptr, Pointer):
+          error(location, "permission operation requires pointer, not "
+                + str(ptr))
+        return Number(True, ptr.permission)
       case cmp if cmp in compare_ops.keys():
         left, right = vals
         l = to_number(left, location)
@@ -184,6 +190,11 @@ def write(ptr, index, val, mem, location):
         error(location, 'in write expected a pointer, not ' + str(ptr))
     if not writable(ptr.permission):
         error(location, 'pointer does not have write permission: ' + str(ptr))
+    if not ptr.address in mem.keys():
+        error(location, 'in write, bad address: ' + str(ptr.address))
+    if not (index < len(mem[ptr.address])):
+        error(location, 'in write, index too big: ' + str(index)
+              + ' for address ' + str(ptr.address))
     mem[ptr.address][index].kill(mem, location)
     if val.temporary:
         mem[ptr.address][index] = val
@@ -395,7 +406,6 @@ class Pointer(Value):
           
     def kill(self, mem, location):
         self.lender = find_lender(self.lender)
-        
         if self.lender is None and (not self.address is None):
             if self.permission == Fraction(1,1):
                 delete(self, mem, location)
@@ -405,7 +415,6 @@ class Pointer(Value):
         if (not self.lender is None) and (not self.address is None):
             self.lender.permission += self.permission
         self.address = None
-        #self.permission = Fraction(1,1) # all of nothing! -Jeremy
         self.permission = Fraction(0,1)
     
 @dataclass

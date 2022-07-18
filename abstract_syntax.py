@@ -112,7 +112,8 @@ class Prim(Exp):
         return set().union(*[arg.free_vars() for arg in self.args])
     def step(self, action, machine):
       if action.state < len(self.args):
-        machine.schedule(self.args[action.state], action.env)
+        machine.schedule(self.args[action.state], action.env,
+                         dup=(False if self.op == 'permission' else True))
       else:
         retval = eval_prim(self.op, action.results, machine.memory,
                            self.location)
@@ -136,8 +137,8 @@ class Member(Exp):
         mod = action.results[0]
         if not isinstance(mod, Module):
           error(e.location, "expected a module, not " + str(val))
-        if field in mod.members.keys():
-          return mod.members[self.field]
+        if self.field in mod.members.keys():
+          machine.finish_expression(mod.members[self.field])
         else:
           error(self.location, 'no member ' + self.field
                 + ' in module ' + mod.name)
@@ -180,7 +181,7 @@ class Array(Exp):
         size = to_number(sz, self.location)
         vals = [val.duplicate(Fraction(1,2)) for i in range(0,size-1)]
         vals.append(val)
-        machine.finish_expression(allocate(vals, mem))
+        machine.finish_expression(allocate(vals, machine.memory))
       
 @dataclass
 class Var(Exp):
@@ -472,7 +473,8 @@ class Transfer(Stmt):
         machine.schedule(self.rhs, action.env, dup=False)
       else:
         dest_ptr, amount, src_ptr = action.results
-        dest_ptr.transfer(amount, src_ptr, self.location)
+        percent = to_number(amount, self.location)
+        dest_ptr.transfer(percent, src_ptr, self.location)
         machine.finish_statement()
     
 @dataclass
@@ -572,15 +574,15 @@ class While(Stmt):
     def step(self, action, machine):
       if action.state == 0:
         machine.schedule(self.cond, action.env)
-      elif not action.return_value is None:
-        machine.finish_statement()
-      else:
+      elif action.state == 1:
         c = to_boolean(action.results[0], self.cond.location)
         if c:
           machine.schedule(self, action.env)
           machine.schedule(self.body, action.env)
         else:
           machine.finish_statement()
+      else:
+        machine.finish_statement()
     
 @dataclass
 class Pass(Stmt):
