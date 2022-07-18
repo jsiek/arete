@@ -122,6 +122,9 @@ def parse_tree_to_ast(e):
                         parse_tree_to_ast(e.children[0]),
                         parse_tree_to_ast(e.children[1]),
                         parse_tree_to_ast(e.children[2]))
+    elif e.data == 'upgrade':
+        return Expr(e.meta,
+                    Prim(e.meta, 'upgrade', [parse_tree_to_ast(e.children[0])]))
     elif e.data == 'expr':
         return Expr(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'assert':

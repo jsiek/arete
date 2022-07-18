@@ -39,10 +39,10 @@ def allocate_locals(var_priv_vals, env, location):
         if priv == 'write' and isinstance(val, Pointer) \
            and val.permission != Fraction(1,1):
             error(location, 'need writable pointer, not ' + str(val))
-        elif priv == 'read' and isinstance(val, Pointer) \
-                  and (not val.address is None) \
-                  and val.permission == Fraction(0,1):
-            error(location, 'need readable pointer, not ' + str(val))
+        # elif priv == 'read' and isinstance(val, Pointer) \
+        #           and (not val.address is None) \
+        #           and val.permission == Fraction(0,1):
+        #     error(location, 'need readable pointer, not ' + str(val))
         env_set(env, var, val)
 
 def deallocate_locals(vars, env, mem, location):
@@ -133,6 +133,9 @@ def eval_prim(op, vals, mem, location):
           error(location, "permission operation requires pointer, not "
                 + str(ptr))
         return Number(True, ptr.permission)
+      case 'upgrade':
+        ptr = vals[0]
+        ptr.upgrade(location)
       case cmp if cmp in compare_ops.keys():
         left, right = vals
         l = to_number(left, location)
@@ -349,6 +352,16 @@ class Pointer(Value):
         amount = other.permission * percent
         other.permission -= amount
         self.permission += amount
+
+    def upgrade(self, location):
+        self.lender = find_lender(self.lender)
+        if self.lender is None:
+            #error(location, "failed to upgrade " + str(self) + ", no lender")
+            pass
+        else:
+            self.transfer(Fraction(1,1), self.lender, location)
+        # if not self.permission == Fraction(1,1):
+        #     error(location, "failed to upgrade pointer " + str(self))
         
     def duplicate(self, percentage):
         if self.address is None:

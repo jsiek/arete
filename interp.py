@@ -170,6 +170,8 @@ def interp_exp(e, env, mem, dup=True, lhs=False):
         if trace:
             print('duplicating free vars of lambda: ' + str(free))
         for x in free:
+            if not x in env.keys():
+              error(e.location, 'in closure, undefined variable ' + x)
             v = env_get(env, x)
             if not (v is None):
                 env_init(clos_env, x, v.duplicate(Fraction(1,2)))

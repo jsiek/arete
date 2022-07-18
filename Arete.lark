@@ -56,7 +56,8 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
       
 ?stmt: exp "=" init ";"                          -> write
     | exp "<-" exp "of" exp ";"                  -> transfer
-    | "!" exp ";"                          -> expr
+    | "upgrade" exp ";"                          -> upgrade
+    | "!" exp ";"                                -> expr
     | "delete" exp ";"                           -> delete
     | "assert" exp ";"                           -> assert
     | "if" "(" exp ")" block                     -> if

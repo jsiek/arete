@@ -115,7 +115,8 @@ class Prim(Exp):
     def step(self, action, machine):
       if action.state < len(self.args):
         machine.schedule(self.args[action.state], action.env,
-                         dup=(False if self.op == 'permission' else True))
+                         dup=(False if self.op == 'permission' 
+                              or self.op == 'upgrade' else True))
       else:
         retval = eval_prim(self.op, action.results, machine.memory,
                            self.location)
@@ -286,6 +287,8 @@ class Lambda(Exp):
         clos_env = {}
         free = self.body.free_vars() - set([p.ident for p in self.params])
         for x in free:
+            if not x in action.env.keys():
+              error(self.location, 'in closure, undefined variable ' + x)
             v = env_get(action.env, x)
             if not (v is None):
                 env_init(clos_env, x, v.duplicate(Fraction(1,2)))
