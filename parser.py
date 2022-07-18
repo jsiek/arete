@@ -51,7 +51,7 @@ def parse_tree_to_param(e):
 primitive_ops = {'add', 'sub', 'mul', 'div', 'neg', 'and', 'or', 'not', 'null',
                  'is_null', 'split', 'join', 'equal', 'not_equal',
                  'less', 'greater', 'less_equal', 'greater_equal',
-                 'permission'}
+                 'permission', 'upgrade'}
     
 def parse_tree_to_ast(e):
     e.meta.filename = filename
@@ -122,9 +122,6 @@ def parse_tree_to_ast(e):
                         parse_tree_to_ast(e.children[0]),
                         parse_tree_to_ast(e.children[1]),
                         parse_tree_to_ast(e.children[2]))
-    elif e.data == 'upgrade':
-        return Expr(e.meta,
-                    Prim(e.meta, 'upgrade', [parse_tree_to_ast(e.children[0])]))
     elif e.data == 'expr':
         return Expr(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'assert':
@@ -155,6 +152,8 @@ def parse_tree_to_ast(e):
         return Delete(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'block':
         return Block(e.meta, body=parse_tree_to_ast(e.children[0]))
+    elif e.data == 'pass':
+        return Pass(e.meta)
 
     # declarations
     elif e.data == 'import':

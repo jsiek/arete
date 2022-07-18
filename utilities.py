@@ -135,7 +135,8 @@ def eval_prim(op, vals, mem, location):
         return Number(True, ptr.permission)
       case 'upgrade':
         ptr = vals[0]
-        ptr.upgrade(location)
+        retval = ptr.upgrade(location)
+        return Boolean(True, retval)
       case cmp if cmp in compare_ops.keys():
         left, right = vals
         l = to_number(left, location)
@@ -360,6 +361,7 @@ class Pointer(Value):
             pass
         else:
             self.transfer(Fraction(1,1), self.lender, location)
+        return self.permission == Fraction(1,1)
         # if not self.permission == Fraction(1,1):
         #     error(location, "failed to upgrade pointer " + str(self))
         
