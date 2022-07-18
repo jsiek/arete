@@ -1,0 +1,12 @@
+fun write(!p, v) {
+  *p = v;
+}
+
+fun main() {
+  var !a = new 0;
+  var f1 = future write(a, 42);
+  ! await f1;
+  var f2 = future write(a, -42);
+  ! await f2;
+  return *a + 42;
+}

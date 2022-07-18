@@ -209,7 +209,11 @@ class Value:
         return str(self)
     def node_label(self):
         return str(self)
-    
+
+@dataclass
+class Void(Value):
+    pass
+
 @dataclass
 class Module(Value):
     name: str

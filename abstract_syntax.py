@@ -96,6 +96,8 @@ class Call(Exp):
                         machine.memory, self.location)
       for val in action.results:
           kill_temp(val, machine.memory, self.location)
+      if action.return_value is None:
+        action.return_value = Void(True)
       machine.finish_expression(action.return_value)
 
 @dataclass

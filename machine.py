@@ -178,8 +178,6 @@ if __name__ == "__main__":
     machine = Machine({}, [], None, None, None)
     try:
       retval = machine.run(decls)
-      if trace:
-          print('result: ' + str(retval))
       if expect_fail:
           print("expected failure, but didn't, returned " + str(retval))
           exit(-1)
