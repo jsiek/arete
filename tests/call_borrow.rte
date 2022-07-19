@@ -3,9 +3,9 @@ fun inc(!p) {
 }
 
 fun main() {
-  var !q = new 0;
+  let !q = new 0;
   ! inc(q);
   *q = *q + 1;
-  var a = *q;
+  let a = *q;
   return a - 2;
 }

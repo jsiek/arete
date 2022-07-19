@@ -134,16 +134,15 @@ def parse_tree_to_ast(e):
                    parse_tree_to_ast(e.children[1]))
     elif e.data == 'last_stmt':
         return parse_tree_to_ast(e.children[0])
-    elif e.data == 'if':
-        return IfStmt(e.meta,
-                      parse_tree_to_ast(e.children[0]),
-                      parse_tree_to_ast(e.children[1]),
-                      Pass(e.meta))
-    elif e.data == 'if_else':
+    elif e.data == 'if' or e.data == 'else_if':
         return IfStmt(e.meta,
                       parse_tree_to_ast(e.children[0]),
                       parse_tree_to_ast(e.children[1]),
                       parse_tree_to_ast(e.children[2]))
+    elif e.data == 'else':
+        return parse_tree_to_ast(e.children[0])
+    elif e.data == 'no_else':
+        return Pass(e.meta)
     elif e.data == 'while':
         return While(e.meta,
                       parse_tree_to_ast(e.children[0]),

@@ -13,8 +13,8 @@ fun map(f, ls) {
 fun inc(x) { return x + 1; }
 
 fun main() {
-  var !ls1 = new 0, (new 1, (new 2, null));
-  var !ls2 = map(inc, ls1);
-  var three = front(rest(rest(ls2)));
+  let !ls1 = new 0, (new 1, (new 2, null));
+  let !ls2 = map(inc, ls1);
+  let three = front(rest(rest(ls2)));
   return three - 3;
 }

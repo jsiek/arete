@@ -6,8 +6,8 @@ fun push(data, !list) {
   return new data, 1 of list;
 }
 
-var head = 0;
-var tail = 1;
+let head = 0;
+let tail = 1;
 
 fun is_last(node) {
   if (is_null(node)) {
@@ -24,7 +24,7 @@ fun remove_last(!n) {
     return 0;
   } else {
     if (is_last(n[tail])) {
-      var !q = n[tail];
+      let !q = n[tail];
       n[tail] = null;
       return q;
     } else {
@@ -34,9 +34,9 @@ fun remove_last(!n) {
 }
 
 fun main() {
-  var !one_two = push(1, listof(2));
-  var !two_null = remove_last(one_two);
-  var one = one_two[head];
-  var two = two_null[head];
+  let !one_two = push(1, listof(2));
+  let !two_null = remove_last(one_two);
+  let one = one_two[head];
+  let two = two_null[head];
   return one + one - two;
 }

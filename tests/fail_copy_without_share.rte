@@ -1,6 +1,6 @@
 fun main() {
-  var !x = new 42;
-  var y = x; // error: read privilege requires no writers
+  let !x = new 42;
+  let y = x; // error: read privilege requires no writers
   *x = 0;
   return *y;
 }

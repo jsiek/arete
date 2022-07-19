@@ -1,11 +1,11 @@
 fun main() {
-  var n = 10;
-  var !a = new [n] 0;
-  var !i = new 0;
+  let n = 10;
+  let !a = new [n] 0;
+  let !i = new 0;
   while (*i < n) {
     a[*i] = *i;
     *i = *i + 1;
   }
-  var last = a[9];
+  let last = a[9];
   return last - 9;
 }

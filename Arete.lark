@@ -9,7 +9,7 @@ LINECOMMENT: "//" /[^\n]*/ NEWLINE
 COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 
 ?exp: exp_logic "?" exp ":" exp                  -> condition
-    | "var" param "=" init "in" exp              -> let
+    | "let" param "=" init "in" exp              -> let
     | exp_logic
 
 ?exp_logic: exp_logic "and" exp_cmp              -> and
@@ -53,19 +53,24 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "true"                                     -> true
     | "false"                                    -> false
     | "future" exp                               -> future
-    | "await" exp                                -> await
+    | "await" exp_hi                             -> await
       
 ?stmt: exp "=" init ";"                          -> write
     | exp "<-" exp "of" exp ";"                  -> transfer
     | "!" exp ";"                                -> expr
     | "delete" exp ";"                           -> delete
     | "assert" exp ";"                           -> assert
-    | "if" "(" exp ")" block                     -> if
-    | "if" "(" exp ")" block "else" block        -> if_else
     | "while" "(" exp ")" block                  -> while
     | block
+    | if_stmt
 
-?stmt_list: "var" param "=" init ";" stmt_list   -> var_init
+?if_stmt: "if" "(" exp ")" block if_rest          -> if
+
+?if_rest: "else" block                            -> else
+    | "else" "if" "(" exp ")" block if_rest       -> else_if
+    |                                             -> no_else
+
+?stmt_list: "let" param "=" init ";" stmt_list   -> var_init
     | stmt stmt_list                             -> seq
     | stmt                                       -> last_stmt
     | "return" exp ";"                           -> return
@@ -86,6 +91,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 				                 
 param: IDENT                                     -> read
     | "!" IDENT                                  -> write
+    | "@" IDENT                                  -> none
 				                 
 ?param_list:                                     -> empty
     | param                                      -> single
@@ -95,7 +101,7 @@ param: IDENT                                     -> read
     | IDENT                                      -> single
     | IDENT "," ident_list                       -> push
     
-?decl: "var" IDENT "=" exp ";"                   -> global
+?decl: "let" IDENT "=" exp ";"                   -> global
     | "fun" IDENT "(" param_list ")" block       -> function
     | "module" IDENT "exports" ident_list "{" decl_list "}" -> module
     | "from" exp "import" ident_list ";"         -> import

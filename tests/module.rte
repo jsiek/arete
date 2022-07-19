@@ -1,8 +1,8 @@
 module M
   exports empty, push, front, rest, map
 {
-  var all = 1;
-  var empty = null;
+  let all = 1;
+  let empty = null;
   fun push(data, rest) {
     return new data, all of rest;
   }
@@ -21,9 +21,9 @@ module M
 from M import empty, push, front, rest;
 
 fun main() {
-  var !ls1 = push(0, push(1, push(2, empty)));
-  var inc = fun (x) { return x + 1; };
-  var !ls2 = M.map(inc, ls1); // test . operator
-  var three = front(rest(rest(ls2)));
+  let !ls1 = push(0, push(1, push(2, empty)));
+  let inc = fun (x) { return x + 1; };
+  let !ls2 = M.map(inc, ls1); // test . operator
+  let three = front(rest(rest(ls2)));
   return three - 3;
 }

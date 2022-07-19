@@ -1,8 +1,8 @@
 fun main() {
-  var !p = new 0;
-  var copy1 = fun() { return p; };
-  var copy2 = copy1;
-  var !q = join(copy1(), copy2());
+  let !p = new 0;
+  let copy1 = fun() { return p; };
+  let copy2 = copy1;
+  let !q = join(copy1(), copy2());
   *p = 1;
   *q = 2;
   return *p;

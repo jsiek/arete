@@ -1,17 +1,17 @@
 // AVL Tree (UNDER CONSTRUCTION)
 // tree layout: [root]
-var root = 0;
+let root = 0;
 // node layout: [data, left, right, parent, height]
-var data = 0;
-var left = 1;
-var right = 2;
-var parent = 3;
-var height = 4;
+let data = 0;
+let left = 1;
+let right = 2;
+let parent = 3;
+let height = 4;
 
 // Common fractions
-var none = 0;
-var half = 1/2;
-var all = 1;
+let none = 0;
+let half = 1/2;
+let all = 1;
 
 fun find(key, node, parent) {
   if (is_null(node)) {
@@ -67,15 +67,15 @@ fun insert(key, !tree) {
   if (is_null(tree[root])) {
     tree[root] = new key, null, null, null, 0;
   } else {
-    var node = all of find(key, all of tree[root], null);
+    let node = all of find(key, all of tree[root], null);
     if (key < node[data]) {
-      var !new_node = new key, null, null, null, 0;
+      let !new_node = new key, null, null, null, 0;
       ! gather_permission(all of node);
       ! set_left(node, new_node);
       ! scatter_permission(all of node);
     }
     if (node[data] < key) {
-      var !new_node = new key, null, null, null, 0;
+      let !new_node = new key, null, null, null, 0;
       ! gather_permission(all of node);
       ! set_right(node, new_node);
       ! scatter_permission(all of node);
@@ -97,11 +97,11 @@ fun delete_tree(!tree) {
 }
 
 fun main() {
-  var !tree = new null;
+  let !tree = new null;
   ! insert(5, tree);
   ! insert(10, tree);
   ! insert(1, tree);
-  var ten = (var t = find(10, tree[root])
+  let ten = (let t = find(10, tree[root])
              in t[data]);
   ! delete_tree(tree);
   return ten - 10;

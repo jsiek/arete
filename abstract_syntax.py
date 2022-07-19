@@ -40,6 +40,8 @@ class Initializer:
           self.percentage = Frac(self.location, Fraction(1,2))
         elif action.privilege == 'write':
           self.percentage = Frac(self.location, Fraction(1,1))
+        elif action.privilege == 'none':
+          self.percentage = Frac(self.location, Fraction(0,1))
         else:
           error(self.location, "unexpected privilege " + action.privilege)
       machine.schedule(self.percentage, action.env)

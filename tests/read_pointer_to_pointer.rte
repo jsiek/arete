@@ -1,12 +1,12 @@
 fun f(y) {
-  var !x = new y;
-  var z = *x;
+  let !x = new y;
+  let z = *x;
   return *z - *y;
 }
 
 fun main() {
-  var !y = new 42;
-  var a = f(y);
+  let !y = new 42;
+  let a = f(y);
   return a;
 }
 

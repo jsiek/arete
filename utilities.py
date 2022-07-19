@@ -39,10 +39,10 @@ def allocate_locals(var_priv_vals, env, location):
         if priv == 'write' and isinstance(val, Pointer) \
            and val.permission != Fraction(1,1):
             error(location, 'need writable pointer, not ' + str(val))
-        # elif priv == 'read' and isinstance(val, Pointer) \
-        #           and (not val.address is None) \
-        #           and val.permission == Fraction(0,1):
-        #     error(location, 'need readable pointer, not ' + str(val))
+        elif priv == 'read' and isinstance(val, Pointer) \
+                  and (not val.address is None) \
+                  and val.permission == Fraction(0,1):
+            error(location, 'need readable pointer, not ' + str(val))
         env_set(env, var, val)
 
 def deallocate_locals(vars, env, mem, location):

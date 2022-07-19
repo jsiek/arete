@@ -3,9 +3,9 @@ fun write(!p, v) {
 }
 
 fun main() {
-  var !a = new 0;
-  var f1 = future write(a, 42);
-  var f2 = future write(a, -42); // need writable pointer
+  let !a = new 0;
+  let f1 = future write(a, 42);
+  let f2 = future write(a, -42); // need writable pointer
   ! await f1;
   ! await f2;
   return *a;

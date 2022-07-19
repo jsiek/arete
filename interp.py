@@ -112,6 +112,8 @@ def interp_init(init, env, mem, privilege):
                 percentage = Fraction(1,2)
             elif privilege == 'write':
                 percentage = Fraction(1,1)
+            elif privilege == 'none':
+                percentage = Fraction(0,1)
             else:
                 error(init.location, "unexpected privilege " + privilege)
         else:

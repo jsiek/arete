@@ -1,6 +1,6 @@
 fun main() {
-  var !x = new 10;
+  let !x = new 10;
   *x = 20;
-  var y = *x;
+  let y = *x;
   return y - 20;
 }
