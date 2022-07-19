@@ -70,7 +70,8 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "else" "if" "(" exp ")" block if_rest       -> else_if
     |                                             -> no_else
 
-?stmt_list: "let" param "=" init ";" stmt_list   -> var_init
+?stmt_list: "let" param "=" init ";" stmt_list   -> let_init
+    | "var" IDENT "=" exp ";" stmt_list          -> var_init
     | stmt stmt_list                             -> seq
     | stmt                                       -> last_stmt
     | "return" exp ";"                           -> return

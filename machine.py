@@ -25,6 +25,7 @@ from typing import Any
 from interp import *
 from abstract_syntax import AST
 import random
+from desugar import desugar_decls
 
 trace = False
 
@@ -174,6 +175,7 @@ if __name__ == "__main__":
           trace = True
       p = file.read()
       decls += parse(p, trace)
+      decls = desugar_decls(decls, {})
     
     machine = Machine({}, [], None, None, None)
     try:

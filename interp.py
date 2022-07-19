@@ -231,7 +231,7 @@ def interp_stmt(s, env, mem):
         log_graphviz(env, mem)
         print()
     match s:
-      case VarInit(var, init, body):
+      case LetInit(var, init, body):
         val = interp_init(init, env, mem, var.kind)
         body_env = env.copy()
         declare_locals([var.ident], body_env)

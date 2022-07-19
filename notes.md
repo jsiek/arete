@@ -1,13 +1,13 @@
 # TODO list
 
-[ ] add `none` privilege
+[ ] mutable variables? (desugar to var + new + *)
 [ ] remove uses of interp in machine
 [ ] newtype/seal/reveal
 [ ] standard library
-[ ] mutable variables? (desugar to var + new + *)
 [ ] type checker for permissions
 [ ] compiler
 
+[X] add `none` privilege
 [X] future/promise - abstract machine
 [X] automatic delete on kill
 [X] import

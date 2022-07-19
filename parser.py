@@ -106,6 +106,11 @@ def parse_tree_to_ast(e):
         return Await(e.meta, parse_tree_to_ast(e.children[0]))
     
     # statements
+    elif e.data == 'let_init':
+        return LetInit(e.meta,
+                       parse_tree_to_param(e.children[0]),
+                       parse_tree_to_ast(e.children[1]),
+                       parse_tree_to_ast(e.children[2]))
     elif e.data == 'var_init':
         return VarInit(e.meta,
                        parse_tree_to_param(e.children[0]),

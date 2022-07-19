@@ -414,17 +414,17 @@ class Seq(Stmt):
       machine.schedule(self.rest, action.env)
     
 @dataclass
-class VarInit(Exp):
+class LetInit(Exp):
     var: Param
     init: Initializer
     body: Stmt
     __match_args__ = ("var", "init", "body")
     def __str__(self):
       if False:
-        return "var " + str(self.var) + " = " + str(self.init) + ";\n" \
+        return "let " + str(self.var) + " = " + str(self.init) + ";\n" \
             + str(self.body)
       else:
-        return "var " + str(self.var) + " = " + str(self.init) + "; ..."
+        return "let " + str(self.var) + " = " + str(self.init) + "; ..."
     def __repr__(self):
         return str(self)
     def free_vars(self):
@@ -446,6 +446,24 @@ class VarInit(Exp):
                           machine.memory, self.location)
         machine.finish_statement()
 
+@dataclass
+class VarInit(Exp):
+    var: str
+    rhs: Exp
+    body: Stmt
+    __match_args__ = ("var", "rhs", "body")
+    def __str__(self):
+      if False:
+        return "var " + str(self.var) + " = " + str(self.rhs) + ";\n" \
+            + str(self.body)
+      else:
+        return "var " + str(self.var) + " = " + str(self.rhs) + "; ..."
+    def __repr__(self):
+        return str(self)
+    def free_vars(self):
+        return self.rhs.free_vars() \
+            | (self.body.free_vars() - set([self.var.ident]))
+        
 @dataclass
 class Return(Stmt):
     arg: Exp
@@ -687,7 +705,7 @@ class Function(Decl):
 class ModuleDecl(Decl):
     name: str
     exports: List[str]
-    body: Stmt
+    body: List[Decl]
     __match_args__ = ("name", "exports", "body")
     def __str__(self):
         return 'module ' + self.name + '\n'\
