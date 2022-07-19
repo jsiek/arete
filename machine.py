@@ -176,6 +176,10 @@ if __name__ == "__main__":
       p = file.read()
       decls += parse(p, trace)
       decls = desugar_decls(decls, {})
+      if trace:
+          print('**** after desugar ****')
+          print(decls)
+          print()
     
     machine = Machine({}, [], None, None, None)
     try:

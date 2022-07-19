@@ -1,12 +1,13 @@
 # TODO list
 
-[ ] mutable variables? (desugar to var + new + *)
+[ ] primitive `len` operator for arrays (and pointers)
 [ ] remove uses of interp in machine
 [ ] newtype/seal/reveal
 [ ] standard library
 [ ] type checker for permissions
 [ ] compiler
 
+[X] mutable variables? (desugar to var + new + *)
 [X] add `none` privilege
 [X] future/promise - abstract machine
 [X] automatic delete on kill

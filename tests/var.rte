@@ -1,0 +1,5 @@
+fun main() {
+  var x = 42;
+  x = x - 42;
+  return x;
+}

@@ -333,6 +333,7 @@ class Pointer(Value):
         #     + "⦆" 
         return "⦅ " + str(self.address) + " @" + priv_str(self.permission) \
             + ", " + str(id(self)) \
+            + ", " + ("tmp" if self.temporary else "prm") \
             + "⦆"
     def __repr__(self):
         return str(self)

@@ -20,7 +20,7 @@ def desugar_exp(e, env):
         if x not in env:
             error(e.location, 'use of undefined variable ' + x)
         if env[x]:
-            return Index(e.location, e, Int(0))
+            return Index(e.location, e, Int(e.location, 0))
         else:
             return e
       case Int(n):
@@ -88,12 +88,17 @@ def desugar_stmt(s, env):
         #  var x = e in b[x]
         #  =>
         #  let !x = new e in b[*x]
-        new_init = desugar_init(init, env, var.kind)
+        new_rhs = desugar_exp(rhs, env)
         body_env = env.copy()
         body_env[var] = True
         new_body = desugar_stmt(body, body_env)
-        return LetInit(s.location, Param(s.location, var, 'write'),
-                       new_rhs, new_body)
+        loc = s.location
+        new_exp = New(loc, [Initializer(loc, Frac(loc, Fraction(1,1)),new_rhs)])
+        return LetInit(loc, Param(loc, 'write', var),
+                       Initializer(loc,
+                                   Frac(loc, Fraction(1,1)),
+                                   new_exp),
+                       new_body)
       case Seq(first, rest):
         new_first = desugar_stmt(first, env)
         new_rest = desugar_stmt(rest, env)

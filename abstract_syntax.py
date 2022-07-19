@@ -4,6 +4,8 @@ from lark.tree import Meta
 from fractions import Fraction
 from utilities import *
 
+verbose = True
+
 # Parameters
 
 @dataclass(frozen=True)
@@ -396,7 +398,7 @@ class Seq(Stmt):
   rest: Stmt
   __match_args__ = ("first", "rest")
   def __str__(self):
-    if False:
+    if verbose:
       return str(self.first) + "\n" + str(self.rest)
     else:
       return str(self.first) + "..."
@@ -420,7 +422,7 @@ class LetInit(Exp):
     body: Stmt
     __match_args__ = ("var", "init", "body")
     def __str__(self):
-      if False:
+      if verbose:
         return "let " + str(self.var) + " = " + str(self.init) + ";\n" \
             + str(self.body)
       else:
@@ -453,7 +455,7 @@ class VarInit(Exp):
     body: Stmt
     __match_args__ = ("var", "rhs", "body")
     def __str__(self):
-      if False:
+      if verbose:
         return "var " + str(self.var) + " = " + str(self.rhs) + ";\n" \
             + str(self.body)
       else:
@@ -462,7 +464,7 @@ class VarInit(Exp):
         return str(self)
     def free_vars(self):
         return self.rhs.free_vars() \
-            | (self.body.free_vars() - set([self.var.ident]))
+            | (self.body.free_vars() - set([self.var]))
         
 @dataclass
 class Return(Stmt):
@@ -598,7 +600,7 @@ class IfStmt(Stmt):
     els: Stmt
     __match_args__ = ("cond", "thn", "els")
     def __str__(self):
-      if False:
+      if verbose:
         return "if " + "(" + str(self.cond) + ")\n" + str(self.thn) \
             + "else " + str(self.els)
       else:
