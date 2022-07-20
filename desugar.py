@@ -94,7 +94,7 @@ def desugar_stmt(s, env):
         new_body = desugar_stmt(body, body_env)
         loc = s.location
         new_exp = New(loc, [Initializer(loc, Frac(loc, Fraction(1,1)),new_rhs)])
-        return LetInit(loc, Param(loc, 'write', var),
+        return LetInit(loc, Param(loc, 'write', var, None),
                        Initializer(loc,
                                    Frac(loc, Fraction(1,1)),
                                    new_exp),

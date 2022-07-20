@@ -63,6 +63,12 @@ compare_ops = { 'less': lambda x, y: x < y,
 
 def eval_prim(op, vals, mem, location):
     match op:
+      case 'len':
+        ptr = vals[0]
+        if not ptr.address in mem.keys():
+            error(location, "in len, bad address: " + str(ptr.address))
+        n = len(mem[ptr.address])
+        return Number(True, n)
       case 'equal':
         left, right = vals
         retval = Boolean(True, left.equals(right))
@@ -91,6 +97,10 @@ def eval_prim(op, vals, mem, location):
         left = to_number(vals[0], location)
         right = to_number(vals[1], location)
         return Number(True, Fraction(left, right))
+      case 'int_div':
+        left = to_number(vals[0], location)
+        right = to_number(vals[1], location)
+        return Number(True, left // right)
       case 'neg':
         val = to_number(vals[0], location)
         return Number(True, - val)
@@ -498,8 +508,15 @@ def to_number(val, location):
       case Number(tmp, value):
         return value
       case _:
-        error(location, 'expected an integer, not ' + str(val))
+        error(location, 'expected an number, not ' + str(val))
 
+def to_integer(val, location):
+    match val:
+      case Number(tmp, value):
+        return int(value)
+      case _:
+        error(location, 'expected an integer, not ' + str(val))
+        
 def to_boolean(val, location):
     match val:
       case Boolean(tmp, value):

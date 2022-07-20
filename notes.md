@@ -1,17 +1,32 @@
 # TODO list
 
-[ ] primitive `len` operator for arrays (and pointers)
-[ ] remove uses of interp in machine
+[ ] type checker for types (int, bool, pointers, arrays)
 [ ] newtype/seal/reveal
 [ ] standard library
 [ ] type checker for permissions
-[ ] compiler
+[ ] gradual typing
+[ ] compile to C?
+[ ] compile to LLVM?
 
+
+[X] remove uses of interp in machine
+[X] primitive `len` operator for arrays (and pointers)
 [X] mutable variables? (desugar to var + new + *)
 [X] add `none` privilege
 [X] future/promise - abstract machine
 [X] automatic delete on kill
 [X] import
+
+# Runtime Fractions
+
+Runtime fractions do not guarantee determinism. 
+
+Programs can non-deterministically produce different answers
+because they can use permmissions like mutex's.
+
+Programs can error non-deterministically because they can race on the
+acquisition/release of permissions. The good thing is that races can't
+cause undefined behavior, they can only cause errors.
 
 # Permission Groups
 

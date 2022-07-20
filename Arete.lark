@@ -8,6 +8,18 @@ WS: /[ \t\f\r\n]/+
 LINECOMMENT: "//" /[^\n]*/ NEWLINE
 COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 
+?type: "int"                                     -> int_type
+    | "bool"                                     -> bool_type
+    | "?"                                        -> any_type
+    | "[" type "]"                               -> array_type
+    | "{" type_list "}"                          -> ptr_type
+    
+?type_list: type                                 -> single
+    | type "," type_list                         -> push
+
+?type_annot: ":" type                            -> just
+    |                                            -> nothing
+
 ?exp: exp_logic "?" exp ":" exp                  -> condition
     | "let" param "=" init "in" exp              -> let
     | exp_logic
@@ -24,17 +36,19 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | exp_cmp ">=" exp_add                       -> greater_equal
     | exp_add
 
-?exp_add: exp_add "+" exp_med      -> add
-    | exp_add "-" exp_med          -> sub
+?exp_add: exp_add "+" exp_med                    -> add
+    | exp_add "-" exp_med                        -> sub
     | exp_med
 
-?exp_med: exp_med "/" exp_hi       -> div
-    | exp_med "*" exp_hi       -> mul
+?exp_med: exp_med "%" exp_hi                    -> int_div
+    | exp_med "/" exp_hi                         -> div
+    | exp_med "*" exp_hi                         -> mul
     | exp_hi
 
 ?exp_hi: INT                                     -> int
     | "is_null" "(" exp ")"                      -> is_null
     | "null"                                     -> null
+    | "len" "(" exp ")"                          -> len
     | "split" "(" exp ")"                        -> split
     | "join" "(" exp "," exp ")"                 -> join
     | "permission" "(" exp ")"                   -> permission
@@ -90,9 +104,9 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | init                                       -> single
     | init "," init_list                         -> push
 				                 
-param: IDENT                                     -> read
-    | "!" IDENT                                  -> write
-    | "@" IDENT                                  -> none
+param: IDENT type_annot                          -> read
+    | "!" IDENT type_annot                       -> write
+    | "@" IDENT type_annot                       -> none
 				                 
 ?param_list:                                     -> empty
     | param                                      -> single

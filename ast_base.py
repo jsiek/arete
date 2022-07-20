@@ -16,3 +16,7 @@ class Stmt(AST):
 @dataclass
 class Decl(AST):
     pass
+
+@dataclass
+class Type(AST):
+    pass

@@ -21,11 +21,13 @@
 
 from dataclasses import dataclass
 from typing import Any
-
-from interp import *
-from abstract_syntax import AST
 import random
+import sys
+
+from abstract_syntax import *
 from desugar import desugar_decls
+from utilities import *
+from parser import parse, set_filename
 
 trace = False
 
@@ -58,14 +60,20 @@ class Machine:
   result: Value
 
   def run(self, decls):
-      env = {}
-      for d in decls:
-          if isinstance(d, Function) and d.name == 'main':
-              main = d
-      interp_decls(decls, env, machine.memory)
-
       self.main_thread = Thread([], None)
       self.current_thread = self.main_thread
+      self.threads = [self.main_thread]
+      self.push_frame()
+      
+      env = {}
+      for d in decls:
+        if isinstance(d, Function) and d.name == 'main':
+          main = d
+        declare_decl(d, env, self.memory)
+      for d in reversed(decls):
+        self.schedule(d, env)
+      self.loop()
+
       self.threads = [self.main_thread]
       self.push_frame()
       loc = main.location
@@ -138,6 +146,9 @@ class Machine:
       else:
         self.result = retval
 
+  def finish_declaration(self):
+    self.current_frame().todo.pop()
+        
   def push_frame(self):
       frame = Frame([])
       self.current_thread.stack.append(frame)

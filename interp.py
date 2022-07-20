@@ -1,3 +1,7 @@
+#
+#  OBSOLETE: replaced by machine.py
+#
+
 from abstract_syntax import *
 from dataclasses import dataclass
 from parser import parse, set_filename
@@ -349,7 +353,6 @@ def interp_decl(decl, env, mem):
                 env_set(env, x, mod.members[x]) # duplicate?
             else:
                 error(decl.location, 'module does not export ' + x)
-                
     
 def interp(decls):
     env = {}

@@ -1,24 +1,22 @@
-fun split(array) {
-  let half = len(array) / 2;
+fun split_array(array) {
+  let half = len(array) % 2;
   let !left = new [half] 0;
   let !right = new [len(array) - half] 0;
   var i = 0;
   while (i < half) {
-    left[i] = array[i]
+    left[i] = array[i];
     i = i + 1;
   }
   while (i < len(array)) {
-    right[i - half] = array[i]
+    right[i - half] = array[i];
     i = i + 1;
   }
-  return new left, right;
+  return new 1 of left, 1 of right;
 }
 
 fun merge(array1, array2) {
-  let !result = new [len(array1) + len(array2)];
-  var i = 0;
-  var j = 0;
-  var k = 0;
+  let !result = new [len(array1) + len(array2)] 0;
+  var i = 0; var j = 0; var k = 0;
   while (j < len(array1) and k < len(array2)) {
     if (array1[j] <= array2[k]) {
       result[i] = array1[j];
@@ -43,10 +41,14 @@ fun merge(array1, array2) {
 }
 
 fun merge_sort(array) {
-  let !s = split(array);
-  let !left = merge_sort(s[0]);
-  let !right = merge_sort(s[1]);
-  return merge(left, right)
+  if (len(array) < 2) {
+    return array;
+  } else {
+    let !s = split_array(array);
+    let !left = merge_sort(s[0]);
+    let !right = merge_sort(s[1]);
+    return merge(left, right);
+  }
 }
 
 fun is_sorted(array) {
@@ -61,15 +63,14 @@ fun is_sorted(array) {
 }
 
 fun main() {
-  let n = 10;
-  let !a = new [n] 0;
-  let !i = new 0;
-  while (i < n) {
-    a[i] = n - i;
+  let !a = new [21] 0;
+  var i = 0;
+  while (i < len(a)) {
+    a[i] = len(a) - i;
     i = i + 1;
   }
-  let !b = merge_sort(a, n);
-  if (is_sorted(b, n)) {
+  let !b = merge_sort(a);
+  if (is_sorted(b)) {
     return 0;
   } else {
     return 1;

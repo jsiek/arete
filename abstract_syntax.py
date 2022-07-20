@@ -13,6 +13,7 @@ class Param:
     location: Meta
     kind: str # read, write
     ident: str
+    type_annot: Type
     __match_args__ = ("kind", "ident")
     def __str__(self):
         return self.kind + " " + self.ident
@@ -185,7 +186,7 @@ class Array(Exp):
         machine.schedule(self.arg, action.env)
       else:
         sz, val = action.results
-        size = to_number(sz, self.location)
+        size = to_integer(sz, self.location)
         vals = [val.duplicate(Fraction(1,2)) for i in range(0,size-1)]
         vals.append(val)
         machine.finish_expression(allocate(vals, machine.memory))
@@ -262,17 +263,15 @@ class Index(Exp):
         machine.schedule(self.index, action.env)
       else:
         ptr, ind = action.results
-        match ind:
-          case Number(tmp, i):
-            if action.lhs:
-                retval = Offset(ptr.temporary, ptr, i)
-            else:
-                retval = read(ptr, i, machine.memory, self.location, action.dup)
-                kill_temp(ptr, machine.memory, self.location)
-                kill_temp(ind, machine.memory, self.location)
-            machine.finish_expression(retval)
-          case _:
-            error(self.location, 'index must be an integer, not ' + repr(ind))
+        i = to_integer(ind, self.location)
+        if action.lhs:
+            retval = Offset(ptr.temporary, ptr, int(i))
+        else:
+            retval = read(ptr, i, machine.memory, self.location, action.dup)
+            kill_temp(ptr, machine.memory, self.location)
+            kill_temp(ind, machine.memory, self.location)
+        machine.finish_expression(retval)
+
         
 @dataclass
 class Lambda(Exp):
@@ -465,7 +464,7 @@ class VarInit(Exp):
     def free_vars(self):
         return self.rhs.free_vars() \
             | (self.body.free_vars() - set([self.var]))
-        
+      
 @dataclass
 class Return(Stmt):
     arg: Exp
@@ -601,8 +600,8 @@ class IfStmt(Stmt):
     __match_args__ = ("cond", "thn", "els")
     def __str__(self):
       if verbose:
-        return "if " + "(" + str(self.cond) + ")\n" + str(self.thn) \
-            + "else " + str(self.els)
+        return "if " + "(" + str(self.cond) + ") " + str(self.thn) \
+            + " else " + str(self.els)
       else:
         return "if " + "(" + str(self.cond) + ") ..."
     def __repr__(self):
@@ -661,7 +660,7 @@ class Block(Stmt):
     body: Exp
     __match_args__ = ("body",)
     def __str__(self):
-        return "{\n" + str(self.body) + "\n}\n"
+        return "{\n" + str(self.body) + "\n}"
     def __repr__(self):
         return str(self)
     def free_vars(self):
@@ -676,17 +675,23 @@ class Block(Stmt):
     
 @dataclass
 class Global(Exp):
-    name: str
-    rhs: Exp
-    __match_args__ = ("name", "rhs")
-    def __str__(self):
-        return "var " + str(self.name) + " = " + str(self.rhs) + ";"
-    def __repr__(self):
-        return str(self)
-    def free_vars(self):
-        return init.free_vars()
-    def local_vars(self):
-        return set([var.ident])
+  name: str
+  rhs: Exp
+  __match_args__ = ("name", "rhs")
+  def __str__(self):
+    return "var " + str(self.name) + " = " + str(self.rhs) + ";"
+  def __repr__(self):
+    return str(self)
+  def free_vars(self):
+    return init.free_vars()
+  def local_vars(self):
+    return set([var.ident])
+  def step(self, action, machine):
+    if action.state == 0:
+      machine.schedule(self.rhs, action.env)
+    else:
+      env_set(action.env, self.name, action.results[0])
+      machine.finish_declaration()
     
 @dataclass
 class Function(Decl):
@@ -697,33 +702,108 @@ class Function(Decl):
     def __str__(self):
         return "function " + self.name \
             + "(" + ", ".join([str(p) for p in self.params]) + ")" \
-            + " { " + str(self.body) + " }"
+            + " " + str(self.body)
     def __repr__(self):
         return str(self)
     def free_vars(self):
         return body.free_vars() - set([p.ident for p in self.params])
-
+    def step(self, action, machine):
+      if action.state == 0:
+        lam = Lambda(self.location, self.params, self.body)
+        machine.schedule(lam, action.env)
+      else:
+        env_set(action.env, self.name, action.results[0])
+        machine.finish_declaration()
+      
+def declare_decl(decl, env, mem):
+    match decl:
+      case Import(module, imports):
+        for x in imports:
+            env_init(env, x, None)
+      case _:
+        env_init(env, decl.name, None)
+        
 @dataclass
 class ModuleDecl(Decl):
-    name: str
-    exports: List[str]
-    body: List[Decl]
-    __match_args__ = ("name", "exports", "body")
-    def __str__(self):
-        return 'module ' + self.name + '\n'\
-            + '  exports ' + ", ".join(ex for ex in self.exports) + ' {\n' \
-            + str(self.body) + '\n}\n'
-    def __repr__(self):
-        return str(self)
+  name: str
+  exports: List[str]
+  body: List[Decl]
+  __match_args__ = ("name", "exports", "body")
+  def __str__(self):
+    return 'module ' + self.name + '\n'\
+        + '  exports ' + ", ".join(ex for ex in self.exports) + ' {\n' \
+        + '\n'.join([str(d) for d in self.body]) + '\n}\n'
+  def __repr__(self):
+    return str(self)
+  def step(self, action, machine):
+    if action.state == 0:
+      action.body_env = {}
+      for d in self.body:
+        declare_decl(d, action.body_env, machine.memory)
+    if action.state < len(self.body):
+      machine.schedule(self.body[action.state], action.body_env)
+    else:
+      for ex in self.exports:
+        if not ex in action.body_env:
+          error(self.location, 'export ' + ex + ' not defined in module')
+      mod = Module(False, self.name,
+                   {ex: env_get(action.body_env, ex) for ex in self.exports})
+      env_set(action.env, self.name, mod)
+      machine.finish_declaration()
 
 @dataclass
 class Import(Decl):
-    module: Exp
-    imports: List[str]
-    __match_args__ = ("module", "imports")
-    def __str__(self):
-        return 'from ' + str(self.module) + ' import ' \
-            + ', '.join(im for im in self.imports) + ';\n'
-    def __repr__(self):
-        return str(self)
-    
+  module: Exp
+  imports: List[str]
+  __match_args__ = ("module", "imports")
+  def __str__(self):
+    return 'from ' + str(self.module) + ' import ' \
+        + ', '.join(im for im in self.imports) + ';'
+  def __repr__(self):
+    return str(self)
+  def step(self, action, machine):
+    if action.state == 0:
+      machine.schedule(self.module, action.env)
+    else:
+      mod = action.results[0]
+      for x in self.imports:
+        if x in mod.members.keys():
+          env_set(action.env, x, mod.members[x]) # duplicate?
+        else:
+          error(self.location, 'module does not export ' + x)
+      machine.finish_declaration()
+      
+# Types
+
+@dataclass
+class IntType(Type):
+  def __str__(self):
+    return 'int'
+  def __repr__(self):
+    return str(self)
+
+@dataclass
+class BoolType(Type):
+  def __str__(self):
+    return 'bool'
+  def __repr__(self):
+    return str(self)
+
+@dataclass
+class PointerType(Type):
+  member_types: list[Type]
+  
+  def __str__(self):
+    return '{' + ', '.join([str(t) for t in self.member_types]) + '}'
+  def __repr__(self):
+    return str(self)
+
+@dataclass
+class ArrayType(Type):
+  element_type: Type
+
+  def __str__(self):
+    return '[' + str(self.element_type) + ']'
+  def __repr__(self):
+    return str(self)
+  
