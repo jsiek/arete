@@ -676,10 +676,12 @@ class Block(Stmt):
 @dataclass
 class Global(Exp):
   name: str
+  type_annot: Type
   rhs: Exp
-  __match_args__ = ("name", "rhs")
+  __match_args__ = ("name", "type_annot", "rhs")
   def __str__(self):
-    return "var " + str(self.name) + " = " + str(self.rhs) + ";"
+    return "var " + str(self.name) + " : " + str(self.type_annot) \
+        + " = " + str(self.rhs) + ";"
   def __repr__(self):
     return str(self)
   def free_vars(self):
@@ -697,8 +699,9 @@ class Global(Exp):
 class Function(Decl):
     name: str
     params: List[Param]
+    return_type: Type
     body: Exp
-    __match_args__ = ("name", "params", "body")
+    __match_args__ = ("name", "params", "return_type", "body")
     def __str__(self):
         return "function " + self.name \
             + "(" + ", ".join([str(p) for p in self.params]) + ")" \
@@ -775,35 +778,85 @@ class Import(Decl):
       
 # Types
 
-@dataclass
+@dataclass(eq=True)
+class AnyType(Type):
+  def __str__(self):
+    return '?'
+  def __repr__(self):
+    return str(self)
+
+@dataclass(eq=True)
 class IntType(Type):
   def __str__(self):
     return 'int'
   def __repr__(self):
     return str(self)
 
-@dataclass
+@dataclass(eq=True)
+class RationalType(Type):
+  def __str__(self):
+    return 'rational'
+  def __repr__(self):
+    return str(self)
+
+@dataclass(eq=True)
 class BoolType(Type):
   def __str__(self):
     return 'bool'
   def __repr__(self):
     return str(self)
 
-@dataclass
+@dataclass(eq=True)
+class VoidType(Type):
+  def __str__(self):
+    return 'void'
+  def __repr__(self):
+    return str(self)
+
+@dataclass(eq=True)
 class PointerType(Type):
-  member_types: list[Type]
-  
+  member_types: list[Type]  
+  __match_args__ = ("member_types",)
   def __str__(self):
     return '{' + ', '.join([str(t) for t in self.member_types]) + '}'
   def __repr__(self):
     return str(self)
 
-@dataclass
+@dataclass(eq=True)
 class ArrayType(Type):
   element_type: Type
-
+  __match_args__ = ("element_type",)
   def __str__(self):
     return '[' + str(self.element_type) + ']'
   def __repr__(self):
     return str(self)
   
+@dataclass(eq=True)
+class FunctionType(Type):
+  param_types: list[Type]
+  return_type: Type
+  __match_args__ = ("param_types", "return_type")
+  def __str__(self):
+    return '(' + ', '.join([str(t) for t in self.param_types]) + ')' \
+        + '->' + str(self.return_type)
+  def __repr__(self):
+    return str(self)
+    
+@dataclass(eq=True)
+class ModuleType(Type):
+  member_types: dict[str, Type]
+  __match_args__ = ("member_types",)
+  def __str__(self):
+    return '{' + ', '.join([n + ':' + str(t) \
+                            for n,t in self.member_types.items()]) + '}'
+  def __repr__(self):
+    return str(self)
+
+@dataclass(eq=True)
+class FutureType(Type):
+  result_type: Type
+  __match_args__ = ("reult_type",)
+  def __str__(self):
+    return '^' + str(self.result_type)
+  def __repr__(self):
+    return str(self)

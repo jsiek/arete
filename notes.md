@@ -1,6 +1,8 @@
 # TODO list
 
+[ ] constant declaration: constant front = 0;
 [ ] type checker for types (int, bool, pointers, arrays)
+[ ] lambda capture writable pointer
 [ ] newtype/seal/reveal
 [ ] standard library
 [ ] type checker for permissions

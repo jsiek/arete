@@ -13,6 +13,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "?"                                        -> any_type
     | "[" type "]"                               -> array_type
     | "{" type_list "}"                          -> ptr_type
+    | "(" type_list ")" "->" type                -> function_type
     
 ?type_list: type                                 -> single
     | type "," type_list                         -> push
@@ -40,7 +41,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | exp_add "-" exp_med                        -> sub
     | exp_med
 
-?exp_med: exp_med "%" exp_hi                    -> int_div
+?exp_med: exp_med "%" exp_hi                     -> int_div
     | exp_med "/" exp_hi                         -> div
     | exp_med "*" exp_hi                         -> mul
     | exp_hi
@@ -60,7 +61,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "-" exp_hi                                 -> neg
     | "not" exp_hi                               -> not
     | "(" exp ")"                                -> paren
-    | "fun" "(" param_list ")" block        -> lambda
+    | "fun" "(" param_list ")" block             -> lambda
     | "new" init_list                            -> new
     | "new" "[" exp "]" exp                      -> array
     | exp_hi "(" init_list ")"                   -> call
@@ -115,9 +116,12 @@ param: IDENT type_annot                          -> read
 ?ident_list:                                     -> empty
     | IDENT                                      -> single
     | IDENT "," ident_list                       -> push
-    
-?decl: "let" IDENT "=" exp ";"                   -> global
-    | "fun" IDENT "(" param_list ")" block       -> function
+
+?ret_type: "->" type                             -> just
+    |                                            -> nothing
+
+?decl: "let" IDENT type_annot "=" exp ";"        -> global
+    | "fun" IDENT "(" param_list ")" ret_type block -> function
     | "module" IDENT "exports" ident_list "{" decl_list "}" -> module
     | "from" exp "import" ident_list ";"         -> import
 

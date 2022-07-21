@@ -37,8 +37,8 @@ def parse_tree_to_str_list(e):
         raise Exception('parse_tree_to_str_list, unexpected ' + str(e))
 
 def parse_tree_to_type_annot(e):
-    if e.data == 'nothing':
-        return None
+    if e.data == 'nothing' or e.data == 'any_type':
+        return AnyType(e.meta)
     elif e.data == 'just':
         return parse_tree_to_type_annot(e.children[0])
     elif e.data == 'int_type':
@@ -188,12 +188,14 @@ def parse_tree_to_ast(e):
     elif e.data == 'global':
         return Global(e.meta,
                       str(e.children[0].value),
-                      parse_tree_to_ast(e.children[1]))
+                      parse_tree_to_type_annot(e.children[1]),
+                      parse_tree_to_ast(e.children[2]))
     elif e.data == 'function':
         return Function(e.meta,
                         str(e.children[0].value),
                         parse_tree_to_param(e.children[1]),
-                        parse_tree_to_ast(e.children[2]))
+                        parse_tree_to_type_annot(e.children[2]),
+                        parse_tree_to_ast(e.children[3]))
     elif e.data == 'module':
         return ModuleDecl(e.meta,
                           str(e.children[0].value),

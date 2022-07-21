@@ -28,6 +28,7 @@ from abstract_syntax import *
 from desugar import desugar_decls
 from utilities import *
 from parser import parse, set_filename
+from type_check import type_check_decls
 
 trace = False
 
@@ -186,11 +187,14 @@ if __name__ == "__main__":
           trace = True
       p = file.read()
       decls += parse(p, trace)
-      decls = desugar_decls(decls, {})
-      if trace:
-          print('**** after desugar ****')
-          print(decls)
-          print()
+      
+    decls = desugar_decls(decls, {})
+    type_check_decls(decls, {})
+      
+    if trace:
+      print('**** after desugar ****')
+      print(decls)
+      print()
     
     machine = Machine({}, [], None, None, None)
     try:

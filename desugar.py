@@ -150,15 +150,15 @@ def declare_decl(decl, env):
     
 def desugar_decl(decl, env):
     match decl:
-      case Global(name, rhs):
+      case Global(name, ty, rhs):
         new_rhs = desugar_exp(rhs, env)
-        return Global(decl.location, name, new_rhs)
-      case Function(name, params, body):
+        return Global(decl.location, name, ty, new_rhs)
+      case Function(name, params, ret_ty, body):
         body_env = env.copy()
         for p in params:
             body_env[p.ident] = False
         new_body = desugar_stmt(body, body_env)
-        return Function(decl.location, name, params, new_body)
+        return Function(decl.location, name, params, ret_ty, new_body)
       case ModuleDecl(name, exports, body):
         new_body = desugar_decls(body, env)
         return ModuleDecl(decl.location, name, exports, new_body)
