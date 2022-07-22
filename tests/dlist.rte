@@ -1,11 +1,11 @@
-let front = 0;
-let back = 1;
-let data = 0;
-let prev = 1;
-let next = 2;
-let none = 0;
-let half = 1/2;
-let all = 1;
+const front = 0;
+const back = 1;
+const data = 0;
+const prev = 1;
+const next = 2;
+const none = 0;
+const half = 1/2;
+const all = 1;
 
 fun listof(data) {
   let !p = new data, null, null;
@@ -13,7 +13,7 @@ fun listof(data) {
 }
 
 fun push(data, !lst) {
-  let !first = new data, null , null;
+  let !first = new data, null, null;
   if (lst[front] == lst[back]) { // lst is a 1 element list
     /*
       first: * -1-> [ A , / , / ]

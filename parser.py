@@ -37,6 +37,7 @@ def parse_tree_to_str_list(e):
         raise Exception('parse_tree_to_str_list, unexpected ' + str(e))
 
 def parse_tree_to_type_annot(e):
+    e.meta.filename = filename
     if e.data == 'nothing' or e.data == 'any_type':
         return AnyType(e.meta)
     elif e.data == 'just':
@@ -190,6 +191,11 @@ def parse_tree_to_ast(e):
                       str(e.children[0].value),
                       parse_tree_to_type_annot(e.children[1]),
                       parse_tree_to_ast(e.children[2]))
+    elif e.data == 'constant':
+        return ConstantDecl(e.meta,
+                            str(e.children[0].value),
+                            parse_tree_to_type_annot(e.children[1]),
+                            parse_tree_to_ast(e.children[2]))
     elif e.data == 'function':
         return Function(e.meta,
                         str(e.children[0].value),

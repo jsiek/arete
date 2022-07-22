@@ -67,7 +67,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | exp_hi "(" init_list ")"                   -> call
     | "true"                                     -> true
     | "false"                                    -> false
-    | "future" exp                               -> future
+    | "spawn" exp                                -> future
     | "await" exp_hi                             -> await
       
 ?stmt: exp "=" init ";"                          -> write
@@ -121,6 +121,7 @@ param: IDENT type_annot                          -> read
     |                                            -> nothing
 
 ?decl: "let" IDENT type_annot "=" exp ";"        -> global
+    | "const" IDENT type_annot "=" exp ";"       -> constant
     | "fun" IDENT "(" param_list ")" ret_type block -> function
     | "module" IDENT "exports" ident_list "{" decl_list "}" -> module
     | "from" exp "import" ident_list ";"         -> import

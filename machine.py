@@ -29,6 +29,7 @@ from desugar import desugar_decls
 from utilities import *
 from parser import parse, set_filename
 from type_check import type_check_decls
+from const_eval import const_eval_decls
 
 trace = False
 
@@ -189,12 +190,17 @@ if __name__ == "__main__":
       decls += parse(p, trace)
       
     decls = desugar_decls(decls, {})
-    type_check_decls(decls, {})
-      
     if trace:
       print('**** after desugar ****')
       print(decls)
       print()
+    decls = const_eval_decls(decls, {})
+    if trace:
+      print('**** after const_eval ****')
+      print(decls)
+      print()
+    type_check_decls(decls, {})
+      
     
     machine = Machine({}, [], None, None, None)
     try:

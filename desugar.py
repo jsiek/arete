@@ -74,7 +74,7 @@ def desugar_exp(e, env):
         new_arg = desugar_exp(arg, env)
         return Await(e.location, new_arg)
       case _:
-        error(e.location, 'error in desugar_exp, unhandled: ' + repr(e)) 
+        error(e.location, 'error in desugar_exp, unhandled: ' + repr(e))
     
 def desugar_stmt(s, env):
     match s:
@@ -94,7 +94,7 @@ def desugar_stmt(s, env):
         new_body = desugar_stmt(body, body_env)
         loc = s.location
         new_exp = New(loc, [Initializer(loc, Frac(loc, Fraction(1,1)),new_rhs)])
-        return LetInit(loc, Param(loc, 'write', var, None),
+        return LetInit(loc, Param(loc, 'write', var, AnyType(loc)),
                        Initializer(loc,
                                    Frac(loc, Fraction(1,1)),
                                    new_exp),
@@ -138,7 +138,7 @@ def desugar_stmt(s, env):
       case Block(body):
         return Block(s.location, desugar_stmt(body, env))
       case _:
-        raise Exception('error in desugar_stmt, unhandled: ' + repr(s)) 
+        error(s.location, 'error in desugar_stmt, unhandled: ' + repr(s)) 
 
 def declare_decl(decl, env):
     match decl:
@@ -150,6 +150,9 @@ def declare_decl(decl, env):
     
 def desugar_decl(decl, env):
     match decl:
+      case ConstantDecl(name, type_annot, rhs):
+        new_rhs = desugar_exp(rhs, env)
+        return ConstantDecl(decl.location, name, type_annot, new_rhs)
       case Global(name, ty, rhs):
         new_rhs = desugar_exp(rhs, env)
         return Global(decl.location, name, ty, new_rhs)
@@ -165,6 +168,8 @@ def desugar_decl(decl, env):
       case Import(module, imports):
         new_module = desugar_exp(module, env)
         return Import(decl.location, new_module, imports)
+      case _:
+        error(decl.location, "in desugar_decl, unhandled: " + str(decl))
 
 def desugar_decls(decls, env):
     body_env = env.copy()

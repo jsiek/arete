@@ -4,8 +4,8 @@ fun write(!p, v) {
 
 fun main() {
   let !a = new 0;
-  let f1 = future write(a, 42);
-  let f2 = future write(a, -42); // need writable pointer
+  let f1 = spawn write(a, 42);
+  let f2 = spawn write(a, -42); // need writable pointer
   ! await f1;
   ! await f2;
   return *a;

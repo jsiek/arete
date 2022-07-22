@@ -694,7 +694,23 @@ class Global(Exp):
     else:
       env_set(action.env, self.name, action.results[0])
       machine.finish_declaration()
-    
+
+@dataclass
+class ConstantDecl(Exp):
+  name: str
+  type_annot: Type
+  rhs: Exp
+  __match_args__ = ("name", "type_annot", "rhs")
+  def __str__(self):
+    return "const " + str(self.name) + " : " + str(self.type_annot) \
+        + " = " + str(self.rhs) + ";"
+  def __repr__(self):
+    return str(self)
+  def free_vars(self):
+    return init.free_vars()
+  def local_vars(self):
+    return set([var.ident])
+      
 @dataclass
 class Function(Decl):
     name: str

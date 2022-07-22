@@ -195,7 +195,8 @@ def type_check_exp(e, env):
       case Array(size, arg):
         size_type = type_check_exp(size, env)
         arg_type = type_check_exp(arg, env)
-        if not isinstance(size_type, IntType):
+        if not (isinstance(size_type, IntType)
+                or isinstance(size_type, AnyType)):
             error(e.location, "expected integer array size, not "
                   + str(size_type))
         return ArrayType(e.location, arg_type)
@@ -244,7 +245,8 @@ def type_check_exp(e, env):
         cond_type = type_check_exp(cond, env)
         thn_type = type_check_exp(thn, env)
         els_type = type_check_exp(els, env)
-        if not isinstance(cond_type, BoolType):
+        if not (isinstance(cond_type, BoolType)
+                or isinstance(cond_type, AnyType)):
           error(e.location, 'in conditional, expected a Boolean, not '
                 + str(cond_type))
         if not consistent(thn_type, els_type):
@@ -262,10 +264,13 @@ def type_check_exp(e, env):
         return FutureType(e.location, arg_type)
       case Await(arg):
         arg_type = type_check_exp(arg, env)
-        if not isinstance(arg_type, FutureType):
+        if isinstance(arg_type, FutureType):
+          return arg_type.result_type
+        elif isinstance(arg_type, AnyType):
+          return AnyType(e.location)
+        else:
           error(arg.location, 'in await, expected a future, not '
                 + str(arg_type))
-        return arg_type.result_type
       case _:
         error(e.location, 'error in type_check_exp, unhandled: ' + repr(e)) 
     
@@ -273,8 +278,9 @@ def type_check_stmt(s, env):
     match s:
       case LetInit(var, init, body):
         init_type = type_check_init(init, env)
+        assert consistent(init_type, var.type_annot)
         body_env = env.copy()
-        body_env[var.ident] = init_type
+        body_env[var.ident] = var.type_annot
         body_type = type_check_stmt(body, body_env)
         return body_type
       case Seq(first, rest):
@@ -287,8 +293,8 @@ def type_check_stmt(s, env):
       case Pass():
         return None
       case Write(lhs, rhs):
-        new_lhs = type_check_exp(lhs, env)
-        new_rhs = type_check_init(rhs, env)
+        lhs_type = type_check_exp(lhs, env)
+        rhs_type = type_check_init(rhs, env)
         # TODO
         return None
       case Transfer(lhs, percent, rhs):
@@ -320,7 +326,7 @@ def type_check_stmt(s, env):
       case Block(body):
         return type_check_stmt(body, env)
       case _:
-        raise Exception('error in type_check_stmt, unhandled: ' + repr(s)) 
+        error(s.location, 'error in type_check_stmt, unhandled: ' + repr(s)) 
 
 def typeof_decl(decl):
   match decl:
@@ -329,7 +335,10 @@ def typeof_decl(decl):
     case Function(name, params, ret_ty, body):
       return FunctionType(decl.location, [p.type_annot for p in params], ret_ty)
     case ModuleDecl(name, exports, body):
-      member_types = {n: typeof_decl(d) for n,d in body.items()}
+      member_types = {}
+      for d in body:
+        if not isinstance(d, Import):
+          member_types[d.name] = typeof_decl(d)
       return ModuleType(decl.location, member_types)
     case _:
       error(decl.location, 'error in typeof_decl, unhandled: ' + str(decl))
