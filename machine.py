@@ -51,7 +51,9 @@ class Frame:
 @dataclass
 class Thread:
     stack: list[Frame]
-    result: Value
+    result: Value        # None if not finished
+    parent: Any
+    num_children: int
     
 @dataclass
 class Machine:
@@ -62,7 +64,7 @@ class Machine:
   result: Value
 
   def run(self, decls):
-      self.main_thread = Thread([], None)
+      self.main_thread = Thread([], None, None, 0)
       self.current_thread = self.main_thread
       self.threads = [self.main_thread]
       self.push_frame()
@@ -91,11 +93,16 @@ class Machine:
       while len(self.threads) > 0:
           t = random.randint(0, len(self.threads)-1)
           self.current_thread = self.threads[t]
+          # case current_thread is finished
           if len(self.current_thread.stack) == 0:
+            if self.current_thread.num_children == 0:
               self.threads.remove(self.current_thread)
+              if not self.current_thread.parent is None:
+                  self.current_thread.parent.num_children -= 1
               if self.current_thread == self.main_thread:
                   self.result = self.current_thread.result
-              continue
+            continue
+          # case current_thread has work to do
           frame = self.current_frame()
           if len(frame.todo) > 0:
             if trace:
@@ -168,7 +175,8 @@ class Machine:
   def spawn(self, exp: Exp, env):
       act = Action(exp, 0, env, True, False, [], None, 'read')
       frame = Frame([act])
-      thread = Thread([frame], None)
+      self.current_thread.num_children += 1
+      thread = Thread([frame], None, self.current_thread, 0)
       self.threads.append(thread)
       return thread
   

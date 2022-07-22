@@ -385,7 +385,8 @@ class Await(Exp):
       machine.schedule(self.arg, action.env)
     else:
       future = action.results[0]
-      if not future.thread.result is None:
+      if not future.thread.result is None \
+         and future.thread.num_children == 0:
         machine.finish_expression(future.thread.result)
   
     

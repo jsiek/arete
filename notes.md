@@ -1,7 +1,7 @@
 # TODO list
 
-[ ] constant declaration: const front = 0;
-[ ] type checker for types (int, bool, pointers, arrays)
+[ ] type checker for types (int, bool, pointers, arrays, recursive types)
+[ ] exceptions?
 [ ] lambda capture writable pointer
 [ ] newtype/seal/reveal
 [ ] standard library
@@ -11,6 +11,7 @@
 [ ] compile to LLVM?
 
 
+[X] constant declaration: const front = 0;
 [X] remove uses of interp in machine
 [X] primitive `len` operator for arrays (and pointers)
 [X] mutable variables? (desugar to var + new + *)
