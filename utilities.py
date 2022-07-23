@@ -65,9 +65,9 @@ def eval_prim(op, vals, mem, location):
     match op:
       case 'len':
         ptr = vals[0]
-        if not ptr.address in mem.keys():
+        if not mem.valid_address(ptr.address):
             error(location, "in len, bad address: " + str(ptr.address))
-        n = len(mem[ptr.address])
+        n = len(mem.get_block(ptr.address))
         return Number(True, n)
       case 'equal':
         left, right = vals
@@ -131,7 +131,7 @@ def eval_prim(op, vals, mem, location):
         ptr = vals[0]
         ptr1 = ptr.duplicate(Fraction(1, 2))
         ptr2 = ptr.duplicate(Fraction(1, 1))
-        return allocate([ptr1, ptr2], mem)
+        return mem.allocate([ptr1, ptr2])
       case 'join':
         ptr1, ptr2 = vals
         ptr = ptr1.duplicate(1)
@@ -167,54 +167,6 @@ def readable(frac):
 def none(frac):
     return frac == Fraction(0, 1)
 
-next_address = 0
-
-def allocate(vals, mem):
-    global next_address
-    addr = next_address
-    next_address += 1
-    mem[addr] = vals
-    return Pointer(True, addr, Fraction(1,1), None)
-
-def read(ptr, index, mem, location, dup):
-    if not isinstance(ptr, Pointer):
-        error(location, 'in read expected a pointer, not ' + str(ptr))
-    if none(ptr.permission):
-        error(location, 'pointer does not have read permission: ' + str(ptr))
-    # whether to copy here or not?
-    # see tests/fail_indirect_write
-    if not ptr.address in mem.keys():
-        error(location, 'in read, bad address: ' + str(ptr.address))
-    if not (index < len(mem[ptr.address])):
-        error(location, 'in read, index too big: ' + str(index)
-              + ' for address ' + str(ptr.address))
-    if dup:
-        retval = mem[ptr.address][index].duplicate(ptr.permission)
-    else:
-        retval = mem[ptr.address][index]
-    if False:
-        print('read from ' + str(ptr) + '[' + str(index) + ']')
-        print('    value: ' + str(mem[ptr.address][index]))
-        print('    producing: ' + str(retval))
-    return retval
-    #return mem[ptr.address]
-
-def write(ptr, index, val, mem, location):
-    if not isinstance(ptr, Pointer):
-        error(location, 'in write expected a pointer, not ' + str(ptr))
-    if not writable(ptr.permission):
-        error(location, 'pointer does not have write permission: ' + str(ptr))
-    if not ptr.address in mem.keys():
-        error(location, 'in write, bad address: ' + str(ptr.address))
-    if not (index < len(mem[ptr.address])):
-        error(location, 'in write, index too big: ' + str(index)
-              + ' for address ' + str(ptr.address))
-    mem[ptr.address][index].kill(mem, location)
-    if val.temporary:
-        mem[ptr.address][index] = val
-    else:
-        mem[ptr.address][index] = val.duplicate(1)
-    mem[ptr.address][index].temporary = False
 
 @dataclass
 class Value:
@@ -228,7 +180,7 @@ class Value:
 class Void(Value):
     pass
 
-@dataclass
+@dataclass(eq=False)
 class Module(Value):
     name: str
     members: dict[str, Value]
@@ -529,10 +481,78 @@ def delete(ptr, mem, location):
       case Pointer(tmp, addr, priv):
         if not writable(priv):
             error(location, 'delete needs writable pointer, not ' + str(ptr))
-        if not addr in mem.keys():
-            error(location, 'already deleted address ' + str(addr))
-        for val in mem[addr]:
-            val.kill(mem, location)
-        del mem[addr]
+        mem.deallocate(addr, location)
     
+@dataclass
+class Memory:
+  memory: dict[int,Value]
+  next_address: int
+
+  def __init__(self):
+    self.memory = {}
+    self.next_address = 0
+
+  def size(self):
+    return len(self.memory)
+
+  def __str__(self):
+    return str(self.memory)
+
+  def valid_address(self, addr):
+    return addr in self.memory.keys()
+
+  def get_block(self, addr):
+    return self.memory[addr]
+  
+  def allocate(self, vals):
+    addr = self.next_address
+    self.next_address += 1
+    self.memory[addr] = vals
+    return Pointer(True, addr, Fraction(1,1), None)
+
+  def deallocate(self, addr, location):
+    if not self.valid_address(addr):
+        error(location, 'already deleted address ' + str(addr))
+    for val in self.memory[addr]:
+        val.kill(self, location)
+    del self.memory[addr]
+  
+  def read(self, ptr, index, location, dup):
+      if not isinstance(ptr, Pointer):
+          error(location, 'in read expected a pointer, not ' + str(ptr))
+      if none(ptr.permission):
+          error(location, 'pointer does not have read permission: ' + str(ptr))
+      # whether to copy here or not?
+      # see tests/fail_indirect_write
+      if not self.valid_address(ptr.address):
+          error(location, 'in read, bad address: ' + str(ptr.address))
+      if not (index < len(self.memory[ptr.address])):
+          error(location, 'in read, index too big: ' + str(index)
+                + ' for address ' + str(ptr.address))
+      if dup:
+          retval = self.memory[ptr.address][index].duplicate(ptr.permission)
+      else:
+          retval = self.memory[ptr.address][index]
+      if False:
+          print('read from ' + str(ptr) + '[' + str(index) + ']')
+          print('    value: ' + str(self.memory[ptr.address][index]))
+          print('    producing: ' + str(retval))
+      return retval
+
+  def write(self, ptr, index, val, location):
+      if not isinstance(ptr, Pointer):
+          error(location, 'in write expected a pointer, not ' + str(ptr))
+      if not writable(ptr.permission):
+          error(location, 'pointer does not have write permission: ' + str(ptr))
+      if not self.valid_address(ptr.address):
+          error(location, 'in write, bad address: ' + str(ptr.address))
+      if not (index < len(self.memory[ptr.address])):
+          error(location, 'in write, index too big: ' + str(index)
+                + ' for address ' + str(ptr.address))
+      self.memory[ptr.address][index].kill(self.memory, location)
+      if val.temporary:
+          self.memory[ptr.address][index] = val
+      else:
+          self.memory[ptr.address][index] = val.duplicate(1)
+      self.memory[ptr.address][index].temporary = False
 

@@ -48,7 +48,7 @@ class Action:
 class Frame:
     todo: list[Action]
 
-@dataclass
+@dataclass(eq=False)
 class Thread:
     stack: list[Frame]
     result: Value        # None if not finished
@@ -57,7 +57,7 @@ class Thread:
     
 @dataclass
 class Machine:
-  memory: dict[int,Value]
+  memory: Memory
   threads: list[Thread]
   current_thread: Thread
   main_thread: Thread
@@ -84,9 +84,9 @@ class Machine:
       call_main = Call(loc, Var(loc, 'main'), [])
       self.schedule(call_main, env)
       self.loop()
-      if len(self.memory) > 0:
+      if self.memory.size() > 0:
           error(main.location, 'memory leak, memory size = '
-                + str(len(self.memory)))
+                + str(self.memory.size()))
       return self.result
 
   def loop(self):
@@ -121,6 +121,8 @@ class Machine:
   def schedule(self, ast, env, dup=True, lhs=False):
       if trace:
           print('scheduling ' + str(ast))
+          print('in ' + str(env))
+          print()
       action = Action(ast, 0, env, dup, lhs, [], None, '???')
       self.current_frame().todo.append(action)
       return action
@@ -210,7 +212,7 @@ if __name__ == "__main__":
     type_check_decls(decls, {})
       
     
-    machine = Machine({}, [], None, None, None)
+    machine = Machine(Memory(), [], None, None, None)
     try:
       retval = machine.run(decls)
       if expect_fail:

@@ -166,7 +166,8 @@ class New(Exp):
         init_act = machine.schedule(self.inits[action.state], action.env)
         init_act.privilege = 'read'
       else:
-        machine.finish_expression(allocate(action.results, machine.memory))
+        ptr = machine.memory.allocate(action.results)
+        machine.finish_expression(ptr)
 
 @dataclass
 class Array(Exp):
@@ -189,7 +190,8 @@ class Array(Exp):
         size = to_integer(sz, self.location)
         vals = [val.duplicate(Fraction(1,2)) for i in range(0,size-1)]
         vals.append(val)
-        machine.finish_expression(allocate(vals, machine.memory))
+        ptr = machine.memory.allocate(vals)
+        machine.finish_expression(ptr)
       
 @dataclass
 class Var(Exp):
@@ -267,7 +269,7 @@ class Index(Exp):
         if action.lhs:
             retval = Offset(ptr.temporary, ptr, int(i))
         else:
-            retval = read(ptr, i, machine.memory, self.location, action.dup)
+            retval = machine.memory.read(ptr, i, self.location, action.dup)
             kill_temp(ptr, machine.memory, self.location)
             kill_temp(ind, machine.memory, self.location)
         machine.finish_expression(retval)
@@ -506,7 +508,7 @@ class Write(Stmt):
             error(self.location,
                   "expected pointer offset on left-hand side of " 
                   + "assignment, not " + str(offset))
-        write(offset.ptr, offset.offset, val, machine.memory, self.location)
+        machine.memory.write(offset.ptr, offset.offset, val, self.location)
         kill_temp(offset, machine.memory, self.location)
         kill_temp(val, machine.memory, self.location)
         machine.finish_statement()
