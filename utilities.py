@@ -522,13 +522,13 @@ class Memory:
           error(location, 'in read expected a pointer, not ' + str(ptr))
       if none(ptr.permission):
           error(location, 'pointer does not have read permission: ' + str(ptr))
-      # whether to copy here or not?
-      # see tests/fail_indirect_write
       if not self.valid_address(ptr.address):
           error(location, 'in read, bad address: ' + str(ptr.address))
       if not (index < len(self.memory[ptr.address])):
           error(location, 'in read, index too big: ' + str(index)
                 + ' for address ' + str(ptr.address))
+      # whether to copy here or not?
+      # see tests/fail_indirect_write
       if dup:
           retval = self.memory[ptr.address][index].duplicate(ptr.permission)
       else:
