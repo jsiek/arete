@@ -1,7 +1,9 @@
 # TODO list
 
+[ ] remove temporaries, always allocate and return pointers a la Val
 [ ] type checker for types (int, bool, pointers, arrays, recursive types)
 [ ] exceptions?
+[ ] thread cancellation
 [ ] lambda capture writable pointer
 [ ] newtype/seal/reveal
 [ ] standard library
