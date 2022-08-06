@@ -1,11 +1,11 @@
 fun inc(!p) {
-  *p = *p + 1;
+  p = p + 1;
 }
 
 fun main() {
-  let !q = new 0;
+  let !q = 0;
   ! inc(q);
-  *q = *q + 1;
-  let a = *q;
+  q = q + 1;
+  let a = q;
   return a - 2;
 }

@@ -1,20 +1,36 @@
-const front = 0;
-const back = 1;
-const data = 0;
-const prev = 1;
-const next = 2;
+// permissions
 const none = 0;
 const half = 1/2;
 const all = 1;
 
-fun listof(data) {
-  let !p = new data, null, null;
+fun listof(dat) {
+  let !p = new ⟨dat, null, null⟩;
   return split(p);
 }
 
-fun push(data, !lst) {
-  let !first = new data, null, null;
-  if (lst[front] == lst[back]) { // lst is a 1 element list
+fun front(lst) & {
+  return lst[0];
+}
+
+fun back(lst) & {
+  return lst[1];
+}
+
+fun data(node) & {
+  return (*node)[0];
+}
+
+fun prev(node) & {
+  return (*node)[1];
+}
+
+fun next(node) & {
+  return (*node)[2];
+}
+
+fun push(dat, !lst) {
+  let !first = new ⟨dat, null, null⟩;
+  if (front(lst) == back(lst)) { // lst is a 1 element list
     /*
       first: * -1-> [ A , / , / ]
       
@@ -23,18 +39,18 @@ fun push(data, !lst) {
                   V   V
 		  [ B , / , / ]
     */
-    let !n = join(lst[front], lst[back]);
-    n[prev] = none of first;
-    first[next] = half of n;
-    n[prev] <- half of first;
+    let !n = join(lst[0], lst[1]);
+    prev(all of n) = none of first;
+    next(all of first) = half of n;
+    (*n)[1] <- half of *first;
     /*
       first: *-.5-> [ A , / , * ]
                     ^         |
                     |.5       |.5
       n: -.5-> [ B, * , / ]<--|
     */
-    lst[front] = all of first;
-    lst[back] = all of n;
+    front(all of lst) = all of first;
+    back(all of lst) = all of n;
     return lst;
   } else { // lst has at least 2 elements
     /*
@@ -49,12 +65,12 @@ fun push(data, !lst) {
 		            |___/          |             |   
 			      .5            \-.5->  <-.5-/
      */
-    lst[front] <- all of lst[front][next][prev];
-    lst[front][prev] = none of first;
-    lst[front][next][prev] <- half of lst[front];
-    first[next] = all of lst[front];
-    first[next][prev] <- half of first;
-    lst[front] = all of first;
+    lst[0] <- all of lst[0][2][1];
+    (*front(all of lst))[1] = none of first;
+    lst[0][2][1] <- half of lst[0];
+    next(all of first) = front(all of lst);
+    (*first)[2][1] <- half of *first;
+    front(all of lst) = all of first;
     /*
            lst: *-1-> [ * , * ]
                       .5|   \____.5_______________________________
@@ -72,35 +88,40 @@ fun push(data, !lst) {
 }
 
 fun check_nodes_permissions(node) {
-  if (not is_null(node[next])) {
-    assert permission(node[next]) == half;
-    ! check_nodes_permissions(all of node[next]);
-  }
-  if (not is_null(node[prev])) {
-    assert permission(node[prev]) == half;
+  if (not is_null(node)) {
+    if (not is_null(next(node))) {
+      assert permission(next(node)) == half;
+      ! check_nodes_permissions(next(all of node));
+    }
+    if (not is_null(prev(node))) {
+      assert permission(prev(all of node)) == half;
+    }
   }
 }
 
 fun check_list_permissions(list) {
-  let first = all of list[front];
-  let last = all of list[back];
-  assert permission(first) == half;
-  assert permission(last) == half;
+  let first = copy(front(all of list));
+  let last = copy(back(all of list));
+  assert permission(*first) == half;
+  assert permission(*last) == half;
   ! check_nodes_permissions(all of first);
 }
 
 fun delete_nodes(node, last) {
-  if (node == last) {
-    delete join(node, last);
-  } else {
-    node <- all of node[next][prev];
-    ! delete_nodes(all of node[next], all of last);
-    delete node;
+  if (not is_null(node)) {
+    if (node == last) {
+      delete join(*node, *last);
+    } else {
+      *node <- all of (*node)[2][1];
+      ! delete_nodes(copy(next(all of node)), all of last);
+      delete node;
+    }
   }
 }
 
 fun delete_list(!list) {
-  ! delete_nodes(all of list[front], all of list[back]);
+  ! delete_nodes(copy(front(all of list)),
+                 copy(back(all of list)));
 }
 
 fun main() {
@@ -108,7 +129,7 @@ fun main() {
   let !two_three = push(2, three);
   let !one_two_three = push(1, two_three);
   ! check_list_permissions(all of one_two_three);
-  let one = one_two_three[front][data];
+  let one = copy(data(front(one_two_three)));
   ! delete_list(one_two_three);
   return one - 1;
 }

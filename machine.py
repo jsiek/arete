@@ -31,18 +31,16 @@ from parser import parse, set_filename
 from type_check import type_check_decls
 from const_eval import const_eval_decls
 
-trace = False
-
 @dataclass
 class Action:
     ast: AST
     state: int
-    env: dict[str,Value]
-    dup: bool # duplicate the value? default is True
-    lhs: bool # left-hand side of an assignment (Write), default is False
     results: list[Value] # results of subexpressions
-    return_value: Value # result of `return` statement
-    privilege: str
+    return_value: Value  # result of `return` statement
+    return_mode: str     # value or address
+    context: Context     # rvalue/lvalue/etc.
+    env: dict[str,Value]
+    
     
 @dataclass
 class Frame:
@@ -75,16 +73,44 @@ class Machine:
           main = d
         declare_decl(d, env, self.memory)
       for d in reversed(decls):
-        self.schedule(d, env)
+        self.schedule(d, env, return_mode='-no-return-mode-')
       self.loop()
 
       self.threads = [self.main_thread]
       self.push_frame()
       loc = main.location
       call_main = Call(loc, Var(loc, 'main'), [])
-      self.schedule(call_main, env)
+      self.schedule(call_main, env, ValueCtx(Fraction(1,2)),
+                    return_mode='-no-return-mode-')
       self.loop()
+      if tracing_on():
+          print('** finished program')
+      if tracing_on():
+        print('memory: ' + str(self.memory))
+        print('killing top-level env: ' + str(env))
+      changed = True
+      while changed:
+        changed = False
+        deletes = set()
+        for x, ptr in env.items():
+          if ptr.permission == Fraction(1,1):
+            if tracing_on():
+                print('kill env ' + x)
+            ptr.kill(self.memory, loc)
+            deletes |= set([x])
+            changed = True
+          else:
+            # this is to deal with cycles due to recursive functions -Jeremy
+            ptr.clear(self.memory, loc)
+        for x in deletes:
+            del env[x]
+      if tracing_on():
+        print('top-level env: ' + str(env))
       if self.memory.size() > 0:
+          if tracing_on():
+              print('final memory:')
+              print(self.memory)
+          print('program result: ' + str(self.result))
           error(main.location, 'memory leak, memory size = '
                 + str(self.memory.size()))
       return self.result
@@ -105,50 +131,58 @@ class Machine:
           # case current_thread has work to do
           frame = self.current_frame()
           if len(frame.todo) > 0:
-            if trace:
-              print('len(frame.todo) = ' + str(len(frame.todo)))
             action = self.current_action()
-            if trace:
+            if tracing_on():
+              print(error_header(action.ast.location))
               print('stepping ' + repr(action))
-              print(machine.memory)
             action.ast.step(action, self)
+            if tracing_on():
+              print(machine.memory)
+              print()
+            #machine.memory.compute_fractions()
             action.state += 1
           else:
             self.current_thread.stack.pop()
 
   # Call schedule to start the evaluation of an AST node.
   # Returns the new action.
-  def schedule(self, ast, env, dup=True, lhs=False):
-      if trace:
-          print('scheduling ' + str(ast))
-          print('in ' + str(env))
-          print()
-      action = Action(ast, 0, env, dup, lhs, [], None, '???')
+  def schedule(self, ast, env, context=ValueCtx(Fraction(1,2)),
+               return_mode=None):
+      return_mode = self.current_action().return_mode if return_mode is None \
+                    else return_mode
+      action = Action(ast, 0, [], None, return_mode, context, env)
       self.current_frame().todo.append(action)
       return action
 
   # Call finish_expression to signal that the current expression
   # action is finished and register the value it produced with the
   # previous action.
-  def finish_expression(self, val):
-      if trace:
-          print('finish_expression ' + str(val))
+  def finish_expression(self, result, location):
+      if tracing_on():
+          print('finish_expression ' + str(result))
+          print(self.memory)
+      for p in self.current_action().results:
+        if not isinstance(self.current_action().context, ObserveCtx):
+          p.kill(machine.memory, location)
       self.current_frame().todo.pop()
       if len(self.current_frame().todo) > 0:
-          self.current_action().results.append(val)
+          self.current_action().results.append(result)
       elif len(self.current_thread.stack) > 1:
-          self.pop_frame(val)
+          self.pop_frame(result)
       else:
-          if trace:
-              print('finished thread ' + str(val))
-          self.current_thread.result = val
+          if tracing_on():
+              print('finished thread ' + str(result))
+          self.current_thread.result = result
 
   # Call finish_statement to signal that the current statement action is done.
   # Propagates the return value if there is one.
-  def finish_statement(self):
+  def finish_statement(self, location):
       retval = self.current_action().return_value
-      if trace:
+      if tracing_on():
           print('finish_statement ' + str(retval))
+      for p in self.current_action().results:
+        if not isinstance(self.current_action().ast, Transfer):
+          p.kill(machine.memory, location)
       self.current_frame().todo.pop()
       if len(self.current_frame().todo) > 0:
         self.current_action().return_value = retval
@@ -157,7 +191,9 @@ class Machine:
       else:
         self.result = retval
 
-  def finish_declaration(self):
+  def finish_declaration(self, location):
+    for p in self.current_action().results:
+      p.kill(machine.memory, location)
     self.current_frame().todo.pop()
         
   def push_frame(self):
@@ -175,7 +211,9 @@ class Machine:
       return self.current_frame().todo[-1]
 
   def spawn(self, exp: Exp, env):
-      act = Action(exp, 0, env, True, False, [], None, 'read')
+      act = Action(exp, 0, [], None,
+                   self.current_action().return_mode, # ??
+                   ValueCtx(Fraction(1,1)), env)
       frame = Frame([act])
       self.current_thread.num_children += 1
       thread = Thread([frame], None, self.current_thread, 0)
@@ -195,23 +233,22 @@ if __name__ == "__main__":
       if 'fail' in sys.argv:
           expect_fail = True
       if 'trace' in sys.argv:
-          trace = True
+          set_trace(True)
       p = file.read()
-      decls += parse(p, trace)
+      decls += parse(p, tracing_on())
       
     decls = desugar_decls(decls, {})
-    if trace:
+    if tracing_on():
       print('**** after desugar ****')
       print(decls)
       print()
     decls = const_eval_decls(decls, {})
-    if trace:
+    if tracing_on():
       print('**** after const_eval ****')
       print(decls)
       print()
     type_check_decls(decls, {})
       
-    
     machine = Machine(Memory(), [], None, None, None)
     try:
       retval = machine.run(decls)
@@ -219,15 +256,15 @@ if __name__ == "__main__":
           print("expected failure, but didn't, returned " + str(retval))
           exit(-1)
       else:
-          if trace:
+          if tracing_on():
               print('result: ' + str(retval.value))
-          exit(retval.value)
+          exit(int(retval.value))
     except Exception as ex:
         if expect_fail:
             exit(0)
         else:
             print('unexpected failure')
-            if trace:
+            if tracing_on():
                 raise ex
             else:
                 print(str(ex))

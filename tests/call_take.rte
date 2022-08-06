@@ -1,10 +1,10 @@
 fun inc(!p) {
-  *p = *p + 1;
-  return *p;
+  p = p + 1;
+  return p;
 }
 
 fun main() {
-  let !q = new 0;
+  let !q = 0;
   let a = inc(q);
   return a - 1;
 }

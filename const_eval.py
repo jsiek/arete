@@ -38,11 +38,11 @@ def is_constant(e):
 def eval_constant(e):
   match e:
     case Int(n):
-      return Number(True, n)
+      return Number(n)
     case Frac(f):
-      return Number(True, f)
+      return Number(f)
     case Bool(b):
-      return Boolean(True, b)
+      return Boolean(b)
     case _:
       error(e.location, "expected a constant, not " + str(e))
       
@@ -75,20 +75,23 @@ def const_eval_exp(e, env):
       case Member(arg, field):
         new_arg = const_eval_exp(arg, env)
         return Member(e.location, new_arg, field)
-      case New(inits):
-        new_inits = [const_eval_init(init, env) for init in inits]
-        return New(e.location, new_inits)
+      case New(init):
+        new_init = const_eval_init(init, env)
+        return New(e.location, new_init)
       case Array(size, arg):
         new_size = const_eval_exp(size, env)
         new_arg = const_eval_exp(arg, env)
         return Array(e.location, new_size, new_arg)
-      case Lambda(params, body):
+      case TupleExp(inits):
+        new_inits = [const_eval_init(init, env) for init in inits]
+        return TupleExp(e.location, new_inits)
+      case Lambda(params, ret_mode, body, name):
         body_env = env.copy()
         for p in params:
           if p.ident in body_env.keys():
             del body_env[p.ident]
         new_body = const_eval_stmt(body, body_env)
-        return Lambda(e.location, params, new_body)
+        return Lambda(e.location, params, ret_mode, new_body, name)
       case Call(fun, args):
         new_fun = const_eval_exp(fun, env)
         new_args = [const_eval_init(arg, env) for arg in args]
@@ -97,6 +100,12 @@ def const_eval_exp(e, env):
         new_arg = const_eval_exp(arg, env)
         new_index = const_eval_exp(index, env)
         return Index(e.location, new_arg, new_index)
+      case Deref(arg):
+        new_arg = const_eval_exp(arg, env)
+        return Deref(e.location, new_arg)
+      case AddressOf(arg):
+        new_arg = const_eval_exp(arg, env)
+        return AddressOf(e.location, new_arg)
       case IfExp(cond, thn, els):
         new_cond = const_eval_exp(cond, env)
         new_thn = const_eval_exp(thn, env)
@@ -181,13 +190,14 @@ def const_eval_decl(decl, env):
       case Global(name, type_annot, rhs):
         new_rhs = const_eval_exp(rhs, env)
         return [Global(decl.location, name, type_annot, new_rhs)]
-      case Function(name, params, return_ty, body):
+      case Function(name, params, return_ty, return_mode, body):
         body_env = env.copy()
         for p in params:
           if p.ident in body_env.keys():
             del body_env[p.ident]
         new_body = const_eval_stmt(body, body_env)
-        return [Function(decl.location, name, params, return_ty, new_body)]
+        return [Function(decl.location, name, params, return_ty, return_mode,
+                         new_body)]
       case ModuleDecl(name, exports, body):
         body_env = env.copy()
         new_body = const_eval_decls(body, body_env)

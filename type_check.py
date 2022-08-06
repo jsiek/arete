@@ -11,6 +11,8 @@ def consistent(ty1, ty2):
       return consistent(t1, t2)
     case (PointerType(ts1), PointerType(ts2)):
       return all([consistent(t1, t2) for t1,t2 in zip(ts1, ts2)])
+    case (TupleType(ts1), TupleType(ts2)):
+      return all([consistent(t1, t2) for t1,t2 in zip(ts1, ts2)])
     case (FunctionType(ps1, rt1), FunctionType(ps2, rt2)):
       return all([consistent(t1, t2) for t1, t2 in zip(ps1, ps2)]) \
         and consistent(rt1,rt2)
@@ -33,6 +35,8 @@ def join(ty1, ty2):
       return ArrayType(ty1.location, join(t1, t2))
     case (PointerType(ts1), PointerType(ts2)):
       return PointerType([join(t1, t2) for t1,t2 in zip(ts1, ts2)])
+    case (TupleType(ts1), TupleType(ts2)):
+      return TupleType([join(t1, t2) for t1,t2 in zip(ts1, ts2)])
     case (FunctionType(ps1, rt1), FunctionType(ps2, rt2)):
       return FunctionType([join(t1, t2) for t1, t2 in zip(ps1, ps2)],
                           join(rt1,rt2))
@@ -63,6 +67,8 @@ def type_check_init(init, env):
 
 def type_check_prim(location, op, arg_types):
     match op:
+      case 'copy':
+        return arg_types[0]
       case 'len':
         assert len(arg_types) == 1
         assert isinstance(arg_types[0], PointerType) \
@@ -189,9 +195,9 @@ def type_check_exp(e, env):
             error(e.location, "module " + str(arg) + " does not contain "
                   + field)
         return mod_type.member_types[field]
-      case New(inits):
-        init_types = [type_check_init(init, env) for init in inits]
-        return PointerType(e.location, init_types)
+      case New(init):
+        init_type = type_check_init(init, env)
+        return PointerType(e.location, [init_type])
       case Array(size, arg):
         size_type = type_check_exp(size, env)
         arg_type = type_check_exp(arg, env)
@@ -200,7 +206,10 @@ def type_check_exp(e, env):
             error(e.location, "expected integer array size, not "
                   + str(size_type))
         return ArrayType(e.location, arg_type)
-      case Lambda(params, body):
+      case TupleExp(inits):
+        init_types = [type_check_init(init, env) for init in inits]
+        return TupleType(e.location, init_types)
+      case Lambda(params, ret_mode, body, name):
         body_env = env.copy()
         for p in params:
             body_env[p.ident] = p.type_annot
@@ -225,7 +234,7 @@ def type_check_exp(e, env):
       case Index(arg, index):
         arg_type = type_check_exp(arg, env)
         index_type = type_check_exp(index, env)
-        if isinstance(arg_type, PointerType):
+        if isinstance(arg_type, PointerType) or isinstance(arg_type, TupleType):
           if isinstance(index, Int):
             if 0 <= index.value and index.value < len(arg_type.member_types):
               return arg_type.member_types[index.value]
@@ -241,6 +250,20 @@ def type_check_exp(e, env):
         else:
           error(e.location, 'in subscript, expected pointer or array, not '
                 + str(arg_type))
+      case Deref(arg):
+        arg_type = type_check_exp(arg, env)
+        if isinstance(arg_type, PointerType):
+          return arg_type.member_types[0]
+        elif isinstance(arg_type, ArrayType):
+          return arg_type.element_type
+        elif isinstance(arg_type, AnyType):
+          return AnyType(e.location)
+        else:
+          error(e.location, 'in subscript, expected pointer or array, not '
+                + str(arg_type))
+      case AddressOf(arg):
+        arg_type = type_check_exp(arg, env)
+        return arg_type # or pointer to arg_type? -Jeremy
       case IfExp(cond, thn, els):
         cond_type = type_check_exp(cond, env)
         thn_type = type_check_exp(thn, env)
@@ -332,7 +355,7 @@ def typeof_decl(decl):
   match decl:
     case Global(name, ty, rhs):
       return ty
-    case Function(name, params, ret_ty, body):
+    case Function(name, params, ret_ty, ret_mode, body):
       return FunctionType(decl.location, [p.type_annot for p in params], ret_ty)
     case ModuleDecl(name, exports, body):
       member_types = {}
@@ -363,7 +386,7 @@ def type_check_decl(decl, env):
     case Global(name, ty, rhs):
       rhs_type = type_check_exp(rhs, env)
       # TODO
-    case Function(name, params, ret_ty, body):
+    case Function(name, params, ret_ty, ret_mode, body):
       body_env = env.copy()
       for p in params:
           body_env[p.ident] = p.type_annot

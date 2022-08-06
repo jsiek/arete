@@ -1,6 +1,7 @@
 fun main() {
-  let !x = new 10;
-  *x = 20;
-  let y = *x;
-  return y - 20;
+  let !x = 10;
+  let z = copy(x); // otherwise z is an alias for x
+  x = 20;
+  let y = x;
+  return y - z - 10;
 }

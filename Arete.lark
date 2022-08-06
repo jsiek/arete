@@ -21,6 +21,9 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 ?type_annot: ":" type                            -> just
     |                                            -> nothing
 
+?ret_mode: "&"                                   -> address
+    |                                            -> value
+
 ?exp: exp_logic "?" exp ":" exp                  -> condition
     | "let" param "=" init "in" exp              -> let
     | exp_logic
@@ -47,6 +50,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | exp_hi
 
 ?exp_hi: INT                                     -> int
+    | "copy" "(" exp ")"                         -> copy
     | "is_null" "(" exp ")"                      -> is_null
     | "null"                                     -> null
     | "len" "(" exp ")"                          -> len
@@ -57,19 +61,21 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | IDENT                                      -> var
     | exp_hi "[" exp "]"                         -> index
     | "*" exp_hi                                 -> deref
+    | "&" exp_hi                                 -> addrof
     | exp_hi "." IDENT                           -> member
     | "-" exp_hi                                 -> neg
     | "not" exp_hi                               -> not
     | "(" exp ")"                                -> paren
-    | "fun" "(" param_list ")" block             -> lambda
-    | "new" init_list                            -> new
+    | "fun" "(" param_list ")" ret_mode block    -> lambda
+    | "new" init                                 -> new
     | "new" "[" exp "]" exp                      -> array
+    | "⟨" init_list "⟩"                          -> tuple
     | exp_hi "(" init_list ")"                   -> call
     | "true"                                     -> true
     | "false"                                    -> false
     | "spawn" exp                                -> future
     | "await" exp_hi                             -> await
-      
+
 ?stmt: exp "=" init ";"                          -> write
     | exp "<-" exp "of" exp ";"                  -> transfer
     | "!" exp ";"                                -> expr
@@ -122,7 +128,7 @@ param: IDENT type_annot                          -> read
 
 ?decl: "let" IDENT type_annot "=" exp ";"        -> global
     | "const" IDENT type_annot "=" exp ";"       -> constant
-    | "fun" IDENT "(" param_list ")" ret_type block -> function
+    | "fun" IDENT "(" param_list ")" ret_type ret_mode block -> function
     | "module" IDENT "exports" ident_list "{" decl_list "}" -> module
     | "from" exp "import" ident_list ";"         -> import
 

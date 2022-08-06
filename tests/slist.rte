@@ -1,19 +1,24 @@
 fun listof(data) {
-  return new data, null;
+  return new ⟨data, null⟩;
 }
 
 fun push(data, !list) {
-  return new data, 1 of list;
+  return new ⟨data, 1 of list⟩;
 }
 
-let head = 0;
-let tail = 1;
+fun data(node) & {
+  return (*node)[0];
+}
+
+fun next(node) & {
+  return (*node)[1];
+}
 
 fun is_last(node) {
   if (is_null(node)) {
     return false;
   } else {
-    return is_null(node[tail]);
+    return is_null(next(node));
   }
 }
 
@@ -21,14 +26,14 @@ fun is_last(node) {
 // part just containing the last element.
 fun remove_last(!n) {
   if (is_null(n)) {
-    return 0;
+    return null;
   } else {
-    if (is_last(n[tail])) {
-      let !q = n[tail];
-      n[tail] = null;
+    if (is_last(next(n))) {
+      let !q = copy(next(1 of n)); // want all permissions to next(n)
+      next(1 of n) = null;
       return q;
     } else {
-      return remove_last(n[tail]);
+      return remove_last(next(1 of n));
     }
   }
 }
@@ -36,7 +41,7 @@ fun remove_last(!n) {
 fun main() {
   let !one_two = push(1, listof(2));
   let !two_null = remove_last(one_two);
-  let one = one_two[head];
-  let two = two_null[head];
+  let one = data(one_two);
+  let two = data(two_null);
   return one + one - two;
 }

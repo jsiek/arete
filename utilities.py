@@ -2,10 +2,56 @@ from dataclasses import dataclass
 from lark.tree import Meta
 import numbers
 from fractions import Fraction
-from typing import Any
+from typing import Any, Optional
 from ast_base import *
 
+trace = False
+
+def set_trace(b: bool):
+  global trace
+  trace = b
+
+def tracing_on():
+  return trace
+
+@dataclass
+class Context:
+    pass
+
+# Want the value of the expression (not its address).
+# If the value is a pointer, duplicate with the specified percentage
+# of its permission.
+# (rvalue)
+@dataclass
+class ValueCtx(Context):
+  percentage : Fraction
+
+# Want a copy of the address of the expression's result with
+# the specified percentage of its permission.
+# (lvalue)
+@dataclass
+class AddressCtx(Context):
+  percentage : Fraction
+
+# Want the address of the subexpression.
+# (lvalue)
+@dataclass
+class ObserveCtx(Context):
+  pass
+
+def priv_to_percent(priv):
+  if priv == 'write':
+    return Fraction(1,1)
+  elif priv == 'read':
+    return Fraction(1,2)
+  elif priv == 'none':
+    return Fraction(0,1)
+  else:
+    raise Exception('in priv_to_percent, unrecognized ' + priv)
+
 def error_header(location):
+  # seeing a strange error where some Meta objects don't have a line member.
+  if hasattr(location, 'line'):
     return '{file}:{line1}.{column1}-{line2}.{column2}: ' \
         .format(file=location.filename,
                 line1=location.line, column1=location.column,
@@ -21,20 +67,7 @@ def warning(location, msg):
                 line2=location.end_line, column2=location.end_column)
     print(header + 'warning: ' + msg)
 
-def env_init(env, var, val):
-    env[var] = [val]
-
-def env_get(env, var):
-    return env[var][0]
-
-def env_set(env, var, val):
-    env[var][0] = val
-
-def declare_locals(vars, env):
-    for var in vars:
-        env_init(env, var, None)
-
-def allocate_locals(var_priv_vals, env, location):
+def allocate_locals(var_priv_vals, env, mem, location):
     for var, priv, val in var_priv_vals:
         if priv == 'write' and isinstance(val, Pointer) \
            and val.permission != Fraction(1,1):
@@ -43,95 +76,91 @@ def allocate_locals(var_priv_vals, env, location):
                   and (not val.address is None) \
                   and val.permission == Fraction(0,1):
             error(location, 'need readable pointer, not ' + str(val))
-        env_set(env, var, val)
+        if not isinstance(val, Pointer):
+          error(location, 'for variable initialization, expected a pointer, not ' + str(val))
+        env[var] = val
 
 def deallocate_locals(vars, env, mem, location):
     for var in vars:
-        v = env_get(env, var)
-        if not v is None:
-            v.kill(mem, location)
+        if tracing_on():
+          print('deallocating local variable: ' + var)
+        ptr = env[var]
+        ptr.kill(mem, location)
 
-def kill_temp(val, mem, location):
-    if not (val is None):
-        if val.temporary:
-            val.kill(mem, location)
-        
 compare_ops = { 'less': lambda x, y: x < y,
                 'less_equal': lambda x, y: x <= y,
                 'greater': lambda x, y: x > y,
                 'greater_equal': lambda x, y: x >= y}
 
-def eval_prim(op, vals, mem, location):
+def eval_prim(op, vals, machine, location):
     match op:
+      case 'copy':
+        return vals[0].duplicate(1)
       case 'len':
         ptr = vals[0]
-        if not mem.valid_address(ptr.address):
+        if not isinstance(ptr, Pointer):
+          error(self.location, "in len, expected a pointer not " + str(ptr))
+        if not machine.memory.valid_address(ptr.address):
             error(location, "in len, bad address: " + str(ptr.address))
-        n = len(mem.get_block(ptr.address))
-        return Number(True, n)
+        n = len(machine.memory.get_block(ptr.address))
+        return Number(n)
       case 'equal':
         left, right = vals
-        retval = Boolean(True, left.equals(right))
-        kill_temp(left, mem, location)
-        kill_temp(right, mem, location)
-        return retval
+        return Boolean(left.equals(right))
       case 'not_equal':
         left, right = vals
-        retval = Boolean(True, not left.equals(right))
-        kill_temp(left, mem, location)
-        kill_temp(right, mem, location)
-        return retval
+        return Boolean(not left.equals(right))
       case 'add':
-        left = to_number(vals[0], location)
-        right = to_number(vals[1], location)
-        return Number(True, left + right)
+        left, right = vals
+        l = to_number(left, location)
+        r = to_number(right, location)
+        return Number(l + r)
       case 'sub':
         left = to_number(vals[0], location)
         right = to_number(vals[1], location)
-        return Number(True, left - right)
+        return Number(left - right)
       case 'mul':
         left = to_number(vals[0], location)
         right = to_number(vals[0], location)
-        return Number(True, left * right)
+        return Number(left * right)
       case 'div':
         left = to_number(vals[0], location)
         right = to_number(vals[1], location)
-        return Number(True, Fraction(left, right))
+        return Number(Fraction(left, right))
       case 'int_div':
         left = to_number(vals[0], location)
         right = to_number(vals[1], location)
-        return Number(True, left // right)
+        return Number(left // right)
       case 'neg':
         val = to_number(vals[0], location)
-        return Number(True, - val)
+        return Number(- val)
       case 'and':
         left = to_boolean(vals[0], location)
         right = to_boolean(vals[1], location)
-        return Boolean(True, left and right)
+        return Boolean(left and right)
       case 'or':
         left = to_boolean(vals[0], location)
         right = to_boolean(vals[1], location)
-        return Boolean(True, left or right)
+        return left or right
       case 'not':
         val = to_boolean(vals[0], location)
-        return Boolean(True, not val)
+        return Boolean(not val)
       case 'null':
-        # fraction is 1/1 because null has all of nothing! -Jeremy
-        return Pointer(True, None, Fraction(1,1), None)
+        return Pointer(None, [], Fraction(1,1), None)
       case 'is_null':
         ptr = vals[0]
         match ptr:
-          case Pointer(tmp, addr, priv):
-            retval = Boolean(True, addr is None)
+          case Pointer(addr, path, priv):
+            return Boolean(addr is None)
           case _:
-            retval = Boolean(True, False)
-        kill_temp(ptr, mem, location)
-        return retval
+            return Boolean(False)
       case 'split':
         ptr = vals[0]
         ptr1 = ptr.duplicate(Fraction(1, 2))
         ptr2 = ptr.duplicate(Fraction(1, 1))
-        return mem.allocate([ptr1, ptr2])
+        # is this allocation necessary?
+        #return machine.memory.allocate(TupleValue([ptr1, ptr2]))
+        return TupleValue([ptr1, ptr2])
       case 'join':
         ptr1, ptr2 = vals
         ptr = ptr1.duplicate(1)
@@ -142,22 +171,19 @@ def eval_prim(op, vals, mem, location):
         if not isinstance(ptr, Pointer):
           error(location, "permission operation requires pointer, not "
                 + str(ptr))
-        return Number(True, ptr.permission)
+        return Number(ptr.permission)
       case 'upgrade':
         ptr = vals[0]
-        retval = ptr.upgrade(location)
-        return Boolean(True, retval)
+        b = ptr.upgrade(location)
+        return Boolean(b)
       case cmp if cmp in compare_ops.keys():
         left, right = vals
         l = to_number(left, location)
         r = to_number(right, location)
-        retval = Boolean(True, compare_ops[cmp](l, r))
-        kill_temp(left, mem, location)
-        kill_temp(right, mem, location)
-        return retval
+        return Boolean(compare_ops[cmp](l, r))
       case _:
-        error(location, 'unknown primitive operator ' + op)
-    
+        error(location, 'unknown primitive operator ' + op)    
+        
 def writable(frac):
     return frac == Fraction(1, 1)
 
@@ -170,7 +196,6 @@ def none(frac):
 
 @dataclass
 class Value:
-    temporary: bool
     def node_name(self):
         return str(self)
     def node_label(self):
@@ -178,7 +203,10 @@ class Value:
 
 @dataclass
 class Void(Value):
-    pass
+    def kill(self, mem, loc, progress=set()):
+      pass
+    def clear(self, mem, loc, progress=set()):
+      pass
 
 @dataclass(eq=False)
 class Module(Value):
@@ -191,36 +219,33 @@ class Module(Value):
       return self.name + '{' + ','.join([x + '=' + str(v) for x,v in self.members.items()]) + '}'
     def __repr__(self):
         return str(self)
-    def kill(self, mem, location):
+    def kill(self, mem, location, progress=set()):
         for member in members.values:
-            member.kill(mem, location)
+            member.kill(mem, location, progress)
+    def clear(self, mem, location, progress=set()):
+        raise Exception('unimplemented')
 
 @dataclass
 class Number(Value):
-    value: numbers.Number
-    def equals(self, other):
-        return self.value == other.value
-    def initialize(self, kind, location, ret=False):
-      if self.temporary:
-          self.temporary = False
-          return self
-      else:
-          return Number(False, self.value)
-    def init(self, percent, location):
-        return self.initialize('read', location, False)
-    def duplicate(self, percentage):
-        return Number(True, self.value)
-    def return_copy(self):
-      if self.temporary:
-          return self
-      else:
-          return Number(True, self.value)
-    def kill(self, mem, location):
-        pass
-    def __str__(self):
-        return str(self.value)
-    def __repr__(self):
-        return str(self)
+  value: numbers.Number
+  def equals(self, other):
+    return self.value == other.value
+  def initialize(self, kind, location, ret=False):
+    return Number(self.value)
+  def init(self, percent, location):
+    return self.initialize('read', location, False)
+  def duplicate(self, percentage):
+    return Number(self.value)
+  def return_copy(self):
+    return Number(self.value)
+  def kill(self, mem, location, progress=set()):
+    pass
+  def clear(self, mem, location, progress=set()):
+    pass
+  def __str__(self):
+    return str(self.value)
+  def __repr__(self):
+    return str(self)
 
 @dataclass
 class Boolean(Value):
@@ -228,27 +253,55 @@ class Boolean(Value):
     def equals(self, other):
         return self.value == other.value
     def initialize(self, kind, location, ret=False):
-      if self.temporary:
-          self.temporary = False
-          return self
-      else:
-          return Boolean(False, self.value)
+        return Boolean(False, self.value)
     def init(self, percent, location):
         return self.initialize('read', location, False)
     def duplicate(self, percentage):
-        return Boolean(True, self.value)
+        return Boolean(self.value)
     def return_copy(self):
-      if self.temporary:
-          return self
-      else:
-          return Boolean(True, self.value)
-    def kill(self, mem, location):
+        return Boolean(self.value)
+    def kill(self, mem, location, progress=set()):
+        pass
+    def clear(self, mem, location, progress=set()):
         pass
     def __str__(self):
         return repr(self.value)
     def __repr__(self):
         return str(self)
 
+@dataclass
+class TupleValue(Value):
+    elts: list[Value]
+    
+    def equals(self, other):
+      raise Exception('unimplemented')
+    
+    def initialize(self, kind, location, ret=False):
+      raise Exception('unimplemented')
+    
+    def init(self, percent, location):
+      raise Exception('unimplemented')
+    
+    def duplicate(self, percentage):
+      return TupleValue([elt.duplicate(percentage) for elt in self.elts])
+    
+    def return_copy(self):
+      raise Exception('unimplemented')
+    
+    def kill(self, mem, location, progress=set()):
+      for elt in self.elts:
+        elt.kill(mem, location, progress)
+
+    def clear(self, mem, location, progress=set()):
+      for elt in self.elts:
+        elt.clear(mem, location, progress)
+        
+    def __str__(self):
+        return '⟨' + ', '.join([str(elt) for elt in self.elts]) + '⟩'
+      
+    def __repr__(self):
+        return str(self)
+      
 # find the first ptr in the lender chain that is not yet killed,
 # i.e. that has a non-None address.
 def find_lender(ptr):
@@ -262,41 +315,44 @@ def find_lender(ptr):
        return ptr
    
 def priv_str(priv):
-  if priv == 'none':
-    return 'N'
-  elif priv == 'read':
-    return 'R'
-  elif priv == 'write':
-    return 'W'
-  elif priv == 'dead':
-    return 'D'
-  elif priv is None:
-    return 'None'
-  elif isinstance(priv, Fraction):
+  if isinstance(priv, Fraction):
     return str(priv.numerator) + '/' + str(priv.denominator)
+  elif isinstance(priv, str):
+    if priv == 'none':
+      return 'N'
+    elif priv == 'read':
+      return 'R'
+    elif priv == 'write':
+      return 'W'
+    elif priv == 'dead':
+      return 'D'
+    elif priv is None:
+      return 'None'
   else:
     return str(priv)
 
 @dataclass
 class Pointer(Value):
     address: int
-    permission: Fraction    # none is 0, read is 1/n, write is 1/1
+    path: list[int]      # the path through nested tuples
+    permission: Fraction   # none is 0, read is 1/n, write is 1/1
     lender: Value          # who this pointer borrowed from, if any
     
-    __match_args__ = ("temporary", "address", "permission")
+    __match_args__ = ("address", "path", "permission")
 
     def equals(self, other):
-        return self.address == other.address
+        return self.address == other.address and self.path == other.path
     
     def __str__(self):
-        # return "⦅ " + str(self.address) + " @" + priv_str(self.permission) \
-        #     + ", " + ("tmp" if self.temporary else "prm") \
-        #     + (" from: " +str(self.lender) if not self.lender is None else "") \
-        #     + "⦆" 
-        return "⦅ " + str(self.address) + " @" + priv_str(self.permission) \
-            + ", " + str(id(self)) \
-            + ", " + ("tmp" if self.temporary else "prm") \
-            + "⦆"
+        self.lender = find_lender(self.lender)
+        if self.address is None:
+          return 'null'
+        return "(*" + str(self.address) + str(self.path) \
+          + " @" + priv_str(self.permission) \
+          + ", " + str(id(self)) \
+          + ("->" + str(id(self.lender)) if not self.lender is None else "") \
+          + "*)"
+      
     def __repr__(self):
         return str(self)
 
@@ -304,7 +360,8 @@ class Pointer(Value):
         return str(self.address)
 
     def node_label(self):
-        return str(self.address) + ' @' + str(self.permission) + ' ' \
+        return str(self.address) + str(self.path) \
+          + ' @' + str(self.permission) + ' ' \
             + '(' + str(id(self)) + ')' 
 
     def transfer(self, percent, other, location):
@@ -329,112 +386,116 @@ class Pointer(Value):
         #     error(location, "failed to upgrade pointer " + str(self))
         
     def duplicate(self, percentage):
+        self.lender = find_lender(self.lender)
         if self.address is None:
-            ptr = Pointer(True, None, Fraction(1,1), self)
+            ptr = Pointer(None, [], Fraction(1,1), self)
         else:
             other_priv = self.permission * percentage
             self.permission -= other_priv
-            ptr = Pointer(True, self.address, other_priv, self)
+            ptr = Pointer(self.address, self.path, other_priv, self)
+        if tracing_on():
+          print('duplicated ' + str(self) + ' into ' + str(ptr))
         return ptr
     
+    def element_address(self, i, percentage):
+        other_priv = self.permission * percentage
+        self.permission -= other_priv
+        ptr = Pointer(self.address, self.path + [i], other_priv, self)
+        if tracing_on():
+          print('element address ' + str(self) + ' into ' + str(ptr))
+        return ptr
+        
     # self: the pointer being initialized from
     # kind: the permission of the pointer to return
     def initialize(self, kind, location, ret=False):
       if kind == 'write':
-          # if not writable(self.permission):
-          #     error(location, 'initializing writable pointer requires writable pointer, not ' + str(self))
-          if self.temporary:
-              self.temporary = False
-              return self
-          else:
-              ptr = self.duplicate(1)
-              ptr.temporary = False
-              return ptr
+          return self.duplicate(1)
       elif kind == 'read':
-          if self.temporary:
-              self.temporary = False
-              return self
-          elif ret == True:
-              ptr = self.duplicate(1)
-              ptr.temporary = False
-              return ptr
+          if ret == True:
+              return self.duplicate(1)
           else:
-              ptr = self.duplicate(Fraction(1,2))
-              #ptr = self.duplicate(Fraction(1,1))
-              ptr.temporary = False
-              return ptr
+              return self.duplicate(Fraction(1,2))
       else:
           raise Exception('initialize unexpected permission: ' + priv)
 
     # self: the pointer being initialized from
     # percent: the amount of permission to take from self
     def init(self, percent, location):
-      if self.temporary:
-        self.temporary = False
-        return self
-      else:
-        ptr = self.duplicate(percent)
-        ptr.temporary = False
-        return ptr
+        return self.duplicate(percent)
       
     # Copy the return value of a function.
     # Similar to initialize with respect to permissions, but
     # produces a temporary value.
     def return_copy(self):
-      if self.temporary:
-          return self
-      else:
-          return self.duplicate(1)
+      return self.duplicate(1)
           
-    def kill(self, mem, location):
+    def kill(self, mem, location, progress=set()):
+        if self.address is None:
+          return
+        if self.address in progress:
+          return
         self.lender = find_lender(self.lender)
-        if self.lender is None and (not self.address is None):
+        if tracing_on():
+          print('kill: ' + str(self) + ' ignoring ' + str(progress))
+        if self.lender is None:
             if self.permission == Fraction(1,1):
-                delete(self, mem, location)
-            elif self.permission != Fraction(0,1):
-                warning(location, 'memory leak, killing nonempty pointer'
-                        + ' without lender ' + str(self))
-        if (not self.lender is None) and (not self.address is None):
+              delete(self, mem, location, progress)
+            elif self.permission == Fraction(0,1):
+              pass # OK, someone else will delete
+            else:
+              warning(location, 'memory leak, killing pointer'
+                    + ' without lender ' + str(self))
+        else:
             self.lender.permission += self.permission
+            if tracing_on():
+              print('returned ' + str(self.permission)
+                    + ' to ' + str(self.lender))
         self.address = None
         self.permission = Fraction(0,1)
-    
-@dataclass
-class Offset(Value):
-    ptr: Pointer
-    offset: int
-    def __str__(self):
-        return str(self.ptr) + "[" + str(self.offset) + "]"
-    def __repr__(self):
-        return str(self)
-    def equals(self, other):
-        return self.ptr == other.ptr and self.offset == other.offset
-    def duplicate(self, percentage):
-        return Offset(True, self.ptr.duplicate(percentage), self.offset)
-    def return_copy(self):
-      if self.temporary:
-          return self
-      else:
-          return Offset(True, self.ptr.duplicate(percentage), self.offset)
-    def kill(self, mem, location):
-        self.ptr.kill(mem, location)
 
+    def clear(self, mem, location, progress=set()):
+        if self.address is None:
+          return
+        if self.address in progress:
+          return
+        val = mem.memory[self.address]
+        val.clear(mem, location)
+      
 @dataclass
 class Closure(Value):
+    name: str
     params: list[Any]
+    return_mode: str    # 'value' or 'address'
     body: Stmt
     env: Any # needs work
-    __match_args__ = ("temporary", "params", "body", "env")
+    __match_args__ = ("name", "params", "return_mode", "body", "env")
+    
     def duplicate(self, percentage):
-        return self
+      if tracing_on():
+        print('duplicating closure ' + str(self))
+      env_copy = {x: v.duplicate(Fraction(1,2)) for x,v in self.env.items()}
+      return Closure(self.name, self.params, self.return_mode, self.body,
+                       env_copy)
+    
     def initialize(self, kind, location, ret=False):
         return self # ???
+      
     def init(self, percent, location):
         return self.initialize('read', location, False)
-    def kill(self, mem, location):
-        pass # ???
+      
+    def kill(self, mem, location, progress=set()):
+      if tracing_on():
+        print('kill closure ' + str(self))
+      for x, ptr in self.env.items():
+        ptr.kill(mem, location, progress)
+        
+    def clear(self, mem, location, progress=set()):
+      for x, ptr in self.env.items():
+        ptr.kill(mem, location, progress)
+      
     def __str__(self):
-        return "closure"
+        return self.name + '{' + ', '.join([str(ptr) for x, ptr in self.env.items()]) + '}'
+      
     def __repr__(self):
         return str(self)
 
@@ -448,7 +509,9 @@ class Future(Value):
         return self # ???
     def init(self, percent, location):
         return self.initialize('read', location, False)
-    def kill(self, mem, location):
+    def kill(self, mem, location, progress=set()):
+        pass # ???
+    def clear(self, mem, location, progress=set()):
         pass # ???
     def __str__(self):
         return "future"
@@ -457,31 +520,31 @@ class Future(Value):
 
 def to_number(val, location):
     match val:
-      case Number(tmp, value):
+      case Number(value):
         return value
       case _:
         error(location, 'expected an number, not ' + str(val))
 
 def to_integer(val, location):
     match val:
-      case Number(tmp, value):
+      case Number(value):
         return int(value)
       case _:
         error(location, 'expected an integer, not ' + str(val))
         
 def to_boolean(val, location):
     match val:
-      case Boolean(tmp, value):
+      case Boolean(value):
         return value
       case _:
         error(location, 'expected a boolean, not ' + str(val))
 
-def delete(ptr, mem, location):
+def delete(ptr, mem, location, progress=set()):
     match ptr:
-      case Pointer(tmp, addr, priv):
+      case Pointer(addr, path, priv):
         if not writable(priv):
             error(location, 'delete needs writable pointer, not ' + str(ptr))
-        mem.deallocate(addr, location)
+        mem.deallocate(addr, location, progress)
     
 @dataclass
 class Memory:
@@ -508,51 +571,127 @@ class Memory:
     addr = self.next_address
     self.next_address += 1
     self.memory[addr] = vals
-    return Pointer(True, addr, Fraction(1,1), None)
+    return Pointer(addr, [], Fraction(1,1), None)
 
-  def deallocate(self, addr, location):
+  def deallocate(self, addr, location, progress):
     if not self.valid_address(addr):
         error(location, 'already deleted address ' + str(addr))
-    for val in self.memory[addr]:
-        val.kill(self, location)
+    if tracing_on():
+      print('deallocating ' + str(addr))
+    self.memory[addr].kill(self, location, progress | set([addr]))
     del self.memory[addr]
-  
-  def read(self, ptr, index, location, dup):
+
+  def get_tuple_element(self, tup, path):
+    if len(path) == 0:
+      return tup
+    else:
+      if not isinstance(tup, TupleValue):
+        raise Exception('expected tuple in get_tuple_element, not ' + repr(tup))
+      return self.get_tuple_element(tup.elts[path[0]], path[1:])
+
+  def set_tuple_element(self, old, path, val):
+      if len(path) == 0:
+        return val
+      else:
+        if not isinstance(old, TupleValue):
+          raise Exception('expected tuple in set_tuple_element')
+        tup = old
+        i = path[0]
+        front = tup.elts[:i]
+        back = tup.elts[i+1:]
+        ith = self.set_tuple_element(tup.elts[i], path[1:], val)
+        if tracing_on():
+          print('new middle: ' + str(ith))
+        return TupleValue(front + [ith] + back)
+
+  def raw_read(self, address, path):
+    if tracing_on():
+      print('raw_read(' + str(address) + ', ' + str(path) + ')')
+    return self.get_tuple_element(self.memory[address], path)
+      
+  def read(self, ptr, location, context=ValueCtx(Fraction(1,1))):
       if not isinstance(ptr, Pointer):
           error(location, 'in read expected a pointer, not ' + str(ptr))
       if none(ptr.permission):
           error(location, 'pointer does not have read permission: ' + str(ptr))
       if not self.valid_address(ptr.address):
           error(location, 'in read, bad address: ' + str(ptr.address))
-      if not (index < len(self.memory[ptr.address])):
-          error(location, 'in read, index too big: ' + str(index)
-                + ' for address ' + str(ptr.address))
-      # whether to copy here or not?
-      # see tests/fail_indirect_write
-      if dup:
-          retval = self.memory[ptr.address][index].duplicate(ptr.permission)
+
+      val = self.raw_read(ptr.address, ptr.path)
+      if isinstance(context, ObserveCtx):
+          retval = val
       else:
-          retval = self.memory[ptr.address][index]
-      if False:
-          print('read from ' + str(ptr) + '[' + str(index) + ']')
-          print('    value: ' + str(self.memory[ptr.address][index]))
+          retval = val.duplicate(ptr.permission * context.percentage)
+      if tracing_on():
+          print('read from ' + str(ptr))
+          print('    value: ' + str(self.memory[ptr.address]))
           print('    producing: ' + str(retval))
       return retval
 
-  def write(self, ptr, index, val, location):
+  def unchecked_write(self, ptr, val, location):
+      old_val = self.get_tuple_element(self.memory[ptr.address], ptr.path)
+      val_copy = val.duplicate(1)
+      self.memory[ptr.address] = \
+          self.set_tuple_element(self.memory[ptr.address],
+                                 ptr.path, val_copy)
+      if tracing_on():
+        print('wrote ' + str(val_copy) + ' into ' + str(ptr))
+      old_val.kill(self, location)
+    
+  def write(self, ptr, val, location):
       if not isinstance(ptr, Pointer):
           error(location, 'in write expected a pointer, not ' + str(ptr))
       if not writable(ptr.permission):
           error(location, 'pointer does not have write permission: ' + str(ptr))
       if not self.valid_address(ptr.address):
           error(location, 'in write, bad address: ' + str(ptr.address))
-      if not (index < len(self.memory[ptr.address])):
-          error(location, 'in write, index too big: ' + str(index)
-                + ' for address ' + str(ptr.address))
-      self.memory[ptr.address][index].kill(self.memory, location)
-      if val.temporary:
-          self.memory[ptr.address][index] = val
-      else:
-          self.memory[ptr.address][index] = val.duplicate(1)
-      self.memory[ptr.address][index].temporary = False
+      self.unchecked_write(ptr, val, location)
 
+  def compute_fractions(self):
+    fraction_dict = {}
+    for addr in self.memory.keys():
+      fraction_dict[addr] = Fraction(0,1)
+    for addr in self.memory.keys():
+      for v in self.memory[addr]:
+        if isinstance(v, Pointer):
+          fraction_dict[v.address] += v.permission
+    # for addr in self.memory.keys():
+    #   if (fraction[addr] != Fraction(0,1)) \
+    #      and (fraction[addr] != Fraction(1,1)):
+    #     print('**warning fraction[' + str(addr) + '] == ' + str(fraction[addr]))
+    return fraction_dict
+
+def generate_graphviz(env, mem):
+    result = 'digraph {\n'
+    # nodes
+    for var, val in env.items():
+        if isinstance(val, Pointer):
+            result += val.node_name() + '[label="' \
+                + var + ':' + val.node_label() + '"];\n'
+    for addr, vals in mem.items():
+        result += 'struct' + str(addr) + ' [shape=record,label="' \
+            + str(addr) + ':|' \
+            + '|'.join(['<' + val.node_name() + '>' + val.node_label() for val in vals]) \
+            + '"];\n'
+    # edges
+    for var, val in env.items():
+        if isinstance(val, Pointer):
+            if not (val.address is None):
+                result += val.node_name() + ' -> ' \
+                    + 'struct' + str(val.address) + ';\n'
+    for addr, vals in mem.items():
+        for val in vals:
+            if isinstance(val, Pointer) and not (val.address is None):
+                result += 'struct' + str(addr) + ':' + val.node_name() \
+                    + ' -> ' + 'struct' + str(val.address) + ';\n'
+    result += '}\n'
+    return result
+
+def log_graphviz(env, mem):
+    global graph_number
+    filename = "env_mem_" + str(graph_number) + ".dot"
+    graph_number += 1
+    file = open(filename, 'w')
+    file.write(generate_graphviz(env, mem))
+    file.close()
+    print('log graphviz: ' + filename)

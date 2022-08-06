@@ -1,8 +1,8 @@
 fun main() {
-  let !q = new 1;
+  let q = 1;
   { let !p = q;
-    *p = *p + 1; }
-  *q = *q + 1;
-  let a = *q;
+    p = p + 1; }
+  q = q + 1;
+  let a = q;
   return a - 3;
 }

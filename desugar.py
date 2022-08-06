@@ -35,19 +35,22 @@ def desugar_exp(e, env):
       case Member(arg, field):
         new_arg = desugar_exp(arg, env)
         return Member(e.location, new_arg, field)
-      case New(inits):
-        new_inits = [desugar_init(init, env) for init in inits]
-        return New(e.location, new_inits)
+      case New(init):
+        new_init = desugar_init(init, env)
+        return New(e.location, new_init)
       case Array(size, arg):
         new_size = desugar_exp(size, env)
         new_arg = desugar_exp(arg, env)
         return Array(e.location, new_size, new_arg)
-      case Lambda(params, body):
+      case TupleExp(inits):
+        new_inits = [desugar_init(init, env) for init in inits]
+        return TupleExp(e.location, new_inits)
+      case Lambda(params, ret_mode, body, name):
         body_env = env.copy()
         for p in params:
             body_env[p.ident] = False
         new_body = desugar_stmt(body, body_env)
-        return Lambda(e.location, params, new_body)
+        return Lambda(e.location, params, ret_mode, new_body, name)
       case Call(fun, inits):
         new_fun = desugar_exp(fun, env)
         new_inits = [desugar_init(init, env) for init in inits]
@@ -56,6 +59,12 @@ def desugar_exp(e, env):
         new_arg = desugar_exp(arg, env)
         new_index = desugar_exp(index, env)
         return Index(e.location, new_arg, new_index)
+      case Deref(arg):
+        new_arg = desugar_exp(arg, env)
+        return Deref(e.location, new_arg)
+      case AddressOf(arg):
+        new_arg = desugar_exp(arg, env)
+        return AddressOf(e.location, new_arg)
       case IfExp(cond, thn, els):
         new_cond = desugar_exp(cond, env)
         new_thn = desugar_exp(thn, env)
@@ -85,20 +94,34 @@ def desugar_stmt(s, env):
         new_body = desugar_stmt(body, body_env)
         return LetInit(s.location, var, new_init, new_body)
       case VarInit(var, rhs, body):
-        #  var x = e in b[x]
-        #  =>
-        #  let !x = new e in b[*x]
+        loc = s.location
         new_rhs = desugar_exp(rhs, env)
         body_env = env.copy()
-        body_env[var] = True
-        new_body = desugar_stmt(body, body_env)
-        loc = s.location
-        new_exp = New(loc, [Initializer(loc, Frac(loc, Fraction(1,1)),new_rhs)])
-        return LetInit(loc, Param(loc, 'write', var, AnyType(loc)),
-                       Initializer(loc,
-                                   Frac(loc, Fraction(1,1)),
-                                   new_exp),
-                       new_body)
+        if False:
+          #  var x = e in b[[x]]
+          #  =>
+          #  let !x = new e in b[[*x]]
+          body_env[var] = True
+          new_body = desugar_stmt(body, body_env)
+          new_exp = New(loc, [Initializer(loc, Frac(loc, Fraction(1,1)),
+                                          new_rhs)])
+          return LetInit(loc, Param(loc, 'write', var, AnyType(loc)),
+                         Initializer(loc,
+                                     Frac(loc, Fraction(1,1)),
+                                     new_exp),
+                         new_body)
+        else:
+          #  var x = e in b[[x]]
+          #  =>
+          #  let !x = 1 of e in b[[x]]
+          body_env[var] = False
+          new_body = desugar_stmt(body, body_env)
+          return LetInit(loc, Param(loc, 'write', var, AnyType(loc)),
+                         Initializer(loc,
+                                     Frac(loc, Fraction(1,1)),
+                                     new_rhs),
+                         new_body)
+    
       case Seq(first, rest):
         new_first = desugar_stmt(first, env)
         new_rest = desugar_stmt(rest, env)
@@ -156,12 +179,12 @@ def desugar_decl(decl, env):
       case Global(name, ty, rhs):
         new_rhs = desugar_exp(rhs, env)
         return Global(decl.location, name, ty, new_rhs)
-      case Function(name, params, ret_ty, body):
+      case Function(name, params, ret_ty, ret_mode, body):
         body_env = env.copy()
         for p in params:
             body_env[p.ident] = False
         new_body = desugar_stmt(body, body_env)
-        return Function(decl.location, name, params, ret_ty, new_body)
+        return Function(decl.location, name, params, ret_ty, ret_mode, new_body)
       case ModuleDecl(name, exports, body):
         new_body = desugar_decls(body, env)
         return ModuleDecl(decl.location, name, exports, new_body)

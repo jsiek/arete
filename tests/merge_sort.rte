@@ -63,7 +63,7 @@ fun is_sorted(array) {
 }
 
 fun main() {
-  let !a = new [21] 0;
+  let !a = new [11] 0;
   var i = 0;
   while (i < len(a)) {
     a[i] = len(a) - i;

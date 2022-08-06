@@ -70,6 +70,7 @@ def parse_tree_to_param(e):
 
 primitive_ops = {'add', 'sub', 'mul', 'div', 'int_div', 'neg',
                  'and', 'or', 'not',
+                 'copy',
                  'null', 'is_null', 'len', 'split', 'join',
                  'equal', 'not_equal',
                  'less', 'greater', 'less_equal', 'greater_equal',
@@ -90,6 +91,8 @@ def parse_tree_to_ast(e):
         return Prim(e.meta, e.data, [parse_tree_to_ast(c) for c in e.children])
     elif e.data == 'new':
         return New(e.meta, parse_tree_to_ast(e.children[0]))
+    elif e.data == 'tuple':
+        return TupleExp(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'array':
         return Array(e.meta,
                      parse_tree_to_ast(e.children[0]),
@@ -97,7 +100,9 @@ def parse_tree_to_ast(e):
     elif e.data == 'lambda':
         return Lambda(e.meta,
                       parse_tree_to_param(e.children[0]),
-                      parse_tree_to_ast(e.children[1]))
+                      str(e.children[1].data),
+                      parse_tree_to_ast(e.children[2]),
+                      'lambda')
     elif e.data == 'call':
         e1, e2 = e.children
         return Call(e.meta, parse_tree_to_ast(e1), parse_tree_to_ast(e2))
@@ -105,7 +110,9 @@ def parse_tree_to_ast(e):
         e1, e2 = e.children
         return Index(e.meta, parse_tree_to_ast(e1), parse_tree_to_ast(e2))
     elif e.data == 'deref':
-        return Index(e.meta, parse_tree_to_ast(e.children[0]), Int(e.meta, 0))
+        return Deref(e.meta, parse_tree_to_ast(e.children[0]))
+    elif e.data == 'addrof':
+        return AddressOf(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'paren':
         return parse_tree_to_ast(e.children[0])
     elif e.data == 'member':
@@ -201,7 +208,8 @@ def parse_tree_to_ast(e):
                         str(e.children[0].value),
                         parse_tree_to_param(e.children[1]),
                         parse_tree_to_type_annot(e.children[2]),
-                        parse_tree_to_ast(e.children[3]))
+                        str(e.children[3].data),
+                        parse_tree_to_ast(e.children[4]))
     elif e.data == 'module':
         return ModuleDecl(e.meta,
                           str(e.children[0].value),

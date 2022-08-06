@@ -4,7 +4,7 @@ from lark.tree import Meta
 from fractions import Fraction
 from utilities import *
 
-verbose = True
+verbose = False
 
 # Parameters
 
@@ -39,71 +39,110 @@ class Initializer:
   def step(self, action, machine):
     if action.state == 0:
       if self.percentage == 'default':
-        if action.privilege == 'read':
-          self.percentage = Frac(self.location, Fraction(1,2))
-        elif action.privilege == 'write':
-          self.percentage = Frac(self.location, Fraction(1,1))
-        elif action.privilege == 'none':
-          self.percentage = Frac(self.location, Fraction(0,1))
+        if isinstance(action.context, AddressCtx):
+            self.percentage = Frac(self.location, action.context.percentage)
         else:
-          error(self.location, "unexpected privilege " + action.privilege)
+            self.percentage = Frac(self.location, Fraction(1,2))
       machine.schedule(self.percentage, action.env)
     elif action.state == 1:
-      machine.schedule(self.arg, action.env)
+      percent = action.results[0]
+      amount = to_number(percent, self.location)
+      if isinstance(action.context, AddressCtx):
+          ctx = AddressCtx(amount)
+      elif isinstance(action.context, ValueCtx):
+          ctx = ValueCtx(amount)
+      machine.schedule(self.arg, action.env, ctx)
     else:
-      percent, val = action.results
-      num = to_number(percent, self.location)
-      machine.finish_expression(val.init(num, self.location))
+      val = action.results[1]
+      val_copy = val.duplicate(1)
+      machine.finish_expression(val_copy, self.location)
       
 # Expressions
+
+# Dimitri:
+# lvalue for let, inout, and set parameters, rvalue for sink parameters.
 
 @dataclass
 class Call(Exp):
   fun: Exp
   args: List[Initializer]
+  
   __match_args__ = ("fun", "args")
+  
   def __str__(self):
       return str(self.fun) \
           + "(" + ", ".join([str(arg) for arg in self.args]) + ")"
+  
   def __repr__(self):
       return str(self)
+  
   def free_vars(self):
       return self.fun.free_vars() \
           | set().union(*[arg.free_vars() for arg in self.args])
+  
+  def set_closure(self, action, machine):
+      if action.clos is None:
+        action.clos = action.results[0]
+        if not isinstance(action.clos, Closure):
+          error(self.location, 'expected function in call, not '
+                + str(action.clos))
+          
   def step(self, action, machine):
     if action.state == 0:
-      # evaluate subexpressions
+      # evaluate the operator subexpression
       machine.schedule(self.fun, action.env)
+      action.clos = None
     elif action.state <= len(self.args):
-      clos = action.results[0]
-      if not isinstance(clos, Closure):
-        error(location, 'expected function in call, not ' + str(clos))
-      init_act = machine.schedule(self.args[action.state - 1], action.env)
-      init_act.privilege = clos.params[action.state - 1].kind
+      self.set_closure(action, machine)
+      # evaluate the operand subexpressions
+      percent = priv_to_percent(action.clos.params[action.state - 1].kind)
+      machine.schedule(self.args[action.state - 1], action.env,
+                       AddressCtx(percent))
     elif action.state == len(self.args) + 1:
+      self.set_closure(action, machine)
       # call the function
-      match action.results[0]:
-        case Closure(tmp, params, body, clos_env):
+      match action.clos:
+        case Closure(name, params, ret_mode, body, clos_env):
           action.params = params
           action.body_env = clos_env.copy()
+          # In the following, duplicate the val? -Jeremy
           var_priv_vals = [(p.ident, p.kind, val) \
-                           for p,val in zip(params, action.results[1:])]
-          declare_locals([p.ident for p in params], action.body_env)
-          allocate_locals(var_priv_vals, action.body_env, self.location)
+                           for p, val in zip(params, action.results[1:])]
+          allocate_locals(var_priv_vals, action.body_env, machine.memory,
+                          self.location)
           machine.push_frame()
-          machine.schedule(body, action.body_env)
+          machine.schedule(body, action.body_env, return_mode=ret_mode)
         case _:
-          error(location, 'expected function in call, not '
-                + str(self.fun_action.result))
+          error(self.location, 'expected function in call, not '
+                + str(action.clos))
     else:
       # return from the function
       deallocate_locals([p.ident for p in action.params], action.body_env,
                         machine.memory, self.location)
-      for val in action.results:
-          kill_temp(val, machine.memory, self.location)
       if action.return_value is None:
-        action.return_value = Void(True)
-      machine.finish_expression(action.return_value)
+        action.return_value = Void()
+      if isinstance(action.context, ValueCtx):
+        if action.clos.return_mode == 'value':
+          retval = action.return_value
+        elif action.clos.return_mode == 'address':
+          retval = machine.memory.read(action.return_value, self.location,
+                                       AddressCtx(Fraction(1,1)))
+          action.return_value.kill(machine.memory, self.location)
+        else:
+          raise Exception('unrecognized return_mode: '
+                          + action.clos.return_mode)
+      elif isinstance(action.context, AddressCtx):
+        if action.clos.return_mode == 'value':
+          retval = machine.memory.allocate(action.return_value)
+        elif action.clos.return_mode == 'address':
+          retval = action.return_value # duplicate?
+        else:
+          raise Exception('unrecognized return_mode: '
+                          + action.clos.return_mode)
+      elif isinstance(action.context, ObserveCtx):
+        error(self.location, 'function call not allowed in this context')
+        
+      machine.finish_expression(retval, self.location)
 
 @dataclass
 class Prim(Exp):
@@ -119,13 +158,19 @@ class Prim(Exp):
         return set().union(*[arg.free_vars() for arg in self.args])
     def step(self, action, machine):
       if action.state < len(self.args):
-        machine.schedule(self.args[action.state], action.env,
-                         dup=(False if self.op == 'permission' 
-                              or self.op == 'upgrade' else True))
+        context = (ObserveCtx() if self.op \
+                                   in set(['permission','upgrade',
+                                           'split','join']) \
+                   else ValueCtx(Fraction(1,2)))
+        machine.schedule(self.args[action.state], action.env, context)
       else:
-        retval = eval_prim(self.op, action.results, machine.memory,
+        retval = eval_prim(self.op, action.results, machine,
                            self.location)
-        machine.finish_expression(retval)
+        if isinstance(action.context, AddressCtx):
+          # join produces an address, no need to allocate
+          if self.op != 'join':
+            retval = machine.memory.allocate(retval)
+        machine.finish_expression(retval, self.location)
             
 @dataclass
 class Member(Exp):
@@ -146,28 +191,33 @@ class Member(Exp):
         if not isinstance(mod, Module):
           error(e.location, "expected a module, not " + str(val))
         if self.field in mod.members.keys():
-          machine.finish_expression(mod.members[self.field])
+          machine.finish_expression(mod.members[self.field], self.location)
         else:
           error(self.location, 'no member ' + self.field
                 + ' in module ' + mod.name)
         
 @dataclass
 class New(Exp):
-    inits: List[Initializer]
-    __match_args__ = ("inits",)
+    init: Initializer
+    __match_args__ = ("init",)
     def __str__(self):
-        return "new " + ", ".join([str(e) for e in self.inits])
+        return 'new ' + str(self.init)
     def __repr__(self):
         return str(self)
     def free_vars(self):
-        return set().union(*[init.free_vars() for init in self.inits])
+        return self.init.free_vars()
     def step(self, action, machine):
-      if action.state < len(self.inits):
-        init_act = machine.schedule(self.inits[action.state], action.env)
-        init_act.privilege = 'read'
+      if action.state == 0:
+        machine.schedule(self.init, action.env, ValueCtx(Fraction(1,1)))
       else:
-        ptr = machine.memory.allocate(action.results)
-        machine.finish_expression(ptr)
+        ptr = machine.memory.allocate(action.results[0].duplicate(1))
+        if isinstance(action.context, ValueCtx):
+            result = ptr
+        elif isinstance(action.context, AddressCtx):
+            result = machine.memory.allocate(ptr)
+        elif isinstance(action.context, ObserveCtx):
+            error(self.location, 'new not allowed in this context')
+        machine.finish_expression(result, self.location)
 
 @dataclass
 class Array(Exp):
@@ -191,8 +241,37 @@ class Array(Exp):
         vals = [val.duplicate(Fraction(1,2)) for i in range(0,size-1)]
         vals.append(val)
         ptr = machine.memory.allocate(vals)
-        machine.finish_expression(ptr)
-      
+        if isinstance(action.context, ValueCtx):
+            result = ptr
+        elif isinstance(action.context, AddressCtx):
+            result = machine.memory.allocate(ptr)
+        elif isinstance(action.context, ObserveCtx):
+            error(self.location, 'new[] not allowed in this context')
+        machine.finish_expression(result, self.location)
+
+@dataclass
+class TupleExp(Exp):
+    inits: List[Initializer]
+    __match_args__ = ("inits",)
+    def __str__(self):
+        return '(new ' + ', '.join([str(e) for e in self.inits]) + ')'
+    def __repr__(self):
+        return str(self)
+    def free_vars(self):
+        return set().union(*[init.free_vars() for init in self.inits])
+    def step(self, action, machine):
+      if action.state < len(self.inits):
+        machine.schedule(self.inits[action.state], action.env)
+      else:
+        tup = TupleValue([val.duplicate(1) for val in action.results])
+        if isinstance(action.context, ValueCtx):
+          result = tup
+        elif isinstance(action.context, AddressCtx):
+          result = machine.memory.allocate(tup)
+        else:
+          error(self.location, 'tuple not allowed in this context')
+        machine.finish_expression(result, self.location)
+        
 @dataclass
 class Var(Exp):
     ident: str
@@ -206,7 +285,16 @@ class Var(Exp):
     def step(self, action, machine):
         if self.ident not in action.env:
             error(self.location, 'use of undefined variable ' + self.ident)
-        machine.finish_expression(env_get(action.env, self.ident))
+        ptr = action.env[self.ident]
+        if isinstance(action.context, ValueCtx):
+          result = machine.memory.read(ptr, self.location, action.context)
+        elif isinstance(action.context, ObserveCtx):
+          result = ptr
+        elif isinstance(action.context, AddressCtx):
+          result = ptr.duplicate(action.context.percentage)
+        else:
+          raise Exception('in Var.step, bad context ' + repr(action.context))
+        machine.finish_expression(result, self.location)
 
 @dataclass
 class Int(Exp):
@@ -219,7 +307,14 @@ class Int(Exp):
     def free_vars(self):
         return set()
     def step(self, action, machine):
-        machine.finish_expression(Number(True, self.value))
+        val = Number(self.value)
+        if isinstance(action.context, ValueCtx):
+            result = val
+        elif isinstance(action.context, AddressCtx):
+            result = machine.memory.allocate(val)
+        elif isinstance(action.context, ObserveCtx):
+          error(self.location, 'integer not allowed in this context')
+        machine.finish_expression(result, self.location)
 
 @dataclass
 class Frac(Exp):
@@ -232,7 +327,14 @@ class Frac(Exp):
     def free_vars(self):
         return set()
     def step(self, action,  machine):
-        machine.finish_expression(Number(True, self.value))
+        val = Number(self.value)
+        if isinstance(action.context, ValueCtx):
+            result = val
+        elif isinstance(action.context, AddressCtx):
+            result = machine.memory.allocate(val)
+        elif isinstance(action.context, ObserveCtx):
+          error(self.location, 'fraction not allowed in this context')
+        machine.finish_expression(result, self.location)
     
 @dataclass
 class Bool(Exp):
@@ -245,7 +347,14 @@ class Bool(Exp):
     def free_vars(self):
         return set()
     def step(self, action, machine):
-        machine.finish_expression(Boolean(True, self.value))
+        val = Boolean(self.value)
+        if isinstance(action.context, ValueCtx):
+            result = val
+        elif isinstance(action.context, AddressCtx):
+            result = machine.memory.allocate(val)
+        elif isinstance(action.context, ObserveCtx):
+          error(self.location, 'Boolean not allowed in this context')
+        machine.finish_expression(result, self.location)
     
 @dataclass
 class Index(Exp):
@@ -260,26 +369,96 @@ class Index(Exp):
         return self.arg.free_vars() | self.index.free_vars()
     def step(self, action, machine):
       if action.state == 0:
-        machine.schedule(self.arg, action.env)
+        machine.schedule(self.arg, action.env, action.context)
       elif action.state == 1:
         machine.schedule(self.index, action.env)
       else:
-        ptr, ind = action.results
+        ind = action.results[1]
         i = to_integer(ind, self.location)
-        if action.lhs:
-            retval = Offset(ptr.temporary, ptr, int(i))
+        if isinstance(action.context, ValueCtx):
+          if tracing_on():
+              print('in Index.step, ValueCtx')
+          tup = action.results[0]
+          if not isinstance(tup, TupleValue):
+            error(self.location, 'expected a tuple, not ' + str(tup))
+          retval = tup.elts[int(i)].duplicate(1)
+        elif isinstance(action.context, AddressCtx):
+          if tracing_on():
+              print('in Index.step, AddressCtx')
+          ptr = action.results[0]
+          retval = ptr.element_address(int(i), action.context.percentage)
+        elif isinstance(action.context, ObserveCtx):
+          if tracing_on():
+              print('in Index.step, ObserveCtx')
+          ptr = action.results[0]
+          if not isinstance(ptr, Pointer):
+            error(self.location, 'tuple access expected a pointer, not ' + str(ptr))
+          retval = machine.memory.raw_read(ptr.address, ptr.path + [int(i)])
         else:
-            retval = machine.memory.read(ptr, i, self.location, action.dup)
-            kill_temp(ptr, machine.memory, self.location)
-            kill_temp(ind, machine.memory, self.location)
-        machine.finish_expression(retval)
+          error(self.location, 'unrecognized context ' + repr(action.context))
+        
+        machine.finish_expression(retval, self.location)
 
+@dataclass
+class Deref(Exp):
+    arg: Exp
+    __match_args__ = ("arg",)
+    def __str__(self):
+        return '*' + str(self.arg)
+    def __repr__(self):
+        return str(self)
+    def free_vars(self):
+        return self.arg.free_vars()
+    def step(self, action, machine):
+      if action.state == 0:
+        machine.schedule(self.arg, action.env, action.context)
+      else:
+        # slist.rte, trouble with (*n)[1] in an address context
+        if False and isinstance(action.context, AddressCtx):
+          if tracing_on():
+              print('in Deref.step, AddressCtx')
+          retval = action.results[0].duplicate(1)
+        elif True or isinstance(action.context, ValueCtx):
+          if tracing_on():
+              print('in Deref.step, ValueCtx')
+          ptr = action.results[0]
+          if not isinstance(ptr, Pointer):
+            error(self.location, 'deref expected a pointer, not ' + str(ptr))
+          retval = machine.memory.read(ptr, self.location, action.context)
+        else:
+          error(self.location, 'deref not allowed in this context')
+        
+        machine.finish_expression(retval, self.location)
+        
+
+@dataclass
+class AddressOf(Exp):
+    arg: Exp
+    __match_args__ = ("arg",)
+    def __str__(self):
+        return '&' + str(self.arg)
+    def __repr__(self):
+        return str(self)
+    def free_vars(self):
+        return self.arg.free_vars()
+    def step(self, action, machine):
+      if action.state == 0:
+        machine.schedule(self.arg, action.env, AddressCtx(Fraction(1,1)))
+      else:
+        if isinstance(action.context, ValueCtx):
+          ptr = action.results[0]
+          retval = ptr.duplicate(action.context.percentage)
+        else:
+          error(self.location, '& (address of) not allowed in this context')
+        machine.finish_expression(retval, self.location)
         
 @dataclass
 class Lambda(Exp):
     params: List[Param]
+    return_mode: str    # 'value' or 'address'
     body: Stmt
-    __match_args__ = ("params", "body")
+    name: str = "lambda"
+    __match_args__ = ("params", "return_mode", "body", "name")
     def __str__(self):
         return "function " \
             + "(" + ", ".join([str(p) for p in self.params]) + ")" \
@@ -294,13 +473,21 @@ class Lambda(Exp):
         for x in free:
             if not x in action.env.keys():
               error(self.location, 'in closure, undefined variable ' + x)
-            v = env_get(action.env, x)
-            if not (v is None):
-                env_init(clos_env, x, v.duplicate(Fraction(1,2)))
-            else:
-                clos_env[x] = action.env[x]
-        clos = Closure(True, self.params, self.body, clos_env)
-        machine.finish_expression(clos)
+            v = action.env[x]
+            clos_env[x] = v.duplicate(Fraction(1,2))            
+            # if not (v is None):
+            #     clos_env[x] = v.duplicate(Fraction(1,2))
+            # else:
+            #     clos_env[x] = action.env[x]
+        clos = Closure(self.name, self.params, self.return_mode, self.body,
+                       clos_env)
+        if isinstance(action.context, ValueCtx):
+            result = clos
+        elif isinstance(action.context, AddressCtx):
+            result = machine.memory.allocate(clos)
+        else:
+            error(self.location, 'function not allowed in this context')
+        machine.finish_expression(result, self.location)
     
 @dataclass
 class IfExp(Exp):
@@ -320,12 +507,14 @@ class IfExp(Exp):
       if action.state == 0:
         machine.schedule(self.cond, action.env)
       elif action.state == 1:
-        if to_boolean(action.results[0], self.location):
-          machine.schedule(self.thn, action.env)
+        cond = action.results[0]
+        if to_boolean(cond, self.location):
+          machine.schedule(self.thn, action.env, action.context)
         else:
-          machine.schedule(self.els, action.env)
+          machine.schedule(self.els, action.env, action.context)
       elif action.state == 2:
-        machine.finish_expression(action.results[1])
+        retval = action.results[1].duplicate(1)
+        machine.finish_expression(retval, self.location)
     
 @dataclass
 class Let(Exp):
@@ -343,19 +532,20 @@ class Let(Exp):
             (self.body.free_vars() - set([self.var.ident]))
     def step(self, action, machine):
       if action.state == 0:
-        init_act = machine.schedule(self.init, action.env)
-        init_act.privilege = self.var.kind
+        context = AddressCtx(priv_to_percent(self.var.kind))
+        machine.schedule(self.init, action.env, context)
       elif action.state == 1:
         val = action.results[0]
         action.body_env = action.env.copy()
-        declare_locals([self.var.ident], action.body_env)
         var_priv_vals = [(self.var.ident, self.var.kind, val)]
-        allocate_locals(var_priv_vals, action.body_env, self.location)
+        allocate_locals(var_priv_vals, action.body_env, machine.memory,
+                        self.location)
         machine.schedule(self.body, action.body_env)
       else:
         deallocate_locals([self.var.ident], action.body_env, machine.memory,
                           self.location)
-        machine.finish_expression(action.results[1])
+        result = action.results[1].duplicate(1)
+        machine.finish_expression(result, self.location)
 
 @dataclass
 class FutureExp(Exp):
@@ -369,8 +559,14 @@ class FutureExp(Exp):
     return self.arg.free_vars()
   def step(self, action, machine):
     thread = machine.spawn(self.arg, action.env)
-    retval = Future(True, thread)
-    machine.finish_expression(retval)
+    if isinstance(action.context, ValueCtx):
+      retval = Future(thread)
+    elif isinstance(action.context, AddressCtx):
+      future = Future(thread)
+      retval = machine.memory.allocate(future)
+    else:
+        error(self.location, 'future not allowed in this context')
+    machine.finish_expression(retval, self.location)
 
 @dataclass
 class Await(Exp):
@@ -384,12 +580,12 @@ class Await(Exp):
     return self.arg.free_vars()
   def step(self, action, machine):
     if action.state == 0:
-      machine.schedule(self.arg, action.env)
+      machine.schedule(self.arg, action.env, action.context)
     else:
       future = action.results[0]
       if not future.thread.result is None \
          and future.thread.num_children == 0:
-        machine.finish_expression(future.thread.result)
+        machine.finish_expression(future.thread.result, self.location)
   
     
 # Statements
@@ -403,7 +599,7 @@ class Seq(Stmt):
     if verbose:
       return str(self.first) + "\n" + str(self.rest)
     else:
-      return str(self.first) + "..."
+      return "..."
   def __repr__(self):
     return str(self)
   def free_vars(self):
@@ -412,9 +608,9 @@ class Seq(Stmt):
     if action.state == 0:
       machine.schedule(self.first, action.env)
     elif not action.return_value is None:
-      machine.finish_statement()
+      machine.finish_statement(self.location)
     else:
-      machine.finish_statement()
+      machine.finish_statement(self.location)
       machine.schedule(self.rest, action.env)
     
 @dataclass
@@ -436,19 +632,19 @@ class LetInit(Exp):
             | (self.body.free_vars() - set([self.var.ident]))
     def step(self, action, machine):
       if action.state == 0:
-        init_act = machine.schedule(self.init, action.env)
-        init_act.privilege = self.var.kind
+        context = AddressCtx(priv_to_percent(self.var.kind))
+        machine.schedule(self.init, action.env, context)
       elif action.state == 1:
         val = action.results[0]
         action.body_env = action.env.copy()
-        declare_locals([self.var.ident], action.body_env)
         var_priv_vals = [(self.var.ident, self.var.kind, val)]
-        allocate_locals(var_priv_vals, action.body_env, self.init.location)
+        allocate_locals(var_priv_vals, action.body_env, machine.memory,
+                        self.init.location)
         machine.schedule(self.body, action.body_env)
       else:
         deallocate_locals([self.var.ident], action.body_env,
                           machine.memory, self.location)
-        machine.finish_statement()
+        machine.finish_statement(self.location)
 
 @dataclass
 class VarInit(Exp):
@@ -467,7 +663,10 @@ class VarInit(Exp):
     def free_vars(self):
         return self.rhs.free_vars() \
             | (self.body.free_vars() - set([self.var]))
-      
+
+# Dimitri:
+# return values are always evaluated for their rvalue
+
 @dataclass
 class Return(Stmt):
     arg: Exp
@@ -480,10 +679,14 @@ class Return(Stmt):
         return self.arg.free_vars()
     def step(self, action, machine):
       if action.state == 0:
-        machine.schedule(self.arg, action.env)
+        if action.return_mode == 'value':
+          context = ValueCtx(Fraction(1,1))
+        elif action.return_mode == 'address':
+          context = AddressCtx(Fraction(1,1))
+        machine.schedule(self.arg, action.env, context)
       else:
-        action.return_value = action.results[0].return_copy()
-        machine.finish_statement()
+        action.return_value = action.results[0].duplicate(1)
+        machine.finish_statement(self.location)
     
 @dataclass
 class Write(Stmt):
@@ -497,21 +700,15 @@ class Write(Stmt):
     def free_vars(self):
         return self.lhs.free_vars() | self.rhs.free_vars()
     def step(self, action, machine):
+      # TODO: switch the ordering back to lhs then rhs?
       if action.state == 0:
-        machine.schedule(self.lhs, action.env, lhs=True)
+        machine.schedule(self.rhs, action.env)
       elif action.state == 1:
-        init_act = machine.schedule(self.rhs, action.env)
-        init_act.privilege = 'read'
+        machine.schedule(self.lhs, action.env, AddressCtx(Fraction(1,1)))
       else:
-        offset, val = action.results
-        if not isinstance(offset, Offset):
-            error(self.location,
-                  "expected pointer offset on left-hand side of " 
-                  + "assignment, not " + str(offset))
-        machine.memory.write(offset.ptr, offset.offset, val, self.location)
-        kill_temp(offset, machine.memory, self.location)
-        kill_temp(val, machine.memory, self.location)
-        machine.finish_statement()
+        val_ptr, ptr = action.results
+        machine.memory.write(ptr, val_ptr, self.location)
+        machine.finish_statement(self.location)
 
 @dataclass
 class Transfer(Stmt):
@@ -520,7 +717,7 @@ class Transfer(Stmt):
     rhs: Exp
     __match_args__ = ("lhs", "percent", "rhs")
     def __str__(self):
-        return str(self.lhs) + " <= " + str(self.percent) + " of " \
+        return str(self.lhs) + " <- " + str(self.percent) + " of " \
             + str(self.rhs) + ";"
     def __repr__(self):
         return str(self)
@@ -529,16 +726,16 @@ class Transfer(Stmt):
             | self.rhs.free_vars()
     def step(self, action, machine):
       if action.state == 0:
-        machine.schedule(self.lhs, action.env, dup=False)
+        machine.schedule(self.lhs, action.env, ObserveCtx())
       elif action.state == 1:
         machine.schedule(self.percent, action.env)
       elif action.state == 2:
-        machine.schedule(self.rhs, action.env, dup=False)
+        machine.schedule(self.rhs, action.env, ObserveCtx())
       else:
         dest_ptr, amount, src_ptr = action.results
         percent = to_number(amount, self.location)
         dest_ptr.transfer(percent, src_ptr, self.location)
-        machine.finish_statement()
+        machine.finish_statement(self.location)
     
 @dataclass
 class Delete(Stmt):
@@ -552,13 +749,15 @@ class Delete(Stmt):
         return self.arg.free_vars()
     def step(self, action, machine):
       if action.state == 0:
-        machine.schedule(self.arg, action.env)
+        machine.schedule(self.arg, action.env, ValueCtx(Fraction(1,1)))
       else:
         ptr = action.results[0]
+        if not isinstance(ptr, Pointer):
+          error(self.location, 'in delete, expected a pointer, not ' + str(ptr))
         delete(ptr, machine.memory, self.location)
         ptr.address = None
         ptr.permission = Fraction(0,1)
-        machine.finish_statement()
+        machine.finish_statement(self.location)
     
 @dataclass
 class Expr(Stmt):
@@ -574,7 +773,7 @@ class Expr(Stmt):
       if action.state == 0:
         machine.schedule(self.exp, action.env)
       else:
-        machine.finish_statement()
+        machine.finish_statement(self.location)
 
 @dataclass
 class Assert(Stmt):
@@ -592,8 +791,8 @@ class Assert(Stmt):
       else:
         val = to_boolean(action.results[0], self.location)
         if not val:
-          error(e.location, "assertion failed: " + str(e))
-        machine.finish_statement()
+          error(self.location, "assertion failed: " + str(self.exp))
+        machine.finish_statement(self.location)
 
 @dataclass
 class IfStmt(Stmt):
@@ -621,7 +820,7 @@ class IfStmt(Stmt):
         else:
           machine.schedule(self.els, action.env)
       else:
-        machine.finish_statement()
+        machine.finish_statement(self.location)
 
 @dataclass
 class While(Stmt):
@@ -638,14 +837,13 @@ class While(Stmt):
       if action.state == 0:
         machine.schedule(self.cond, action.env)
       elif action.state == 1:
-        c = to_boolean(action.results[0], self.cond.location)
-        if c:
+        if to_boolean(action.results[0], self.cond.location):
           machine.schedule(self, action.env)
           machine.schedule(self.body, action.env)
         else:
-          machine.finish_statement()
+          machine.finish_statement(self.location)
       else:
-        machine.finish_statement()
+        machine.finish_statement(self.location)
     
 @dataclass
 class Pass(Stmt):
@@ -656,7 +854,7 @@ class Pass(Stmt):
     def free_vars(self):
         return set()
     def step(self, action, machine):
-      machine.finish_statement()
+      machine.finish_statement(self.location)
 
 @dataclass
 class Block(Stmt):
@@ -672,7 +870,7 @@ class Block(Stmt):
       if action.state == 0:
         machine.schedule(self.body, action.env)
       else:
-        machine.finish_statement()
+        machine.finish_statement(self.location)
     
 # Declarations
     
@@ -695,8 +893,9 @@ class Global(Exp):
     if action.state == 0:
       machine.schedule(self.rhs, action.env)
     else:
-      env_set(action.env, self.name, action.results[0])
-      machine.finish_declaration()
+      machine.memory.write(action.env[self.name], action.results[0],
+                           self.location)
+      machine.finish_declaration(self.location)
 
 @dataclass
 class ConstantDecl(Exp):
@@ -713,14 +912,15 @@ class ConstantDecl(Exp):
     return init.free_vars()
   def local_vars(self):
     return set([var.ident])
-      
+
 @dataclass
 class Function(Decl):
     name: str
     params: List[Param]
     return_type: Type
+    return_mode: str    # 'value' or 'address'
     body: Exp
-    __match_args__ = ("name", "params", "return_type", "body")
+    __match_args__ = ("name", "params", "return_type", "return_mode", "body")
     def __str__(self):
         return "function " + self.name \
             + "(" + ", ".join([str(p) for p in self.params]) + ")" \
@@ -731,20 +931,14 @@ class Function(Decl):
         return body.free_vars() - set([p.ident for p in self.params])
     def step(self, action, machine):
       if action.state == 0:
-        lam = Lambda(self.location, self.params, self.body)
-        machine.schedule(lam, action.env)
+        lam = Lambda(self.location, self.params, self.return_mode, self.body,
+                     self.name)
+        machine.schedule(lam, action.env, ValueCtx(Fraction(1,1)))
       else:
-        env_set(action.env, self.name, action.results[0])
-        machine.finish_declaration()
-      
-def declare_decl(decl, env, mem):
-    match decl:
-      case Import(module, imports):
-        for x in imports:
-            env_init(env, x, None)
-      case _:
-        env_init(env, decl.name, None)
-        
+        machine.memory.unchecked_write(action.env[self.name], action.results[0],
+                                       self.location)
+        machine.finish_declaration(self.location)
+
 @dataclass
 class ModuleDecl(Decl):
   name: str
@@ -769,9 +963,9 @@ class ModuleDecl(Decl):
         if not ex in action.body_env:
           error(self.location, 'export ' + ex + ' not defined in module')
       mod = Module(False, self.name,
-                   {ex: env_get(action.body_env, ex) for ex in self.exports})
-      env_set(action.env, self.name, mod)
-      machine.finish_declaration()
+                   {ex: action.body_env[ex] for ex in self.exports})
+      machine.memory.write(action.env[self.name], mod, self.location)
+      machine.finish_declaration(self.location)
 
 @dataclass
 class Import(Decl):
@@ -790,11 +984,20 @@ class Import(Decl):
       mod = action.results[0]
       for x in self.imports:
         if x in mod.members.keys():
-          env_set(action.env, x, mod.members[x]) # duplicate?
+          action.env[x] = mod.members[x] # duplicate?
         else:
           error(self.location, 'module does not export ' + x)
-      machine.finish_declaration()
+      machine.finish_declaration(self.location)
       
+# TODO: instead do allocation and then fill in the result -Jeremy
+def declare_decl(decl, env, mem):
+    match decl:
+      case Import(module, imports):
+        for x in imports:
+            env[x] = mem.allocate(Void())
+      case _:
+        env[decl.name] = mem.allocate(Void())
+        
 # Types
 
 @dataclass(eq=True)
@@ -847,6 +1050,15 @@ class ArrayType(Type):
   __match_args__ = ("element_type",)
   def __str__(self):
     return '[' + str(self.element_type) + ']'
+  def __repr__(self):
+    return str(self)
+  
+@dataclass(eq=True)
+class TupleType(Type):
+  member_types: list[Type]  
+  __match_args__ = ("member_types",)
+  def __str__(self):
+    return '⟨' + ', '.join([str(t) for t in self.member_types]) + '⟩'
   def __repr__(self):
     return str(self)
   
