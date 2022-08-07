@@ -247,10 +247,12 @@ if __name__ == "__main__":
       print('**** after const_eval ****')
       print(decls)
       print()
-    type_check_decls(decls, {})
-      
-    machine = Machine(Memory(), [], None, None, None)
     try:
+      type_check_decls(decls, {})
+      if tracing_on():
+        print('**** finished type checking ****')
+
+      machine = Machine(Memory(), [], None, None, None)
       retval = machine.run(decls)
       if expect_fail:
           print("expected failure, but didn't, returned " + str(retval))

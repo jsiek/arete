@@ -44,16 +44,36 @@ def parse_tree_to_type_annot(e):
         return parse_tree_to_type_annot(e.children[0])
     elif e.data == 'int_type':
         return IntType(e.meta)
+    elif e.data == 'rational_type':
+        return RationalType(e.meta)
     elif e.data == 'bool_type':
         return BoolType(e.meta)
     elif e.data == 'array_type':
         return ArrayType(e.meta, parse_tree_to_type_annot(e.children[0]))
     elif e.data == 'ptr_type':
         return PointerType(e.meta,
-                           [parse_tree_to_type_annot(elt_ty) \
-                            for elt_ty in e.children])
+                           parse_tree_to_type_annot(e.children[0]))
+    elif e.data == 'tuple_type':
+        return TupleType(e.meta,
+                         parse_tree_to_type_list(e.children[0]))
+    elif e.data == 'recursive_type':
+        return RecursiveType(e.meta,
+                             str(e.children[0].value),
+                             parse_tree_to_type_annot(e.children[1]))
+    elif e.data == 'type_var':
+        return TypeVar(e.meta, str(e.children[0].value))
     else:
         raise Exception('unrecognized type annotation ' + repr(e))
+    
+def parse_tree_to_type_list(e):
+    e.meta.filename = filename
+    if e.data == 'single':
+        return (parse_tree_to_type_annot(e.children[0]),)
+    elif e.data == 'push':
+        return (parse_tree_to_type_annot(e.children[0]),) \
+            + parse_tree_to_type_list(e.children[1])
+    else:
+        raise Exception('unrecognized as a type list ' + repr(e))
     
 def parse_tree_to_param(e):
     e.meta.filename = filename
@@ -203,6 +223,10 @@ def parse_tree_to_ast(e):
                             str(e.children[0].value),
                             parse_tree_to_type_annot(e.children[1]),
                             parse_tree_to_ast(e.children[2]))
+    elif e.data == 'type_decl':
+        return TypeDecl(e.meta,
+                        str(e.children[0].value),
+                        parse_tree_to_type_annot(e.children[1]))
     elif e.data == 'function':
         return Function(e.meta,
                         str(e.children[0].value),

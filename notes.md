@@ -1,6 +1,7 @@
 # TODO list
 
-[ ] type checker for types (int, bool, pointers, arrays, recursive types)
+[ ] type checker for types
+    (int, bool, pointers, arrays, recursive types)
 [ ] exceptions?
 [ ] thread cancellation
 [ ] lambda capture writable pointer

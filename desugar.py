@@ -176,6 +176,8 @@ def desugar_decl(decl, env):
       case ConstantDecl(name, type_annot, rhs):
         new_rhs = desugar_exp(rhs, env)
         return ConstantDecl(decl.location, name, type_annot, new_rhs)
+      case TypeDecl(name, type):
+        return TypeDecl(decl.location, name, type)
       case Global(name, ty, rhs):
         new_rhs = desugar_exp(rhs, env)
         return Global(decl.location, name, ty, new_rhs)

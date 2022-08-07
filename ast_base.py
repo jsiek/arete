@@ -17,6 +17,6 @@ class Stmt(AST):
 class Decl(AST):
     pass
 
-@dataclass
-class Type(AST):
-    pass
+@dataclass(frozen=True)
+class Type:
+    location: Meta

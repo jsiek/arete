@@ -1,0 +1,49 @@
+type list_t = rec X in ⟨int, X⟩*;
+
+fun listof(data: int) -> list_t {
+  return new ⟨data, null⟩;
+}
+
+fun push(data: int, !lst: list_t) -> list_t {
+  return new ⟨data, 1 of lst⟩;
+}
+
+fun data(node: list_t) -> int & {
+  return (*node)[0];
+}
+
+fun next(node: list_t) -> list_t & {
+  return (*node)[1];
+}
+
+fun is_last(node: list_t) -> bool {
+  if (is_null(node)) {
+    return false;
+  } else {
+    return is_null(next(node));
+  }
+}
+
+// Split the list into two parts, with the second
+// part just containing the last element.
+fun remove_last(!n : list_t) -> list_t {
+  if (is_null(n)) {
+    return null;
+  } else {
+    if (is_last(next(n))) {
+      let !q = copy(next(1 of n)); // want all permissions to next(n)
+      next(1 of n) = null;
+      return q;
+    } else {
+      return remove_last(next(1 of n));
+    }
+  }
+}
+
+fun main() {
+  let !one_two : list_t = push(1, listof(2));
+  let !two_null : list_t = remove_last(one_two);
+  let one : int = data(one_two);
+  let two : int = data(two_null);
+  return one + one - two;
+}

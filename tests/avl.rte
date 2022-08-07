@@ -1,7 +1,7 @@
 // AVL Tree (UNDER CONSTRUCTION)
-// tree layout: [root]
+// tree layout: pointer to root
 let root = 0;
-// node layout: [data, left, right, parent, height]
+// node layout: pointer to ⟨data, left, right, parent, height⟩
 let data = 0;
 let left = 1;
 let right = 2;
@@ -64,18 +64,18 @@ fun set_right(!node, !new_right) {
 }
 
 fun insert(key, !tree) {
-  if (is_null(tree[root])) {
-    tree[root] = new key, null, null, null, 0;
+  if (is_null(*tree)) {
+    *tree = new ⟨key, null, null, null, 0⟩;
   } else {
-    let node = all of find(key, all of tree[root], null);
+    let node = all of find(key, all of *tree, null);
     if (key < node[data]) {
-      let !new_node = new key, null, null, null, 0;
+      let !new_node = new ⟨key, null, null, null, 0⟩;
       ! gather_permission(all of node);
       ! set_left(node, new_node);
       ! scatter_permission(all of node);
     }
     if (node[data] < key) {
-      let !new_node = new key, null, null, null, 0;
+      let !new_node = new ⟨key, null, null, null, 0⟩;
       ! gather_permission(all of node);
       ! set_right(node, new_node);
       ! scatter_permission(all of node);
@@ -93,7 +93,7 @@ fun delete_node(node) {
 }
 
 fun delete_tree(!tree) {
-  ! delete_node(all of tree[root]);
+  ! delete_node(all of *tree);
 }
 
 fun main() {
@@ -101,7 +101,7 @@ fun main() {
   ! insert(5, tree);
   ! insert(10, tree);
   ! insert(1, tree);
-  let ten = (let t = find(10, tree[root])
+  let ten = (let t = find(10, *tree)
              in t[data]);
   ! delete_tree(tree);
   return ten - 10;

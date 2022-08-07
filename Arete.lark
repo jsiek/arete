@@ -9,11 +9,15 @@ LINECOMMENT: "//" /[^\n]*/ NEWLINE
 COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 
 ?type: "int"                                     -> int_type
+    | "rational"                                 -> rational_type
     | "bool"                                     -> bool_type
     | "?"                                        -> any_type
     | "[" type "]"                               -> array_type
-    | "{" type_list "}"                          -> ptr_type
+    | type "*"                                   -> ptr_type
+    | "⟨" type_list "⟩"                          -> tuple_type
     | "(" type_list ")" "->" type                -> function_type
+    | "rec" IDENT "in" type                      -> recursive_type
+    | IDENT                                      -> type_var
     
 ?type_list: type                                 -> single
     | type "," type_list                         -> push
@@ -131,6 +135,7 @@ param: IDENT type_annot                          -> read
     | "fun" IDENT "(" param_list ")" ret_type ret_mode block -> function
     | "module" IDENT "exports" ident_list "{" decl_list "}" -> module
     | "from" exp "import" ident_list ";"         -> import
+    | "type" IDENT "=" type ";"                  -> type_decl
 
 ?decl_list:                                      -> empty
     | decl decl_list                             -> push

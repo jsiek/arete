@@ -16,7 +16,7 @@ class Param:
     type_annot: Type
     __match_args__ = ("kind", "ident")
     def __str__(self):
-        return self.kind + " " + self.ident
+        return self.kind + ' ' + self.ident + ': ' + str(self.type_annot)
     def __repr__(self):
         return str(self)
 
@@ -914,6 +914,19 @@ class ConstantDecl(Exp):
     return set([var.ident])
 
 @dataclass
+class TypeDecl(Exp):
+  name: str
+  type: Type
+  __match_args__ = ("name", "type")
+  def __str__(self):
+    return "type " + str(self.name) + " = " + str(self.type) + ";"
+  def __repr__(self):
+    return str(self)
+  def step(self, action, machine):
+    machine.finish_declaration(self.location)
+
+  
+@dataclass
 class Function(Decl):
     name: str
     params: List[Param]
@@ -924,6 +937,7 @@ class Function(Decl):
     def __str__(self):
         return "function " + self.name \
             + "(" + ", ".join([str(p) for p in self.params]) + ")" \
+            + " -> " + str(self.return_type) \
             + " " + str(self.body)
     def __repr__(self):
         return str(self)
@@ -1000,71 +1014,81 @@ def declare_decl(decl, env, mem):
         
 # Types
 
-@dataclass(eq=True)
+@dataclass(eq=True, frozen=True)
 class AnyType(Type):
   def __str__(self):
     return '?'
   def __repr__(self):
     return str(self)
 
-@dataclass(eq=True)
+@dataclass(eq=True, frozen=True)
 class IntType(Type):
   def __str__(self):
     return 'int'
   def __repr__(self):
     return str(self)
 
-@dataclass(eq=True)
+@dataclass(eq=True, frozen=True)
 class RationalType(Type):
   def __str__(self):
     return 'rational'
   def __repr__(self):
     return str(self)
 
-@dataclass(eq=True)
+@dataclass(eq=True, frozen=True)
 class BoolType(Type):
   def __str__(self):
     return 'bool'
   def __repr__(self):
     return str(self)
 
-@dataclass(eq=True)
+@dataclass(eq=True, frozen=True)
 class VoidType(Type):
   def __str__(self):
     return 'void'
   def __repr__(self):
     return str(self)
 
-@dataclass(eq=True)
+@dataclass(eq=True, frozen=True)
 class PointerType(Type):
-  member_types: list[Type]  
-  __match_args__ = ("member_types",)
+  type: Type
+  __match_args__ = ("type",)
   def __str__(self):
-    return '{' + ', '.join([str(t) for t in self.member_types]) + '}'
+    return str(self.type) + '*'
   def __repr__(self):
     return str(self)
 
-@dataclass(eq=True)
+@dataclass(eq=True, frozen=True)
+class RecursiveType(Type):
+  name: str
+  type: Type
+  __match_args__ = ("name", "type",)
+  def __str__(self):
+    return '(rec ' + self.name + ' in ' + str(self.type) + ')'
+  def __repr__(self):
+    return str(self)
+  
+@dataclass(eq=True, frozen=True)
 class ArrayType(Type):
   element_type: Type
   __match_args__ = ("element_type",)
   def __str__(self):
-    return '[' + str(self.element_type) + ']'
+    return 'array[' + str(self.element_type) + ']'
   def __repr__(self):
     return str(self)
   
-@dataclass(eq=True)
+@dataclass(eq=True, frozen=True)
 class TupleType(Type):
-  member_types: list[Type]  
+  member_types: tuple[Type]  
   __match_args__ = ("member_types",)
   def __str__(self):
     return '⟨' + ', '.join([str(t) for t in self.member_types]) + '⟩'
   def __repr__(self):
     return str(self)
   
-@dataclass(eq=True)
+@dataclass(eq=True, frozen=True)
 class FunctionType(Type):
-  param_types: list[Type]
+  param_types: tuple[Type]
   return_type: Type
   __match_args__ = ("param_types", "return_type")
   def __str__(self):
@@ -1073,7 +1097,7 @@ class FunctionType(Type):
   def __repr__(self):
     return str(self)
     
-@dataclass(eq=True)
+@dataclass(eq=True, frozen=True)
 class ModuleType(Type):
   member_types: dict[str, Type]
   __match_args__ = ("member_types",)
@@ -1083,7 +1107,7 @@ class ModuleType(Type):
   def __repr__(self):
     return str(self)
 
-@dataclass(eq=True)
+@dataclass(eq=True, frozen=True)
 class FutureType(Type):
   result_type: Type
   __match_args__ = ("reult_type",)
@@ -1091,3 +1115,13 @@ class FutureType(Type):
     return '^' + str(self.result_type)
   def __repr__(self):
     return str(self)
+
+@dataclass(eq=True, frozen=True)
+class TypeVar(Type):
+    ident: str
+    __match_args__ = ("ident",)
+    def __str__(self):
+        return self.ident
+    def __repr__(self):
+        return str(self)
+  
