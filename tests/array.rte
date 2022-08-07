@@ -1,6 +1,6 @@
 fun main() {
   let n = 10;
-  let !a = new [n] 0;
+  let !a = [n of 0];
   var i = 0;
   while (i < len(a)) {
     a[i] = i;

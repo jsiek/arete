@@ -97,12 +97,10 @@ def eval_prim(op, vals, machine, location):
       case 'copy':
         return vals[0].duplicate(1)
       case 'len':
-        ptr = vals[0]
-        if not isinstance(ptr, Pointer):
-          error(self.location, "in len, expected a pointer not " + str(ptr))
-        if not machine.memory.valid_address(ptr.address):
-            error(location, "in len, bad address: " + str(ptr.address))
-        n = len(machine.memory.get_block(ptr.address))
+        tup = vals[0]
+        if not isinstance(tup, TupleValue):
+          error(location, "in len, expected a tuple or array not " + str(tup))
+        n = len(tup.elts)
         return Number(n)
       case 'equal':
         left, right = vals

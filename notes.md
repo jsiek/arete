@@ -1,6 +1,5 @@
 # TODO list
 
-[ ] remove temporaries, always allocate and return pointers a la Val
 [ ] type checker for types (int, bool, pointers, arrays, recursive types)
 [ ] exceptions?
 [ ] thread cancellation
@@ -13,6 +12,7 @@
 [ ] compile to LLVM?
 
 
+[X] remove machinery for temporaries, allocate and return pointers a la Val
 [X] constant declaration: const front = 0;
 [X] remove uses of interp in machine
 [X] primitive `len` operator for arrays (and pointers)

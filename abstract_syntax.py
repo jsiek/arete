@@ -240,13 +240,13 @@ class Array(Exp):
         size = to_integer(sz, self.location)
         vals = [val.duplicate(Fraction(1,2)) for i in range(0,size-1)]
         vals.append(val)
-        ptr = machine.memory.allocate(vals)
+        array = TupleValue(vals)
         if isinstance(action.context, ValueCtx):
-            result = ptr
+            result = array
         elif isinstance(action.context, AddressCtx):
-            result = machine.memory.allocate(ptr)
+            result = machine.memory.allocate(array)
         elif isinstance(action.context, ObserveCtx):
-            error(self.location, 'new[] not allowed in this context')
+            error(self.location, 'arrays not allowed in this context')
         machine.finish_expression(result, self.location)
 
 @dataclass

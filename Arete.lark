@@ -68,7 +68,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "(" exp ")"                                -> paren
     | "fun" "(" param_list ")" ret_mode block    -> lambda
     | "new" init                                 -> new
-    | "new" "[" exp "]" exp                      -> array
+    | "[" exp "of" exp "]"                       -> array
     | "⟨" init_list "⟩"                          -> tuple
     | exp_hi "(" init_list ")"                   -> call
     | "true"                                     -> true
