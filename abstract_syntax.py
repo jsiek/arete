@@ -45,7 +45,7 @@ class Initializer:
             self.percentage = Frac(self.location, Fraction(1,2))
       machine.schedule(self.percentage, action.env)
     elif action.state == 1:
-      percent = action.results[0]
+      percent = action.results[0][0]
       amount = to_number(percent, self.location)
       if isinstance(action.context, AddressCtx):
           ctx = AddressCtx(amount)
@@ -53,7 +53,7 @@ class Initializer:
           ctx = ValueCtx(amount)
       machine.schedule(self.arg, action.env, ctx)
     else:
-      val = action.results[1]
+      val = action.results[1][0]
       val_copy = val.duplicate(1)
       machine.finish_expression(val_copy, self.location)
       
@@ -82,7 +82,7 @@ class Call(Exp):
   
   def set_closure(self, action, machine):
       if action.clos is None:
-        action.clos = action.results[0]
+        action.clos = action.results[0][0]
         if not isinstance(action.clos, Closure):
           error(self.location, 'expected function in call, not '
                 + str(action.clos))
@@ -106,7 +106,7 @@ class Call(Exp):
           action.params = params
           action.body_env = clos_env.copy()
           # In the following, duplicate the val? -Jeremy
-          var_priv_vals = [(p.ident, p.kind, val) \
+          var_priv_vals = [(p.ident, p.kind, val[0]) \
                            for p, val in zip(params, action.results[1:])]
           allocate_locals(var_priv_vals, action.body_env, machine.memory,
                           self.location)
@@ -164,7 +164,9 @@ class Prim(Exp):
                    else ValueCtx(Fraction(1,2)))
         machine.schedule(self.args[action.state], action.env, context)
       else:
-        retval = eval_prim(self.op, action.results, machine,
+        retval = eval_prim(self.op,
+                           [val for val, ctx in action.results],
+                           machine,
                            self.location)
         if isinstance(action.context, AddressCtx):
           # join produces an address, no need to allocate
@@ -187,7 +189,7 @@ class Member(Exp):
       if action.state == 0:
         machine.schedule(self.arg, action.env)
       else:
-        mod = action.results[0]
+        mod = action.results[0][0]
         if not isinstance(mod, Module):
           error(e.location, "expected a module, not " + str(val))
         if self.field in mod.members.keys():
@@ -210,7 +212,7 @@ class New(Exp):
       if action.state == 0:
         machine.schedule(self.init, action.env, ValueCtx(Fraction(1,1)))
       else:
-        ptr = machine.memory.allocate(action.results[0].duplicate(1))
+        ptr = machine.memory.allocate(action.results[0][0].duplicate(1))
         if isinstance(action.context, ValueCtx):
             result = ptr
         elif isinstance(action.context, AddressCtx):
@@ -236,7 +238,8 @@ class Array(Exp):
       elif action.state == 1:
         machine.schedule(self.arg, action.env)
       else:
-        sz, val = action.results
+        sz = action.results[0][0]
+        val = action.results[1][0]
         size = to_integer(sz, self.location)
         vals = [val.duplicate(Fraction(1,2)) for i in range(0,size-1)]
         vals.append(val)
@@ -263,7 +266,7 @@ class TupleExp(Exp):
       if action.state < len(self.inits):
         machine.schedule(self.inits[action.state], action.env)
       else:
-        tup = TupleValue([val.duplicate(1) for val in action.results])
+        tup = TupleValue([val.duplicate(1) for (val,ctx) in action.results])
         if isinstance(action.context, ValueCtx):
           result = tup
         elif isinstance(action.context, AddressCtx):
@@ -373,24 +376,24 @@ class Index(Exp):
       elif action.state == 1:
         machine.schedule(self.index, action.env)
       else:
-        ind = action.results[1]
+        ind = action.results[1][0]
         i = to_integer(ind, self.location)
         if isinstance(action.context, ValueCtx):
           if tracing_on():
               print('in Index.step, ValueCtx')
-          tup = action.results[0]
+          tup = action.results[0][0]
           if not isinstance(tup, TupleValue):
             error(self.location, 'expected a tuple, not ' + str(tup))
           retval = tup.elts[int(i)].duplicate(1)
         elif isinstance(action.context, AddressCtx):
           if tracing_on():
               print('in Index.step, AddressCtx')
-          ptr = action.results[0]
+          ptr = action.results[0][0]
           retval = ptr.element_address(int(i), action.context.percentage)
         elif isinstance(action.context, ObserveCtx):
           if tracing_on():
               print('in Index.step, ObserveCtx')
-          ptr = action.results[0]
+          ptr = action.results[0][0]
           if not isinstance(ptr, Pointer):
             error(self.location, 'tuple access expected a pointer, not ' + str(ptr))
           retval = machine.memory.raw_read(ptr.address, ptr.path + [int(i)])
@@ -417,11 +420,11 @@ class Deref(Exp):
         if False and isinstance(action.context, AddressCtx):
           if tracing_on():
               print('in Deref.step, AddressCtx')
-          retval = action.results[0].duplicate(1)
+          retval = action.results[0][0].duplicate(1)
         elif True or isinstance(action.context, ValueCtx):
           if tracing_on():
               print('in Deref.step, ValueCtx')
-          ptr = action.results[0]
+          ptr = action.results[0][0]
           if not isinstance(ptr, Pointer):
             error(self.location, 'deref expected a pointer, not ' + str(ptr))
           retval = machine.memory.read(ptr, self.location, action.context)
@@ -446,7 +449,7 @@ class AddressOf(Exp):
         machine.schedule(self.arg, action.env, AddressCtx(Fraction(1,1)))
       else:
         if isinstance(action.context, ValueCtx):
-          ptr = action.results[0]
+          ptr = action.results[0][0]
           retval = ptr.duplicate(action.context.percentage)
         else:
           error(self.location, '& (address of) not allowed in this context')
@@ -507,13 +510,13 @@ class IfExp(Exp):
       if action.state == 0:
         machine.schedule(self.cond, action.env)
       elif action.state == 1:
-        cond = action.results[0]
+        cond = action.results[0][0]
         if to_boolean(cond, self.location):
           machine.schedule(self.thn, action.env, action.context)
         else:
           machine.schedule(self.els, action.env, action.context)
       elif action.state == 2:
-        retval = action.results[1].duplicate(1)
+        retval = action.results[1][0].duplicate(1)
         machine.finish_expression(retval, self.location)
     
 @dataclass
@@ -535,7 +538,7 @@ class Let(Exp):
         context = AddressCtx(priv_to_percent(self.var.kind))
         machine.schedule(self.init, action.env, context)
       elif action.state == 1:
-        val = action.results[0]
+        val = action.results[0][0]
         action.body_env = action.env.copy()
         var_priv_vals = [(self.var.ident, self.var.kind, val)]
         allocate_locals(var_priv_vals, action.body_env, machine.memory,
@@ -544,7 +547,7 @@ class Let(Exp):
       else:
         deallocate_locals([self.var.ident], action.body_env, machine.memory,
                           self.location)
-        result = action.results[1].duplicate(1)
+        result = action.results[1][0].duplicate(1)
         machine.finish_expression(result, self.location)
 
 @dataclass
@@ -582,7 +585,7 @@ class Await(Exp):
     if action.state == 0:
       machine.schedule(self.arg, action.env, action.context)
     else:
-      future = action.results[0]
+      future = action.results[0][0]
       if not future.thread.result is None \
          and future.thread.num_children == 0:
         machine.finish_expression(future.thread.result, self.location)
@@ -635,7 +638,7 @@ class LetInit(Exp):
         context = AddressCtx(priv_to_percent(self.var.kind))
         machine.schedule(self.init, action.env, context)
       elif action.state == 1:
-        val = action.results[0]
+        val = action.results[0][0]
         action.body_env = action.env.copy()
         var_priv_vals = [(self.var.ident, self.var.kind, val)]
         allocate_locals(var_priv_vals, action.body_env, machine.memory,
@@ -685,7 +688,7 @@ class Return(Stmt):
           context = AddressCtx(Fraction(1,1))
         machine.schedule(self.arg, action.env, context)
       else:
-        action.return_value = action.results[0].duplicate(1)
+        action.return_value = action.results[0][0].duplicate(1)
         machine.finish_statement(self.location)
     
 @dataclass
@@ -706,7 +709,8 @@ class Write(Stmt):
       elif action.state == 1:
         machine.schedule(self.lhs, action.env, AddressCtx(Fraction(1,1)))
       else:
-        val_ptr, ptr = action.results
+        val_ptr = action.results[0][0]
+        ptr = action.results[1][0]
         machine.memory.write(ptr, val_ptr, self.location)
         machine.finish_statement(self.location)
 
@@ -732,7 +736,9 @@ class Transfer(Stmt):
       elif action.state == 2:
         machine.schedule(self.rhs, action.env, ObserveCtx())
       else:
-        dest_ptr, amount, src_ptr = action.results
+        dest_ptr = action.results[0][0]
+        amount = action.results[1][0]
+        src_ptr = action.results[2][0]
         percent = to_number(amount, self.location)
         dest_ptr.transfer(percent, src_ptr, self.location)
         machine.finish_statement(self.location)
@@ -751,7 +757,7 @@ class Delete(Stmt):
       if action.state == 0:
         machine.schedule(self.arg, action.env, ValueCtx(Fraction(1,1)))
       else:
-        ptr = action.results[0]
+        ptr = action.results[0][0]
         if not isinstance(ptr, Pointer):
           error(self.location, 'in delete, expected a pointer, not ' + str(ptr))
         delete(ptr, machine.memory, self.location)
@@ -789,7 +795,7 @@ class Assert(Stmt):
       if action.state == 0:
         machine.schedule(self.exp, action.env)
       else:
-        val = to_boolean(action.results[0], self.location)
+        val = to_boolean(action.results[0][0], self.location)
         if not val:
           error(self.location, "assertion failed: " + str(self.exp))
         machine.finish_statement(self.location)
@@ -815,7 +821,7 @@ class IfStmt(Stmt):
       if action.state == 0:
         machine.schedule(self.cond, action.env)
       elif action.state == 1:
-        if to_boolean(action.results[0], self.location):
+        if to_boolean(action.results[0][0], self.location):
           machine.schedule(self.thn, action.env)
         else:
           machine.schedule(self.els, action.env)
@@ -837,7 +843,7 @@ class While(Stmt):
       if action.state == 0:
         machine.schedule(self.cond, action.env)
       elif action.state == 1:
-        if to_boolean(action.results[0], self.cond.location):
+        if to_boolean(action.results[0][0], self.cond.location):
           machine.schedule(self, action.env)
           machine.schedule(self.body, action.env)
         else:
@@ -893,7 +899,7 @@ class Global(Exp):
     if action.state == 0:
       machine.schedule(self.rhs, action.env)
     else:
-      machine.memory.write(action.env[self.name], action.results[0],
+      machine.memory.write(action.env[self.name], action.results[0][0],
                            self.location)
       machine.finish_declaration(self.location)
 
@@ -949,7 +955,8 @@ class Function(Decl):
                      self.name)
         machine.schedule(lam, action.env, ValueCtx(Fraction(1,1)))
       else:
-        machine.memory.unchecked_write(action.env[self.name], action.results[0],
+        machine.memory.unchecked_write(action.env[self.name],
+                                       action.results[0][0],
                                        self.location)
         machine.finish_declaration(self.location)
 
@@ -995,7 +1002,7 @@ class Import(Decl):
     if action.state == 0:
       machine.schedule(self.module, action.env)
     else:
-      mod = action.results[0]
+      mod = action.results[0][0]
       for x in self.imports:
         if x in mod.members.keys():
           action.env[x] = mod.members[x] # duplicate?

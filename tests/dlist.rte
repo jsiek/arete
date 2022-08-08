@@ -90,11 +90,11 @@ fun push(dat, !lst) {
 fun check_nodes_permissions(node) {
   if (not is_null(node)) {
     if (not is_null(next(node))) {
-      assert permission(next(node)) == half;
+      assert permission((*node)[2]) == half;
       ! check_nodes_permissions(next(all of node));
     }
     if (not is_null(prev(node))) {
-      assert permission(prev(all of node)) == half;
+      assert permission((*node)[1]) == half;
     }
   }
 }

@@ -20,7 +20,7 @@ def simplify(type: Type, env) -> Type:
       ret = RecursiveType(type.location, name, simplify(elt_ty, body_env))
     case FunctionType(param_tys, ret_ty):
       ret = FunctionType(type.location,
-                          [simplify(ty, env) for ty in param_tys],
+                          tuple(simplify(ty, env) for ty in param_tys),
                           simplify(ret_ty, env))
     case IntType():
       ret = type
@@ -120,7 +120,7 @@ def join(ty1, ty2):
     case (TupleType(ts1), TupleType(ts2)):
       return TupleType(tuple(join(t1, t2) for t1,t2 in zip(ts1, ts2)))
     case (FunctionType(ps1, rt1), FunctionType(ps2, rt2)):
-      return FunctionType([join(t1, t2) for t1, t2 in zip(ps1, ps2)],
+      return FunctionType(tuple(join(t1, t2) for t1, t2 in zip(ps1, ps2)),
                           join(rt1,rt2))
     case (FutureType(t1), FutureType(t2)):
       return FutureType(join(t1, t2))
@@ -300,7 +300,7 @@ def type_check_exp(e, env):
         for p in params:
             body_env[p.ident] = p.type_annot
         ret_type = type_check_stmt(body, body_env)
-        return FunctionType(e.location, [p.type_annot for p in params],
+        return FunctionType(e.location, tuple(p.type_annot for p in params),
                             ret_type)
       case Call(fun, inits):
         fun_type = type_check_exp(fun, env)
@@ -450,7 +450,9 @@ def typeof_decl(decl, env):
     case Global(name, ty, rhs):
       ret = simplify(ty, env)
     case Function(name, params, ret_ty, ret_mode, body):
-      ty = FunctionType(decl.location, [p.type_annot for p in params], ret_ty)
+      ty = FunctionType(decl.location,
+                        tuple(p.type_annot for p in params),
+                        ret_ty)
       ret = simplify(ty, env)
     case ModuleDecl(name, exports, body):
       member_types = {}

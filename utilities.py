@@ -244,6 +244,10 @@ class Number(Value):
     return str(self.value)
   def __repr__(self):
     return str(self)
+  def node_name(self):
+    return 'num' + str(self)
+  def node_label(self):
+    return str(self)
 
 @dataclass
 class Boolean(Value):
@@ -300,6 +304,14 @@ class TupleValue(Value):
     def __repr__(self):
         return str(self)
       
+    def node_name(self):
+        return str(self)
+      
+    def node_label(self):
+        return '|'.join(['<' + str(i) + '>' + elt.node_label() \
+                         for (i,elt) in zip(range(0,len(self.elts)),
+                                            self.elts)])
+      
 # find the first ptr in the lender chain that is not yet killed,
 # i.e. that has a non-None address.
 def find_lender(ptr):
@@ -340,26 +352,41 @@ class Pointer(Value):
 
     def equals(self, other):
         return self.address == other.address and self.path == other.path
-    
+
+    def path_str(self, path):
+      if len(path) == 0:
+        return ''
+      elif len(path) == 1:
+        return str(path[0])
+      else:
+        return str(path[0]) + '.' + self.path_str(path[1:])
+      
     def __str__(self):
         self.lender = find_lender(self.lender)
         if self.address is None:
           return 'null'
-        return "(*" + str(self.address) + str(self.path) \
-          + " @" + priv_str(self.permission) \
-          + ", " + str(id(self)) \
+        return "ptr(" + str(self.address) + '.' + self.path_str(self.path) \
+          + "@" + priv_str(self.permission) \
+          + "(" + str(id(self)) + ")" \
           + ("->" + str(id(self.lender)) if not self.lender is None else "") \
-          + "*)"
+          + ")"
       
     def __repr__(self):
         return str(self)
 
     def node_name(self):
-        return str(self.address)
+        if len(self.path) == 0:
+          return str(self.address) + ':base'
+        elif len(self.path) == 1:
+          return str(self.address) + ':' + str(self.path[0])
+        else:
+          return str(self.address) + ':base' # TODO
 
     def node_label(self):
-        return str(self.address) + str(self.path) \
-          + ' @' + str(self.permission) + ' ' \
+        if self.address is None:
+          return 'null'
+        return str(self.address) + '.' + self.path_str(self.path) \
+          + '@' + str(self.permission) + ' ' \
             + '(' + str(id(self)) + ')' 
 
     def transfer(self, percent, other, location):
@@ -492,10 +519,17 @@ class Closure(Value):
         ptr.kill(mem, location, progress)
       
     def __str__(self):
-        return self.name + '{' + ', '.join([str(ptr) for x, ptr in self.env.items()]) + '}'
+        return self.name + '(' + ', '.join([str(ptr) for x, ptr in self.env.items()]) + ')'
       
     def __repr__(self):
         return str(self)
+
+    def node_name(self):
+        return str(self.name)
+      
+    def node_label(self):
+        return 'fun ' + str(self.name)
+    
 
 @dataclass
 class Future(Value):
@@ -661,30 +695,40 @@ class Memory:
 
 def generate_graphviz(env, mem):
     result = 'digraph {\n'
+    result += 'overlap=scale\n'
     # nodes
+    # result += 'subgraph cluster_env {\n'
     for var, val in env.items():
         if isinstance(val, Pointer):
-            result += val.node_name() + '[label="' \
+            result += 'var_' + var + '[label="' \
                 + var + ':' + val.node_label() + '"];\n'
-    for addr, vals in mem.items():
-        result += 'struct' + str(addr) + ' [shape=record,label="' \
-            + str(addr) + ':|' \
-            + '|'.join(['<' + val.node_name() + '>' + val.node_label() for val in vals]) \
+    # result += '}\n'
+    # result += 'subgraph cluster_memory {\n'
+    for addr, val in mem.items():
+        result += str(addr) + ' [shape=record,label="' \
+            + '<base> ' + str(addr) + ': |' \
+            + val.node_label() \
             + '"];\n'
+    # result += '}\n'
     # edges
     for var, val in env.items():
         if isinstance(val, Pointer):
             if not (val.address is None):
-                result += val.node_name() + ' -> ' \
-                    + 'struct' + str(val.address) + ';\n'
-    for addr, vals in mem.items():
-        for val in vals:
-            if isinstance(val, Pointer) and not (val.address is None):
-                result += 'struct' + str(addr) + ':' + val.node_name() \
-                    + ' -> ' + 'struct' + str(val.address) + ';\n'
+                result += 'var_' + var + ' -> ' \
+                    + str(val.address) + ' [len=1];\n'
+    for addr, val in mem.items():
+      if isinstance(val, Pointer) and not (val.address is None):
+        result += str(addr) + ' -> ' + val.node_name() + ' [len=1];\n'
+      elif isinstance(val, TupleValue):
+        for i, elt in zip(range(0, len(val.elts)), val.elts):
+          if isinstance(elt, Pointer) and not elt.address is None:
+            result += str(addr) + ':' + str(i) \
+              + ' -> ' + elt.node_name() + ' [len=1];\n'
     result += '}\n'
     return result
 
+graph_number = 0
+  
 def log_graphviz(env, mem):
     global graph_number
     filename = "env_mem_" + str(graph_number) + ".dot"

@@ -1,81 +1,84 @@
 // AVL Tree (UNDER CONSTRUCTION)
 // tree layout: pointer to root
-let root = 0;
+const root = 0;
 // node layout: pointer to ⟨data, left, right, parent, height⟩
-let data = 0;
-let left = 1;
-let right = 2;
-let parent = 3;
-let height = 4;
+const data = 0;
+const left = 1;
+const right = 2;
+const parent = 3;
+const height = 4;
+
+type node_t = rec X in ⟨int, X, X, X, int⟩*;
+type tree_t = node_t*;
 
 // Common fractions
-let none = 0;
-let half = 1/2;
-let all = 1;
+const none = 0/1;
+const half = 1/2;
+const all = 1/1;
 
-fun find(key, node, parent) {
+fun find(key: int, node: node_t, parent: node_t) -> node_t {
   if (is_null(node)) {
     return parent;
   }
-  if (key < node[data]) {
-    return find(key, all of node[left], all of node);
+  if (key < (*node)[data]) {
+    return find(key, all of copy((*node)[left]), all of node);
   }
-  if (node[data] < key) {
-    return find(key, all of node[right], all of node);
+  if ((*node)[data] < key) {
+    return find(key, all of copy((*node)[right]), all of node);
   }
   return node;
 }
 
-fun gather_permission(node) {
-  if (not is_null(node[left])) {
+fun gather_permission(node: node_t) {
+  if (not is_null((*node)[left])) {
     node <- all of node[left][parent];
   }
-  if (not is_null(node[right])) {
+  if (not is_null((*node)[right])) {
     node <- all of node[right][parent];
   }
-  assert permission(node) == 1;
+  assert permission(node) == 1/1;
 }
 
-fun scatter_permission(node) {
-  if (not is_null(node[left])) {
+fun scatter_permission(node: node_t) {
+  if (not is_null((*node)[left])) {
     node[left][parent] <- half of node;
   }
-  if (not is_null(node[right])) {
+  if (not is_null((*node)[right])) {
     node[right][parent] <- half of node;
   }
 }
 
-fun set_left(!node, !new_left) {
-  assert permission(node) == 1;
-  assert permission(new_left) == 1;
-  node[left] = all of new_left;
-  if (not is_null(new_left)) {
-    node[left][parent] = node;
+fun set_left(!node: node_t, !new_left: node_t) {
+  assert permission(node) == 1/1;
+  assert permission(new_left) == 1/1;
+  (*node)[left] = all of new_left;
+  if (not is_null((*node)[left])) {
+    (*((*node)[left]))[parent] = node;
   }
 }
 
-fun set_right(!node, !new_right) {
-  assert permission(node) == 1;
-  assert permission(new_right) == 1;
-  node[right] = all of new_right;
-  if (not is_null(node[right])) {
-    node[right][parent] = node;
+fun set_right(!node: node_t, !new_right: node_t) {
+  assert permission(node) == 1/1;
+  assert permission(new_right) == 1/1;
+  (*node)[right] = all of new_right;
+  if (not is_null((*node)[right])) {
+    (*((*node)[right]))[parent] = node;
   }
 }
 
-fun insert(key, !tree) {
+fun insert(key: int, !tree: tree_t) {
   if (is_null(*tree)) {
     *tree = new ⟨key, null, null, null, 0⟩;
   } else {
-    let node = all of find(key, all of *tree, null);
-    if (key < node[data]) {
-      let !new_node = new ⟨key, null, null, null, 0⟩;
+    let node: node_t = all of find(key, all of *tree, null);
+    if (key < (*node)[data]) {
+      let !new_node: node_t = new ⟨key, null, null, null, 0⟩;
       ! gather_permission(all of node);
       ! set_left(node, new_node);
       ! scatter_permission(all of node);
     }
-    if (node[data] < key) {
-      let !new_node = new ⟨key, null, null, null, 0⟩;
+    if ((*node)[data] < key) {
+      let !new_node: node_t = new ⟨key, null, null, null, 0⟩;
       ! gather_permission(all of node);
       ! set_right(node, new_node);
       ! scatter_permission(all of node);
@@ -83,26 +86,26 @@ fun insert(key, !tree) {
   }
 }
 
-fun delete_node(node) {
+fun delete_node(node: node_t) {
   if (not is_null(node)) {
     ! gather_permission(all of node);
-    ! delete_node(all of node[left]);
-    ! delete_node(all of node[right]);
+    ! delete_node(all of (*node)[left]);
+    ! delete_node(all of (*node)[right]);
     delete node;
   }
 }
 
-fun delete_tree(!tree) {
+fun delete_tree(!tree: tree_t) {
   ! delete_node(all of *tree);
 }
 
 fun main() {
-  let !tree = new null;
+  let !tree: tree_t = new null;
   ! insert(5, tree);
   ! insert(10, tree);
   ! insert(1, tree);
-  let ten = (let t = find(10, *tree)
-             in t[data]);
+  let ten: int = (let n: node_t = find(10, *tree)
+                  in (*n)[data]);
   ! delete_tree(tree);
   return ten - 10;
 }

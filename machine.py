@@ -35,7 +35,7 @@ from const_eval import const_eval_decls
 class Action:
     ast: AST
     state: int
-    results: list[Value] # results of subexpressions
+    results: list[(Value,Context)] # results of subexpressions
     return_value: Value  # result of `return` statement
     return_mode: str     # value or address
     context: Context     # rvalue/lvalue/etc.
@@ -136,9 +136,10 @@ class Machine:
               print(error_header(action.ast.location))
               print('stepping ' + repr(action))
             action.ast.step(action, self)
-            if tracing_on():
-              print(machine.memory)
-              print()
+            if tracing_on() and len(frame.todo) > 0:
+              log_graphviz(self.current_action().env, self.memory.memory)
+              #print(machine.memory)
+              #print()
             #machine.memory.compute_fractions()
             action.state += 1
           else:
@@ -161,12 +162,13 @@ class Machine:
       if tracing_on():
           print('finish_expression ' + str(result))
           print(self.memory)
-      for p in self.current_action().results:
-        if not isinstance(self.current_action().context, ObserveCtx):
+      for (p,ctx) in self.current_action().results:
+        if not isinstance(ctx, ObserveCtx):
           p.kill(machine.memory, location)
+      context = self.current_action().context
       self.current_frame().todo.pop()
       if len(self.current_frame().todo) > 0:
-          self.current_action().results.append(result)
+          self.current_action().results.append((result, context))
       elif len(self.current_thread.stack) > 1:
           self.pop_frame(result)
       else:
@@ -180,8 +182,8 @@ class Machine:
       retval = self.current_action().return_value
       if tracing_on():
           print('finish_statement ' + str(retval))
-      for p in self.current_action().results:
-        if not isinstance(self.current_action().ast, Transfer):
+      for (p,ctx) in self.current_action().results:
+        if not isinstance(ctx, ObserveCtx):
           p.kill(machine.memory, location)
       self.current_frame().todo.pop()
       if len(self.current_frame().todo) > 0:
@@ -192,8 +194,9 @@ class Machine:
         self.result = retval
 
   def finish_declaration(self, location):
-    for p in self.current_action().results:
-      p.kill(machine.memory, location)
+    for (p,ctx) in self.current_action().results:
+      if not isinstance(ctx, ObserveCtx):
+        p.kill(machine.memory, location)
     self.current_frame().todo.pop()
         
   def push_frame(self):
@@ -235,7 +238,7 @@ if __name__ == "__main__":
       if 'trace' in sys.argv:
           set_trace(True)
       p = file.read()
-      decls += parse(p, tracing_on())
+      decls += parse(p, False)
       
     decls = desugar_decls(decls, {})
     if tracing_on():
