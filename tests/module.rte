@@ -4,7 +4,7 @@ module M
   let all = 1;
   let empty = null;
   fun push(data, rest) {
-    return new data, all of rest;
+    return ⟨data, all of rest⟩;
   }
   fun front(ls) { return ls[0]; }
   fun rest(ls) { return ls[1]; }
@@ -13,7 +13,7 @@ module M
     if (is_null(ls)) {
       return null;
     } else {
-      return new f(front(ls)), map(f, rest(ls));
+      return ⟨f(front(ls)), map(f, rest(ls))⟩;
     }
   }
 }

@@ -88,24 +88,12 @@ class Machine:
       if tracing_on():
         print('memory: ' + str(self.memory))
         print('killing top-level env: ' + str(env))
-      changed = True
-      while changed:
-        changed = False
-        deletes = set()
-        for x, ptr in env.items():
-          if ptr.permission == Fraction(1,1):
-            if tracing_on():
-                print('kill env ' + x)
-            ptr.kill(self.memory, loc)
-            deletes |= set([x])
-            changed = True
-          else:
-            # this is to deal with cycles due to recursive functions -Jeremy
-            ptr.clear(self.memory, loc)
-        for x in deletes:
-            del env[x]
+        log_graphviz('top', env, self.memory.memory)
+      delete_env('top', env, self.memory, loc)
       if tracing_on():
         print('top-level env: ' + str(env))
+        log_graphviz('top', env, self.memory.memory)
+
       if self.memory.size() > 0:
           if tracing_on():
               print('final memory:')
@@ -137,7 +125,7 @@ class Machine:
               print('stepping ' + repr(action))
             action.ast.step(action, self)
             if tracing_on() and len(frame.todo) > 0:
-              log_graphviz(self.current_action().env, self.memory.memory)
+              log_graphviz('top', self.current_action().env, self.memory.memory)
               print(machine.memory)
               print()
             #machine.memory.compute_fractions()

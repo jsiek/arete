@@ -191,13 +191,25 @@ class Member(Exp):
         return self.arg.free_vars()
     def step(self, action, machine):
       if action.state == 0:
-        machine.schedule(self.arg, action.env)
+        machine.schedule(self.arg, action.env, AddressCtx(Fraction(1,2)))
       else:
-        mod = action.results[0][0]
+        mod_ptr = action.results[0][0]
+        mod = machine.memory.read(mod_ptr, self.location, ObserveCtx())
         if not isinstance(mod, Module):
           error(e.location, "expected a module, not " + str(val))
-        if self.field in mod.members.keys():
-          machine.finish_expression(mod.members[self.field], self.location)
+        if self.field in mod.exports.keys():
+          ptr = mod.exports[self.field]
+          if isinstance(action.context, ValueCtx):
+            result = machine.memory.read(ptr, self.location, action.context)
+          elif isinstance(action.context, ObserveCtx):
+            result = machine.memory.raw_read(ptr.address, ptr.path,
+                                             self.location)
+          elif isinstance(action.context, AddressCtx):
+            result = ptr.duplicate(action.context.percentage)
+          else:
+            raise Exception('in Member.step, bad context '
+                            + repr(action.context))
+          machine.finish_expression(result, self.location)
         else:
           error(self.location, 'no member ' + self.field
                 + ' in module ' + mod.name)
@@ -989,9 +1001,10 @@ class ModuleDecl(Decl):
       for ex in self.exports:
         if not ex in action.body_env:
           error(self.location, 'export ' + ex + ' not defined in module')
-      mod = Module(False, self.name,
-                   {ex: action.body_env[ex] for ex in self.exports})
-      machine.memory.write(action.env[self.name], mod, self.location)
+      mod = Module(self.name,
+                   {ex: action.body_env[ex] for ex in self.exports},
+                   action.body_env)
+      machine.memory.memory[action.env[self.name].address] = mod
       machine.finish_declaration(self.location)
 
 @dataclass
@@ -1006,12 +1019,14 @@ class Import(Decl):
     return str(self)
   def step(self, action, machine):
     if action.state == 0:
-      machine.schedule(self.module, action.env)
+      machine.schedule(self.module, action.env, AddressCtx(Fraction(1,2)))
     else:
-      mod = action.results[0][0]
+      mod_ptr = action.results[0][0]
+      mod = machine.memory.read(mod_ptr, self.location, ObserveCtx())
       for x in self.imports:
-        if x in mod.members.keys():
-          action.env[x] = mod.members[x] # duplicate?
+        if x in mod.exports.keys():
+          val = machine.memory.read(mod.exports[x], self.location, ObserveCtx())
+          machine.memory.write(action.env[x], val, self.location)
         else:
           error(self.location, 'module does not export ' + x)
       machine.finish_declaration(self.location)

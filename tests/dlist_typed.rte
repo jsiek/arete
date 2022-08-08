@@ -34,19 +34,19 @@ fun next(node: node_t) -> node_t & {
 fun push(dat: int, !lst: list_t) -> list_t {
   let !first: node_t = new ⟨dat, null, null⟩;
   if (front(lst) == back(lst)) { // lst is a 1 element list
-    let !n: node_t = join(lst[0], lst[1]);
+    let !n: node_t = copy(join(lst[0], lst[1]));
     prev(all of n) = none of first;
     next(all of first) = half of n;
-    (*n)[1] <- half of *first;
+    (*n)[1] <- half of first;
     front(all of lst) = all of first;
     back(all of lst) = all of n;
     return lst;
   } else { // lst has at least 2 elements
-    lst[0] <- all of lst[0][2][1];
+    lst[0] <- all of (*((*(lst[0]))[2]))[1];
     (*front(all of lst))[1] = none of first;
-    lst[0][2][1] <- half of lst[0];
+    (*((*(lst[0]))[2]))[1] <- half of lst[0];
     next(all of first) = front(all of lst);
-    (*first)[2][1] <- half of *first;
+    (*((*first)[2]))[1] <- half of first;
     front(all of lst) = all of first;
     return lst;
   }
@@ -67,17 +67,17 @@ fun check_nodes_permissions(node: node_t) {
 fun check_list_permissions(list: list_t) {
   let first = copy(front(all of list));
   let last = copy(back(all of list));
-  assert permission(*first) == half;
-  assert permission(*last) == half;
+  assert permission(first) == half;
+  assert permission(last) == half;
   ! check_nodes_permissions(all of first);
 }
 
 fun delete_nodes(node: node_t, last: node_t) {
   if (not is_null(node)) {
     if (node == last) {
-      delete join(*node, *last);
+      delete join(node, last);
     } else {
-      *node <- all of (*node)[2][1];
+      node <- all of (*((*node)[2]))[1];
       ! delete_nodes(copy(next(all of node)), all of last);
       delete node;
     }

@@ -39,10 +39,10 @@ fun push(dat, !lst) {
                   V   V
 		  [ B , / , / ]
     */
-    let !n = join(lst[0], lst[1]);
+    let !n = copy(join(lst[0], lst[1]));
     prev(all of n) = none of first;
     next(all of first) = half of n;
-    (*n)[1] <- half of *first;
+    (*n)[1] <- half of first;
     /*
       first: *-.5-> [ A , / , * ]
                     ^         |
@@ -65,11 +65,11 @@ fun push(dat, !lst) {
 		            |___/          |             |   
 			      .5            \-.5->  <-.5-/
      */
-    lst[0] <- all of lst[0][2][1];
+    lst[0] <- all of (*((*(lst[0]))[2]))[1];
     (*front(all of lst))[1] = none of first;
-    lst[0][2][1] <- half of lst[0];
+    (*((*(lst[0]))[2]))[1] <- half of lst[0];
     next(all of first) = front(all of lst);
-    (*first)[2][1] <- half of *first;
+    (*((*first)[2]))[1] <- half of first;
     front(all of lst) = all of first;
     /*
            lst: *-1-> [ * , * ]
@@ -102,17 +102,17 @@ fun check_nodes_permissions(node) {
 fun check_list_permissions(list) {
   let first = copy(front(all of list));
   let last = copy(back(all of list));
-  assert permission(*first) == half;
-  assert permission(*last) == half;
+  assert permission(first) == half;
+  assert permission(last) == half;
   ! check_nodes_permissions(all of first);
 }
 
 fun delete_nodes(node, last) {
   if (not is_null(node)) {
     if (node == last) {
-      delete join(*node, *last);
+      delete join(node, last);
     } else {
-      *node <- all of (*node)[2][1];
+      node <- all of (*((*node)[2]))[1];
       ! delete_nodes(copy(next(all of node)), all of last);
       delete node;
     }

@@ -209,19 +209,30 @@ class Void(Value):
 @dataclass(eq=False)
 class Module(Value):
     name: str
-    members: dict[str, Value]
-    __match_args__ = ("name", "members")
+    exports: dict[str, Value]
+    members: dict[str, Value] # all the members
+    __match_args__ = ("name", "exports")
     def duplicate(self, percentage):
-        return self # ??
+        exports_copy = {x: val.duplicate(percentage) \
+                        for x,val in self.exports.items()}
+        return Module(self.name, exports_copy)
     def __str__(self):
-      return self.name + '{' + ','.join([x + '=' + str(v) for x,v in self.members.items()]) + '}'
+      return self.name + '{' + ','.join([x + '=' + str(v) for x,v in self.exports.items()]) + '}'
     def __repr__(self):
         return str(self)
     def kill(self, mem, location, progress=set()):
-        for member in members.values:
-            member.kill(mem, location, progress)
+        if tracing_on():
+          print('*** killing module ' + self.name + ' (' + str(id(self)) + ')')
+        delete_env(self.name, self.members, mem, location)
+        if tracing_on():
+          print('*** finished killing module ' + self.name + ' (' + str(id(self)) + ')')
     def clear(self, mem, location, progress=set()):
-        raise Exception('unimplemented')
+        for val in self.members.values():
+          val.clear(mem, location, progress)
+    def node_name(self):
+        return str(self.name)
+    def node_label(self):
+        return str(self.name)
 
 @dataclass
 class Number(Value):
@@ -528,7 +539,7 @@ class Closure(Value):
         return str(self.name)
       
     def node_label(self):
-        return 'fun ' + str(self.name)
+        return 'fun ' + str(self.name) + '(' + ', '.join([ptr.node_label() for x, ptr in self.env.items()]) + ')'
     
 
 @dataclass
@@ -577,7 +588,27 @@ def delete(ptr, mem, location, progress=set()):
         if not writable(priv):
             error(location, 'delete needs writable pointer, not ' + str(ptr))
         mem.deallocate(addr, location, progress)
-    
+
+def delete_env(label, env, mem, loc):
+  changed = True
+  while changed:
+    changed = False
+    deletes = set()
+    for x, ptr in env.items():
+      if ptr.permission == Fraction(1,1):
+        if tracing_on():
+            print('kill env ' + x)
+        ptr.kill(mem, loc)
+        deletes |= set([x])
+        changed = True
+      else:
+        # this is to deal with cycles due to recursive functions -Jeremy
+        ptr.clear(mem, loc)
+      if tracing_on():
+        log_graphviz(label, env, mem.memory)
+    for x in deletes:
+        del env[x]
+        
 @dataclass
 class Memory:
   memory: dict[int,Value]
@@ -694,29 +725,34 @@ class Memory:
     #     print('**warning fraction[' + str(addr) + '] == ' + str(fraction[addr]))
     return fraction_dict
 
-def generate_graphviz(env, mem):
-    result = 'digraph {\n'
-    result += 'overlap=scale\n'
+def graphviz_env(label, env):
+    result = 'subgraph cluster_' + label + '{\n'
+    result += 'label = ' + label + ';\n'
     # nodes
-    # result += 'subgraph cluster_env {\n'
     for var, val in env.items():
         if isinstance(val, Pointer):
-            result += 'var_' + var + '[label="' \
+            result += label + '_' + var + '[label="' \
                 + var + ':' + val.node_label() + '"];\n'
-    # result += '}\n'
-    # result += 'subgraph cluster_memory {\n'
+    result += '}\n'
+    # edges
+    for var, val in env.items():
+        if isinstance(val, Pointer):
+            if not (val.address is None):
+                result += label + '_' + var + ' -> ' \
+                    + str(val.address) + ' [len=1];\n'
+    return result
+  
+def generate_graphviz(label, env, mem):
+    result = 'digraph {\n'
+    result += 'overlap=scale\n'
+    result += graphviz_env(label, env)
+    # nodes
     for addr, val in mem.items():
         result += str(addr) + ' [shape=record,label="' \
             + '<base> ' + str(addr) + ': |' \
             + val.node_label() \
             + '"];\n'
-    # result += '}\n'
     # edges
-    for var, val in env.items():
-        if isinstance(val, Pointer):
-            if not (val.address is None):
-                result += 'var_' + var + ' -> ' \
-                    + str(val.address) + ' [len=1];\n'
     for addr, val in mem.items():
       if isinstance(val, Pointer) and not (val.address is None):
         result += str(addr) + ' -> ' + val.node_name() + ' [len=1];\n'
@@ -726,16 +762,18 @@ def generate_graphviz(env, mem):
              and elt.permission > Fraction(0,1):
             result += str(addr) + ':' + str(i) \
               + ' -> ' + elt.node_name() + ' [len=1];\n'
+      elif isinstance(val, Module):
+        result += graphviz_env(val.name, val.members)
     result += '}\n'
     return result
 
 graph_number = 0
   
-def log_graphviz(env, mem):
+def log_graphviz(label, env, mem):
     global graph_number
     filename = "env_mem_" + str(graph_number) + ".dot"
     graph_number += 1
     file = open(filename, 'w')
-    file.write(generate_graphviz(env, mem))
+    file.write(generate_graphviz(label, env, mem))
     file.close()
     print('log graphviz: ' + filename)
