@@ -138,8 +138,8 @@ class Machine:
             action.ast.step(action, self)
             if tracing_on() and len(frame.todo) > 0:
               log_graphviz(self.current_action().env, self.memory.memory)
-              #print(machine.memory)
-              #print()
+              print(machine.memory)
+              print()
             #machine.memory.compute_fractions()
             action.state += 1
           else:

@@ -105,9 +105,13 @@ class Call(Exp):
         case Closure(name, params, ret_mode, body, clos_env):
           action.params = params
           action.body_env = clos_env.copy()
+          args = [val for val,ctx in action.results[1:]]
+          if len(params) != len(args):
+            error(self.location, 'wrong number of arguments, expected '
+                  + str(len(params)) + ' not ' + str(len(args)))
           # In the following, duplicate the val? -Jeremy
-          var_priv_vals = [(p.ident, p.kind, val[0]) \
-                           for p, val in zip(params, action.results[1:])]
+          var_priv_vals = [(p.ident, p.kind, arg) \
+                           for p, arg in zip(params, args)]
           allocate_locals(var_priv_vals, action.body_env, machine.memory,
                           self.location)
           machine.push_frame()
@@ -292,7 +296,7 @@ class Var(Exp):
         if isinstance(action.context, ValueCtx):
           result = machine.memory.read(ptr, self.location, action.context)
         elif isinstance(action.context, ObserveCtx):
-          result = ptr
+          result = machine.memory.raw_read(ptr.address, ptr.path, self.location)
         elif isinstance(action.context, AddressCtx):
           result = ptr.duplicate(action.context.percentage)
         else:
@@ -393,10 +397,12 @@ class Index(Exp):
         elif isinstance(action.context, ObserveCtx):
           if tracing_on():
               print('in Index.step, ObserveCtx')
-          ptr = action.results[0][0]
-          if not isinstance(ptr, Pointer):
-            error(self.location, 'tuple access expected a pointer, not ' + str(ptr))
-          retval = machine.memory.raw_read(ptr.address, ptr.path + [int(i)])
+          tup = action.results[0][0]
+          if isinstance(tup, TupleValue):
+            retval = tup.elts[int(i)]
+          else:
+            error(self.location,
+                  'tuple access in observe context expected a tuple, not ' + str(tup))
         else:
           error(self.location, 'unrecognized context ' + repr(action.context))
         
@@ -543,7 +549,7 @@ class Let(Exp):
         var_priv_vals = [(self.var.ident, self.var.kind, val)]
         allocate_locals(var_priv_vals, action.body_env, machine.memory,
                         self.location)
-        machine.schedule(self.body, action.body_env)
+        machine.schedule(self.body, action.body_env, action.context)
       else:
         deallocate_locals([self.var.ident], action.body_env, machine.memory,
                           self.location)

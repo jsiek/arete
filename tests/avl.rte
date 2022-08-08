@@ -16,9 +16,9 @@ const none = 0/1;
 const half = 1/2;
 const all = 1/1;
 
-fun find(key: int, node: node_t, parent: node_t) -> node_t {
+fun find(key: int, node: node_t, p: node_t) -> node_t {
   if (is_null(node)) {
-    return parent;
+    return p;
   }
   if (key < (*node)[data]) {
     return find(key, all of copy((*node)[left]), all of node);
@@ -31,39 +31,43 @@ fun find(key: int, node: node_t, parent: node_t) -> node_t {
 
 fun gather_permission(node: node_t) {
   if (not is_null((*node)[left])) {
-    node <- all of node[left][parent];
+    node <- all of (*((*node)[left]))[parent];
   }
   if (not is_null((*node)[right])) {
-    node <- all of node[right][parent];
+    node <- all of (*((*node)[right]))[parent];
   }
   assert permission(node) == 1/1;
 }
 
 fun scatter_permission(node: node_t) {
   if (not is_null((*node)[left])) {
-    node[left][parent] <- half of node;
+    (*((*node)[left]))[parent] <- half of node;
   }
   if (not is_null((*node)[right])) {
-    node[right][parent] <- half of node;
+    (*((*node)[right]))[parent] <- half of node;
   }
 }
 
 fun set_left(!node: node_t, !new_left: node_t) {
   assert permission(node) == 1/1;
   assert permission(new_left) == 1/1;
-  (*node)[left] = all of new_left;
-  if (not is_null((*node)[left])) {
-    (*((*node)[left]))[parent] = node;
+  if (not is_null(new_left)) {
+    (*new_left)[parent] = none of node;
   }
+  (*node)[left] = 1/2 of new_left;
+  (*new_left)[parent] <- 1/2 of node;
+  (*node)[left] <- all of new_left;  
 }
 
 fun set_right(!node: node_t, !new_right: node_t) {
   assert permission(node) == 1/1;
   assert permission(new_right) == 1/1;
-  (*node)[right] = all of new_right;
-  if (not is_null((*node)[right])) {
-    (*((*node)[right]))[parent] = node;
+  if (not is_null(new_right)) {
+    (*new_right)[parent] = none of node;
   }
+  (*node)[right] = 1/2 of new_right;
+  (*new_right)[parent] <- 1/2 of node;
+  (*node)[right] <- all of new_right;
 }
 
 fun insert(key: int, !tree: tree_t) {
@@ -104,8 +108,8 @@ fun main() {
   ! insert(5, tree);
   ! insert(10, tree);
   ! insert(1, tree);
-  let ten: int = (let n: node_t = find(10, *tree)
-                  in (*n)[data]);
+  let ten: int = (let n: node_t = find(10, *tree, null)
+                  in copy((*n)[data]));
   ! delete_tree(tree);
   return ten - 10;
 }

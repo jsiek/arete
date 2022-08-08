@@ -4,8 +4,6 @@ from utilities import *
 # TODO: need different type checking rules for ObserveCtx
 
 def simplify(type: Type, env) -> Type:
-  if tracing_on():
-    print('trying to simplify ' + str(type))
   match type:
     case TypeVar(name):
       ret = env[name]
@@ -32,8 +30,6 @@ def simplify(type: Type, env) -> Type:
       ret = type
     case _:
       error(type.location, "in simplify, unrecognized type " + str(type))
-  if tracing_on():
-    print('simplify ' + str(type) + ' to ' + str(ret))
   return ret
       
 def substitute(var: str, ty1: Type, ty2: Type) -> Type:
@@ -58,8 +54,6 @@ def substitute(var: str, ty1: Type, ty2: Type) -> Type:
 def unfold(ty):
   if isinstance(ty, RecursiveType):
     ret = substitute(ty.name, ty, ty.type)
-    if tracing_on():
-      print('unfolding ' + str(ty) + ' to ' + str(ret))
     return ret
   else:
     return ty
@@ -99,8 +93,6 @@ def consistent(ty1, ty2, assumed_consistent=set()):
       result = True
     case _:
       result = False
-  if tracing_on():
-    print("consistent(" + str(ty1) + ',' + str(ty2) + ") = " + str(result))
   return result    
 
 def join(ty1, ty2):
@@ -462,8 +454,6 @@ def typeof_decl(decl, env):
       ret = ModuleType(decl.location, member_types)
     case _:
       error(decl.location, 'error in typeof_decl, unhandled: ' + str(decl))
-  if tracing_on() and hasattr(decl, 'name'):
-    print('typeof ' + decl.name + ' = ' + str(ret))
   return ret
     
 def declare_decl(decl, env):
