@@ -71,7 +71,7 @@ If the value at `address` in memory is a tuple, then the `path`
 specifies which part of the tuple this pointer is referring to.
 The path is a list and not just a single integer because tuples
 can be nested. So, for example, the path `[3,2]` refers to
-the value `12` in the tuple `⟨0,1,2,⟨10,11,12,13⟩,4,5⟩`.
+the location of `12` in the tuple `⟨0,1,2,⟨10,11,12,13⟩,4,5⟩`.
 
 A pointer whose `permission` is `0` or greater can be copied.
 A pointer whose `permission` is greater than `0` can be used for
@@ -122,7 +122,9 @@ Each *frame* has a stack of *node runners*.
 
 A *node runner* is responsible for executing one node in the abstract
 syntax tree of the program. Think of each node runner as a little
-state machine. Each `NodeRunner` has
+state machine. (It's named node runner because I use to enjoy playing
+[Lode Runner](https://loderunnerwebgame.com/game/) in the 1980's.)
+Each `NodeRunner` has
 
 * `ast` (the AST node)
 
