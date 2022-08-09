@@ -1,7 +1,7 @@
 fun split_array(array) {
   let half = len(array) % 2;
-  let !left = new [half] 0;
-  let !right = new [len(array) - half] 0;
+  let !left = [half of 0];
+  let !right = [len(array) - half of 0];
   var i = 0;
   while (i < half) {
     left[i] = array[i];
@@ -11,11 +11,11 @@ fun split_array(array) {
     right[i - half] = array[i];
     i = i + 1;
   }
-  return new 1 of left, 1 of right;
+  return ⟨1 of left, 1 of right⟩;
 }
 
 fun merge(array1, array2) {
-  let !result = new [len(array1) + len(array2)] 0;
+  let !result = [len(array1) + len(array2) of 0];
   var i = 0; var j = 0; var k = 0;
   while (j < len(array1) and k < len(array2)) {
     if (array1[j] <= array2[k]) {
@@ -63,7 +63,7 @@ fun is_sorted(array) {
 }
 
 fun main() {
-  let !a = new [11] 0;
+  let !a = [11 of 0];
   var i = 0;
   while (i < len(a)) {
     a[i] = len(a) - i;

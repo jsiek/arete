@@ -14,9 +14,14 @@ def set_trace(b: bool):
 def tracing_on():
   return trace
 
+# Context information:
+#    1. do you want value or address of the expression? (i.e. rvalue/lvalue)
+#       a) how much permission do you want? (give a percentage)
+#    2. duplicate (normal) or no duplicate (for permission ops)?
+
 @dataclass
 class Context:
-    pass
+    duplicate: bool
 
 # Want the value of the expression (not its address).
 # If the value is a pointer, duplicate with the specified percentage
@@ -32,12 +37,6 @@ class ValueCtx(Context):
 @dataclass
 class AddressCtx(Context):
   percentage : Fraction
-
-# Want the address of the subexpression.
-# (lvalue)
-@dataclass
-class ObserveCtx(Context):
-  pass
 
 def priv_to_percent(priv):
   if priv == 'write':
@@ -409,6 +408,9 @@ class Pointer(Value):
         amount = other.permission * percent
         other.permission -= amount
         self.permission += amount
+        if tracing_on():
+          print('transferred ' + str(amount) + ' from ' + str(other) + ' to '
+                + str(self))
 
     def upgrade(self, location):
         self.lender = find_lender(self.lender)
@@ -671,8 +673,9 @@ class Memory:
     if tracing_on():
       print('raw_read(' + str(address) + ', ' + str(path) + ')')
     return self.get_tuple_element(self.memory[address], path, loc)
-      
-  def read(self, ptr, location, context=ValueCtx(Fraction(1,1))):
+
+  # TODO: move duplicate logic to callers?
+  def read(self, ptr, location, context=ValueCtx(True, Fraction(1,1))):
       if not isinstance(ptr, Pointer):
           error(location, 'in read expected a pointer, not ' + str(ptr))
       if none(ptr.permission):
@@ -681,10 +684,10 @@ class Memory:
           error(location, 'in read, bad address: ' + str(ptr.address))
 
       val = self.raw_read(ptr.address, ptr.path, location)
-      if isinstance(context, ObserveCtx):
-          retval = val
-      else:
+      if context.duplicate:
           retval = val.duplicate(ptr.permission * context.percentage)
+      else:
+          retval = val
       if tracing_on():
           print('read from ' + str(ptr))
           print('    value: ' + str(self.memory[ptr.address]))
@@ -748,6 +751,7 @@ def generate_graphviz(label, env, mem):
     result += graphviz_env(label, env)
     # nodes
     for addr, val in mem.items():
+      if not val is None: # how could it be None? bug? -Jeremy
         result += str(addr) + ' [shape=record,label="' \
             + '<base> ' + str(addr) + ': |' \
             + val.node_label() \

@@ -48,9 +48,9 @@ class Initializer:
       percent = action.results[0][0]
       amount = to_number(percent, self.location)
       if isinstance(action.context, AddressCtx):
-          ctx = AddressCtx(amount)
+          ctx = AddressCtx(True, amount)
       elif isinstance(action.context, ValueCtx):
-          ctx = ValueCtx(amount)
+          ctx = ValueCtx(True, amount)
       machine.schedule(self.arg, action.env, ctx)
     else:
       val = action.results[1][0]
@@ -97,7 +97,7 @@ class Call(Exp):
       # evaluate the operand subexpressions
       percent = priv_to_percent(action.clos.params[action.state - 1].kind)
       machine.schedule(self.args[action.state - 1], action.env,
-                       AddressCtx(percent))
+                       AddressCtx(True, percent))
     elif action.state == len(self.args) + 1:
       self.set_closure(action, machine)
       # call the function
@@ -130,7 +130,7 @@ class Call(Exp):
           retval = action.return_value
         elif action.clos.return_mode == 'address':
           retval = machine.memory.read(action.return_value, self.location,
-                                       AddressCtx(Fraction(1,1)))
+                                       AddressCtx(True, Fraction(1,1)))
           action.return_value.kill(machine.memory, self.location)
         else:
           raise Exception('unrecognized return_mode: '
@@ -143,8 +143,8 @@ class Call(Exp):
         else:
           raise Exception('unrecognized return_mode: '
                           + action.clos.return_mode)
-      elif isinstance(action.context, ObserveCtx):
-        error(self.location, 'function call not allowed in this context')
+      else:
+        error(self.location, 'unknown context ' + repr(action.context))
         
       machine.finish_expression(retval, self.location)
 
@@ -162,16 +162,12 @@ class Prim(Exp):
         return set().union(*[arg.free_vars() for arg in self.args])
     def step(self, action, machine):
       if action.state < len(self.args):
-        context = (ObserveCtx() if self.op \
-                                   in set(['permission','upgrade',
-                                           'split','join']) \
-                   else ValueCtx(Fraction(1,2)))
+        dup = not self.op in set(['permission','upgrade', 'split','join'])
+        context = ValueCtx(dup, Fraction(1,2))
         machine.schedule(self.args[action.state], action.env, context)
       else:
-        retval = eval_prim(self.op,
-                           [val for val, ctx in action.results],
-                           machine,
-                           self.location)
+        retval = eval_prim(self.op, [val for val, ctx in action.results],
+                           machine, self.location)
         if isinstance(action.context, AddressCtx):
           # join produces an address, no need to allocate
           if self.op != 'join':
@@ -191,21 +187,26 @@ class Member(Exp):
         return self.arg.free_vars()
     def step(self, action, machine):
       if action.state == 0:
-        machine.schedule(self.arg, action.env, AddressCtx(Fraction(1,2)))
+        machine.schedule(self.arg, action.env, AddressCtx(True, Fraction(1,2)))
       else:
         mod_ptr = action.results[0][0]
-        mod = machine.memory.read(mod_ptr, self.location, ObserveCtx())
+        mod = machine.memory.read(mod_ptr, self.location,
+                                  ValueCtx(False, Fraction(1,1)))
         if not isinstance(mod, Module):
           error(e.location, "expected a module, not " + str(val))
         if self.field in mod.exports.keys():
           ptr = mod.exports[self.field]
           if isinstance(action.context, ValueCtx):
-            result = machine.memory.read(ptr, self.location, action.context)
-          elif isinstance(action.context, ObserveCtx):
-            result = machine.memory.raw_read(ptr.address, ptr.path,
-                                             self.location)
+            if action.context.duplicate:
+              result = machine.memory.read(ptr, self.location, action.context)
+            else:
+              result = machine.memory.raw_read(ptr.address, ptr.path,
+                                               self.location)
           elif isinstance(action.context, AddressCtx):
-            result = ptr.duplicate(action.context.percentage)
+            if action.context.duplicate:
+              result = ptr.duplicate(action.context.percentage)
+            else:
+              result = ptr
           else:
             raise Exception('in Member.step, bad context '
                             + repr(action.context))
@@ -213,7 +214,9 @@ class Member(Exp):
         else:
           error(self.location, 'no member ' + self.field
                 + ' in module ' + mod.name)
-        
+
+# TODO: do we need `new`? Can it be replaced by taking the address
+#   of a 1-element tuple? -Jeremy
 @dataclass
 class New(Exp):
     init: Initializer
@@ -226,14 +229,14 @@ class New(Exp):
         return self.init.free_vars()
     def step(self, action, machine):
       if action.state == 0:
-        machine.schedule(self.init, action.env, ValueCtx(Fraction(1,1)))
+        machine.schedule(self.init, action.env, ValueCtx(True, Fraction(1,1)))
       else:
         ptr = machine.memory.allocate(action.results[0][0].duplicate(1))
         if isinstance(action.context, ValueCtx):
             result = ptr
         elif isinstance(action.context, AddressCtx):
             result = machine.memory.allocate(ptr)
-        elif isinstance(action.context, ObserveCtx):
+        if not action.context.duplicate:
             error(self.location, 'new not allowed in this context')
         machine.finish_expression(result, self.location)
 
@@ -264,8 +267,8 @@ class Array(Exp):
             result = array
         elif isinstance(action.context, AddressCtx):
             result = machine.memory.allocate(array)
-        elif isinstance(action.context, ObserveCtx):
-            error(self.location, 'arrays not allowed in this context')
+        if not action.context.duplicate:
+          error(self.location, 'arrays not allowed in this context')
         machine.finish_expression(result, self.location)
 
 @dataclass
@@ -287,7 +290,7 @@ class TupleExp(Exp):
           result = tup
         elif isinstance(action.context, AddressCtx):
           result = machine.memory.allocate(tup)
-        else:
+        if not action.context.duplicate:
           error(self.location, 'tuple not allowed in this context')
         machine.finish_expression(result, self.location)
         
@@ -306,11 +309,16 @@ class Var(Exp):
             error(self.location, 'use of undefined variable ' + self.ident)
         ptr = action.env[self.ident]
         if isinstance(action.context, ValueCtx):
-          result = machine.memory.read(ptr, self.location, action.context)
-        elif isinstance(action.context, ObserveCtx):
-          result = machine.memory.raw_read(ptr.address, ptr.path, self.location)
+          if action.context.duplicate:
+            result = machine.memory.read(ptr, self.location, action.context)
+          else:
+            result = machine.memory.raw_read(ptr.address, ptr.path,
+                                             self.location)
         elif isinstance(action.context, AddressCtx):
-          result = ptr.duplicate(action.context.percentage)
+          if action.context.duplicate:
+            result = ptr.duplicate(action.context.percentage)
+          else:
+            result = ptr
         else:
           raise Exception('in Var.step, bad context ' + repr(action.context))
         machine.finish_expression(result, self.location)
@@ -331,7 +339,7 @@ class Int(Exp):
             result = val
         elif isinstance(action.context, AddressCtx):
             result = machine.memory.allocate(val)
-        elif isinstance(action.context, ObserveCtx):
+        if not action.context.duplicate:
           error(self.location, 'integer not allowed in this context')
         machine.finish_expression(result, self.location)
 
@@ -351,7 +359,7 @@ class Frac(Exp):
             result = val
         elif isinstance(action.context, AddressCtx):
             result = machine.memory.allocate(val)
-        elif isinstance(action.context, ObserveCtx):
+        if not action.context.duplicate:
           error(self.location, 'fraction not allowed in this context')
         machine.finish_expression(result, self.location)
     
@@ -371,7 +379,7 @@ class Bool(Exp):
             result = val
         elif isinstance(action.context, AddressCtx):
             result = machine.memory.allocate(val)
-        elif isinstance(action.context, ObserveCtx):
+        if not action.context.duplicate:
           error(self.location, 'Boolean not allowed in this context')
         machine.finish_expression(result, self.location)
     
@@ -400,21 +408,16 @@ class Index(Exp):
           tup = action.results[0][0]
           if not isinstance(tup, TupleValue):
             error(self.location, 'expected a tuple, not ' + str(tup))
-          retval = tup.elts[int(i)].duplicate(1)
+          if action.context.duplicate:
+            retval = tup.elts[int(i)].duplicate(1)
+          else:
+            retval = tup.elts[int(i)]
         elif isinstance(action.context, AddressCtx):
           if tracing_on():
               print('in Index.step, AddressCtx')
           ptr = action.results[0][0]
+          # what if not action.context.duplicate? -Jeremy
           retval = ptr.element_address(int(i), action.context.percentage)
-        elif isinstance(action.context, ObserveCtx):
-          if tracing_on():
-              print('in Index.step, ObserveCtx')
-          tup = action.results[0][0]
-          if isinstance(tup, TupleValue):
-            retval = tup.elts[int(i)]
-          else:
-            error(self.location,
-                  'tuple access in observe context expected a tuple, not ' + str(tup))
         else:
           error(self.location, 'unrecognized context ' + repr(action.context))
         
@@ -434,23 +437,13 @@ class Deref(Exp):
       if action.state == 0:
         machine.schedule(self.arg, action.env, action.context)
       else:
-        # slist.rte, trouble with (*n)[1] in an address context
-        if False and isinstance(action.context, AddressCtx):
-          if tracing_on():
-              print('in Deref.step, AddressCtx')
-          retval = action.results[0][0].duplicate(1)
-        elif True or isinstance(action.context, ValueCtx):
-          if tracing_on():
-              print('in Deref.step, ValueCtx')
-          ptr = action.results[0][0]
-          if not isinstance(ptr, Pointer):
-            error(self.location, 'deref expected a pointer, not ' + str(ptr))
-          retval = machine.memory.read(ptr, self.location, action.context)
-        else:
-          error(self.location, 'deref not allowed in this context')
-        
+        if tracing_on():
+            print('in Deref.step')
+        ptr = action.results[0][0]
+        if not isinstance(ptr, Pointer):
+          error(self.location, 'deref expected a pointer, not ' + str(ptr))
+        retval = machine.memory.read(ptr, self.location, action.context)
         machine.finish_expression(retval, self.location)
-        
 
 @dataclass
 class AddressOf(Exp):
@@ -464,11 +457,15 @@ class AddressOf(Exp):
         return self.arg.free_vars()
     def step(self, action, machine):
       if action.state == 0:
-        machine.schedule(self.arg, action.env, AddressCtx(Fraction(1,1)))
+        machine.schedule(self.arg, action.env,
+                         AddressCtx(action.context.duplicate, Fraction(1,1)))
       else:
         if isinstance(action.context, ValueCtx):
           ptr = action.results[0][0]
-          retval = ptr.duplicate(action.context.percentage)
+          if action.context.duplicate:
+            retval = ptr.duplicate(action.context.percentage)
+          else:
+            retval = ptr
         else:
           error(self.location, '& (address of) not allowed in this context')
         machine.finish_expression(retval, self.location)
@@ -553,7 +550,7 @@ class Let(Exp):
             (self.body.free_vars() - set([self.var.ident]))
     def step(self, action, machine):
       if action.state == 0:
-        context = AddressCtx(priv_to_percent(self.var.kind))
+        context = AddressCtx(True, priv_to_percent(self.var.kind))
         machine.schedule(self.init, action.env, context)
       elif action.state == 1:
         val = action.results[0][0]
@@ -585,7 +582,7 @@ class FutureExp(Exp):
     elif isinstance(action.context, AddressCtx):
       future = Future(thread)
       retval = machine.memory.allocate(future)
-    else:
+    if not action.context.duplicate:
         error(self.location, 'future not allowed in this context')
     machine.finish_expression(retval, self.location)
 
@@ -601,12 +598,19 @@ class Await(Exp):
     return self.arg.free_vars()
   def step(self, action, machine):
     if action.state == 0:
-      machine.schedule(self.arg, action.env, action.context)
+      machine.schedule(self.arg, action.env,
+                       ValueCtx(True, Fraction(1,1)))
     else:
       future = action.results[0][0]
+      if not isinstance(future, Future):
+        error(self.location, 'in await, expected a future, not ' + str(future))
       if not future.thread.result is None \
          and future.thread.num_children == 0:
-        machine.finish_expression(future.thread.result, self.location)
+        if isinstance(action.context, ValueCtx):
+          result = future.thread.result
+        elif isinstance(action.context, AddressCtx):
+          result = machine.memory.allocate(future.thread.result)
+        machine.finish_expression(result, self.location)
   
     
 # Statements
@@ -653,7 +657,7 @@ class LetInit(Exp):
             | (self.body.free_vars() - set([self.var.ident]))
     def step(self, action, machine):
       if action.state == 0:
-        context = AddressCtx(priv_to_percent(self.var.kind))
+        context = AddressCtx(True, priv_to_percent(self.var.kind))
         machine.schedule(self.init, action.env, context)
       elif action.state == 1:
         val = action.results[0][0]
@@ -701,9 +705,9 @@ class Return(Stmt):
     def step(self, action, machine):
       if action.state == 0:
         if action.return_mode == 'value':
-          context = ValueCtx(Fraction(1,1))
+          context = ValueCtx(True, Fraction(1,1))
         elif action.return_mode == 'address':
-          context = AddressCtx(Fraction(1,1))
+          context = AddressCtx(True, Fraction(1,1))
         machine.schedule(self.arg, action.env, context)
       else:
         action.return_value = action.results[0][0].duplicate(1)
@@ -725,7 +729,7 @@ class Write(Stmt):
       if action.state == 0:
         machine.schedule(self.rhs, action.env)
       elif action.state == 1:
-        machine.schedule(self.lhs, action.env, AddressCtx(Fraction(1,1)))
+        machine.schedule(self.lhs, action.env, AddressCtx(True, Fraction(1,1)))
       else:
         val_ptr = action.results[0][0]
         ptr = action.results[1][0]
@@ -748,11 +752,11 @@ class Transfer(Stmt):
             | self.rhs.free_vars()
     def step(self, action, machine):
       if action.state == 0:
-        machine.schedule(self.lhs, action.env, ObserveCtx())
+        machine.schedule(self.lhs, action.env, ValueCtx(False, Fraction(1,1)))
       elif action.state == 1:
         machine.schedule(self.percent, action.env)
       elif action.state == 2:
-        machine.schedule(self.rhs, action.env, ObserveCtx())
+        machine.schedule(self.rhs, action.env, ValueCtx(False, Fraction(1,1)))
       else:
         dest_ptr = action.results[0][0]
         amount = action.results[1][0]
@@ -773,7 +777,7 @@ class Delete(Stmt):
         return self.arg.free_vars()
     def step(self, action, machine):
       if action.state == 0:
-        machine.schedule(self.arg, action.env, ValueCtx(Fraction(1,1)))
+        machine.schedule(self.arg, action.env, ValueCtx(True, Fraction(1,1)))
       else:
         ptr = action.results[0][0]
         if not isinstance(ptr, Pointer):
@@ -971,7 +975,7 @@ class Function(Decl):
       if action.state == 0:
         lam = Lambda(self.location, self.params, self.return_mode, self.body,
                      self.name)
-        machine.schedule(lam, action.env, ValueCtx(Fraction(1,1)))
+        machine.schedule(lam, action.env, ValueCtx(True, Fraction(1,1)))
       else:
         machine.memory.unchecked_write(action.env[self.name],
                                        action.results[0][0],
@@ -1019,13 +1023,15 @@ class Import(Decl):
     return str(self)
   def step(self, action, machine):
     if action.state == 0:
-      machine.schedule(self.module, action.env, AddressCtx(Fraction(1,2)))
+      machine.schedule(self.module, action.env, AddressCtx(True, Fraction(1,2)))
     else:
       mod_ptr = action.results[0][0]
-      mod = machine.memory.read(mod_ptr, self.location, ObserveCtx())
+      mod = machine.memory.read(mod_ptr, self.location,
+                                ValueCtx(False, Fraction(1,1)))
       for x in self.imports:
         if x in mod.exports.keys():
-          val = machine.memory.read(mod.exports[x], self.location, ObserveCtx())
+          val = machine.memory.read(mod.exports[x], self.location,
+                                    ValueCtx(False, Fraction(1,1)))
           machine.memory.write(action.env[x], val, self.location)
         else:
           error(self.location, 'module does not export ' + x)

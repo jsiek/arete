@@ -80,7 +80,7 @@ class Machine:
       self.push_frame()
       loc = main.location
       call_main = Call(loc, Var(loc, 'main'), [])
-      self.schedule(call_main, env, ValueCtx(Fraction(1,2)),
+      self.schedule(call_main, env, ValueCtx(True, Fraction(1,2)),
                     return_mode='-no-return-mode-')
       self.loop()
       if tracing_on():
@@ -107,6 +107,8 @@ class Machine:
       while len(self.threads) > 0:
           t = random.randint(0, len(self.threads)-1)
           self.current_thread = self.threads[t]
+          if tracing_on():
+            print('thread = ' + str(id(self.current_thread)))
           # case current_thread is finished
           if len(self.current_thread.stack) == 0:
             if self.current_thread.num_children == 0:
@@ -135,7 +137,7 @@ class Machine:
 
   # Call schedule to start the evaluation of an AST node.
   # Returns the new action.
-  def schedule(self, ast, env, context=ValueCtx(Fraction(1,2)),
+  def schedule(self, ast, env, context=ValueCtx(True, Fraction(1,2)),
                return_mode=None):
       return_mode = self.current_action().return_mode if return_mode is None \
                     else return_mode
@@ -151,7 +153,7 @@ class Machine:
           print('finish_expression ' + str(result))
           print(self.memory)
       for (p,ctx) in self.current_action().results:
-        if not isinstance(ctx, ObserveCtx):
+        if ctx.duplicate:
           p.kill(machine.memory, location)
       context = self.current_action().context
       self.current_frame().todo.pop()
@@ -171,7 +173,7 @@ class Machine:
       if tracing_on():
           print('finish_statement ' + str(retval))
       for (p,ctx) in self.current_action().results:
-        if not isinstance(ctx, ObserveCtx):
+        if ctx.duplicate:
           p.kill(machine.memory, location)
       self.current_frame().todo.pop()
       if len(self.current_frame().todo) > 0:
@@ -183,7 +185,7 @@ class Machine:
 
   def finish_declaration(self, location):
     for (p,ctx) in self.current_action().results:
-      if not isinstance(ctx, ObserveCtx):
+      if ctx.duplicate:
         p.kill(machine.memory, location)
     self.current_frame().todo.pop()
         
@@ -204,7 +206,7 @@ class Machine:
   def spawn(self, exp: Exp, env):
       act = Action(exp, 0, [], None,
                    self.current_action().return_mode, # ??
-                   ValueCtx(Fraction(1,1)), env)
+                   ValueCtx(True, Fraction(1,1)), env)
       frame = Frame([act])
       self.current_thread.num_children += 1
       thread = Thread([frame], None, self.current_thread, 0)

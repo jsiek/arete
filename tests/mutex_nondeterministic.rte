@@ -1,12 +1,12 @@
 // This program is nondeterministic. 
 
 fun write1(@q) {
-  while (not (upgrade(q))) { }
+  while (not (upgrade(&q))) { }
   *q = 1;
 }
 
 fun write2(@q) {
-  while (not (upgrade(q))) { }
+  while (not (upgrade(&q))) { }
   *q = 2;
 }
 
