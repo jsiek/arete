@@ -587,11 +587,11 @@ class FutureExp(Exp):
     machine.finish_expression(retval, self.location)
 
 @dataclass
-class Await(Exp):
+class Wait(Exp):
   arg: Exp
   __match_args__ = ("arg",)
   def __str__(self):
-    return "await " + str(self.arg)
+    return "wait " + str(self.arg)
   def __repr__(self):
     return str(self)
   def free_vars(self):
@@ -603,7 +603,7 @@ class Await(Exp):
     else:
       future = action.results[0][0]
       if not isinstance(future, Future):
-        error(self.location, 'in await, expected a future, not ' + str(future))
+        error(self.location, 'in wait, expected a future, not ' + str(future))
       if not future.thread.result is None \
          and future.thread.num_children == 0:
         if isinstance(action.context, ValueCtx):
@@ -926,7 +926,7 @@ class Global(Exp):
       machine.finish_declaration(self.location)
 
 @dataclass
-class ConstantDecl(Exp):
+class ConstantDef(Exp):
   name: str
   type_annot: Type
   rhs: Exp
@@ -942,7 +942,7 @@ class ConstantDecl(Exp):
     return set([var.ident])
 
 @dataclass
-class TypeDecl(Exp):
+class TypeDef(Exp):
   name: str
   type: Type
   __match_args__ = ("name", "type")
@@ -983,7 +983,7 @@ class Function(Decl):
         machine.finish_declaration(self.location)
 
 @dataclass
-class ModuleDecl(Decl):
+class ModuleDef(Decl):
   name: str
   exports: List[str]
   body: List[Decl]

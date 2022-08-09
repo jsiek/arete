@@ -32,7 +32,7 @@ from type_check import type_check_decls
 from const_eval import const_eval_decls
 
 @dataclass
-class Action:
+class NodeRunner:
     ast: AST
     state: int
     results: list[(Value,Context)] # results of subexpressions
@@ -44,7 +44,7 @@ class Action:
     
 @dataclass
 class Frame:
-    todo: list[Action]
+    todo: list[NodeRunner]
 
 @dataclass(eq=False)
 class Thread:
@@ -141,7 +141,7 @@ class Machine:
                return_mode=None):
       return_mode = self.current_action().return_mode if return_mode is None \
                     else return_mode
-      action = Action(ast, 0, [], None, return_mode, context, env)
+      action = NodeRunner(ast, 0, [], None, return_mode, context, env)
       self.current_frame().todo.append(action)
       return action
 
@@ -204,7 +204,7 @@ class Machine:
       return self.current_frame().todo[-1]
 
   def spawn(self, exp: Exp, env):
-      act = Action(exp, 0, [], None,
+      act = NodeRunner(exp, 0, [], None,
                    self.current_action().return_mode, # ??
                    ValueCtx(True, Fraction(1,1)), env)
       frame = Frame([act])

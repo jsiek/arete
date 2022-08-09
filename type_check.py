@@ -367,7 +367,7 @@ def type_check_exp(e, env):
       case FutureExp(arg):
         arg_type = type_check_exp(arg, env)
         return FutureType(e.location, arg_type)
-      case Await(arg):
+      case Wait(arg):
         arg_type = type_check_exp(arg, env)
         arg_type = unfold(arg_type)
         if isinstance(arg_type, FutureType):
@@ -375,7 +375,7 @@ def type_check_exp(e, env):
         elif isinstance(arg_type, AnyType):
           return AnyType(e.location)
         else:
-          error(arg.location, 'in await, expected a future, not '
+          error(arg.location, 'in wait, expected a future, not '
                 + str(arg_type))
       case _:
         error(e.location, 'error in type_check_exp, unhandled: ' + repr(e)) 
@@ -446,7 +446,7 @@ def typeof_decl(decl, env):
                         tuple(p.type_annot for p in params),
                         ret_ty)
       ret = simplify(ty, env)
-    case ModuleDecl(name, exports, body):
+    case ModuleDef(name, exports, body):
       member_types = {}
       for d in body:
         if not isinstance(d, Import):
@@ -469,7 +469,7 @@ def declare_decl(decl, env):
               env[x] = mod.member_types[x]
         else:
           error(decl.location, "in import, expected a module, not " + str(mod))
-      case TypeDecl(name, type):
+      case TypeDef(name, type):
         env[name] = simplify(type, env)
       case _:
         env[decl.name] = typeof_decl(decl, env)
@@ -489,14 +489,14 @@ def type_check_decl(decl, env):
         error(decl.location, 'return type mismatch:\n' + str(ret_ty) + ' inconsistent with '
               + str(body_type))
       
-    case ModuleDecl(name, exports, body):
+    case ModuleDef(name, exports, body):
       type_check_decls(body, env)
 
     case Import(module, imports):
       # TODO
       pass
 
-    case TypeDecl(name, type):
+    case TypeDef(name, type):
       pass
       
     

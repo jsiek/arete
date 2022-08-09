@@ -151,8 +151,8 @@ def parse_tree_to_ast(e):
                    parse_tree_to_ast(e.children[2]))
     elif e.data == 'future':
         return FutureExp(e.meta, parse_tree_to_ast(e.children[0]))
-    elif e.data == 'await':
-        return Await(e.meta, parse_tree_to_ast(e.children[0]))
+    elif e.data == 'wait':
+        return Wait(e.meta, parse_tree_to_ast(e.children[0]))
     
     # statements
     elif e.data == 'let_init':
@@ -208,7 +208,7 @@ def parse_tree_to_ast(e):
     elif e.data == 'pass':
         return Pass(e.meta)
 
-    # declarations
+    # definitions
     elif e.data == 'import':
         return Import(e.meta,
                       parse_tree_to_ast(e.children[0]),
@@ -219,12 +219,12 @@ def parse_tree_to_ast(e):
                       parse_tree_to_type_annot(e.children[1]),
                       parse_tree_to_ast(e.children[2]))
     elif e.data == 'constant':
-        return ConstantDecl(e.meta,
+        return ConstantDef(e.meta,
                             str(e.children[0].value),
                             parse_tree_to_type_annot(e.children[1]),
                             parse_tree_to_ast(e.children[2]))
-    elif e.data == 'type_decl':
-        return TypeDecl(e.meta,
+    elif e.data == 'type_def':
+        return TypeDef(e.meta,
                         str(e.children[0].value),
                         parse_tree_to_type_annot(e.children[1]))
     elif e.data == 'function':
@@ -235,7 +235,7 @@ def parse_tree_to_ast(e):
                         str(e.children[3].data),
                         parse_tree_to_ast(e.children[4]))
     elif e.data == 'module':
-        return ModuleDecl(e.meta,
+        return ModuleDef(e.meta,
                           str(e.children[0].value),
                           parse_tree_to_str_list(e.children[1]),
                           parse_tree_to_ast(e.children[2]))

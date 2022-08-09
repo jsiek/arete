@@ -5,8 +5,8 @@ fun write(!p, v) {
 fun main() {
   let !a = new 0;
   let f1 = spawn write(a, 42);
-  ! await f1;
+  ! wait f1;
   let f2 = spawn write(a, -42);
-  ! await f2;
+  ! wait f2;
   return *a + 42;
 }

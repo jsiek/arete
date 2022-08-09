@@ -78,7 +78,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "true"                                     -> true
     | "false"                                    -> false
     | "spawn" exp                                -> future
-    | "await" exp_hi                             -> await
+    | "wait" exp_hi                              -> wait
 
 ?stmt: exp "=" init ";"                          -> write
     | exp "<-" exp "of" exp ";"                  -> transfer
@@ -130,17 +130,17 @@ param: IDENT type_annot                          -> read
 ?ret_type: "->" type                             -> just
     |                                            -> nothing
 
-?decl: "let" IDENT type_annot "=" exp ";"        -> global
+?def: "let" IDENT type_annot "=" exp ";"         -> global
     | "const" IDENT type_annot "=" exp ";"       -> constant
     | "fun" IDENT "(" param_list ")" ret_type ret_mode block -> function
-    | "module" IDENT "exports" ident_list "{" decl_list "}" -> module
+    | "module" IDENT "exports" ident_list "{" def_list "}" -> module
     | "from" exp "import" ident_list ";"         -> import
-    | "type" IDENT "=" type ";"                  -> type_decl
+    | "type" IDENT "=" type ";"                  -> type_def
 
-?decl_list:                                      -> empty
-    | decl decl_list                             -> push
+?def_list:                                       -> empty
+    | def def_list                               -> push
     
-arete: decl_list
+arete: def_list
 
 %ignore COMMENT
 %ignore LINECOMMENT

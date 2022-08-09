@@ -5,6 +5,6 @@ fun write(!p, v) {
 fun main() {
   let !p = new 1;
   let t = spawn spawn write(p, 0);
-  ! await t;
+  ! wait t;
   return *p;
 }

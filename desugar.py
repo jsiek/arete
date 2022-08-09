@@ -79,9 +79,9 @@ def desugar_exp(e, env):
       case FutureExp(arg):
         new_arg = desugar_exp(arg, env)
         return FutureExp(e.location, new_arg)
-      case Await(arg):
+      case Wait(arg):
         new_arg = desugar_exp(arg, env)
-        return Await(e.location, new_arg)
+        return Wait(e.location, new_arg)
       case _:
         error(e.location, 'error in desugar_exp, unhandled: ' + repr(e))
     
@@ -173,11 +173,11 @@ def declare_decl(decl, env):
     
 def desugar_decl(decl, env):
     match decl:
-      case ConstantDecl(name, type_annot, rhs):
+      case ConstantDef(name, type_annot, rhs):
         new_rhs = desugar_exp(rhs, env)
-        return ConstantDecl(decl.location, name, type_annot, new_rhs)
-      case TypeDecl(name, type):
-        return TypeDecl(decl.location, name, type)
+        return ConstantDef(decl.location, name, type_annot, new_rhs)
+      case TypeDef(name, type):
+        return TypeDef(decl.location, name, type)
       case Global(name, ty, rhs):
         new_rhs = desugar_exp(rhs, env)
         return Global(decl.location, name, ty, new_rhs)
@@ -187,9 +187,9 @@ def desugar_decl(decl, env):
             body_env[p.ident] = False
         new_body = desugar_stmt(body, body_env)
         return Function(decl.location, name, params, ret_ty, ret_mode, new_body)
-      case ModuleDecl(name, exports, body):
+      case ModuleDef(name, exports, body):
         new_body = desugar_decls(body, env)
-        return ModuleDecl(decl.location, name, exports, new_body)
+        return ModuleDef(decl.location, name, exports, new_body)
       case Import(module, imports):
         new_module = desugar_exp(module, env)
         return Import(decl.location, new_module, imports)

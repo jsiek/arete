@@ -121,9 +121,9 @@ def const_eval_exp(e, env):
       case FutureExp(arg):
         new_arg = const_eval_exp(arg, env)
         return FutureExp(e.location, new_arg)
-      case Await(arg):
+      case Wait(arg):
         new_arg = const_eval_exp(arg, env)
-        return Await(e.location, new_arg)
+        return Wait(e.location, new_arg)
       case _:
         error(e.location, 'error in const_eval_exp, unhandled: ' + repr(e)) 
 
@@ -179,7 +179,7 @@ def const_eval_stmt(s, env):
 
 def const_eval_decl(decl, env):
     match decl:
-      case ConstantDecl(name, type_annot, rhs):
+      case ConstantDef(name, type_annot, rhs):
         new_rhs = const_eval_exp(rhs, env)
         if is_constant(new_rhs):
           env[name] = new_rhs
@@ -187,8 +187,8 @@ def const_eval_decl(decl, env):
           error(decl.location, 'right-hand side must be a constant, not '
                 + str(rhs))
         return []
-      case TypeDecl(name, type):
-        return [TypeDecl(decl.location, name, type)]
+      case TypeDef(name, type):
+        return [TypeDef(decl.location, name, type)]
       case Global(name, type_annot, rhs):
         new_rhs = const_eval_exp(rhs, env)
         return [Global(decl.location, name, type_annot, new_rhs)]
@@ -200,10 +200,10 @@ def const_eval_decl(decl, env):
         new_body = const_eval_stmt(body, body_env)
         return [Function(decl.location, name, params, return_ty, return_mode,
                          new_body)]
-      case ModuleDecl(name, exports, body):
+      case ModuleDef(name, exports, body):
         body_env = env.copy()
         new_body = const_eval_decls(body, body_env)
-        return [ModuleDecl(decl.location, name, exports, new_body)]
+        return [ModuleDef(decl.location, name, exports, new_body)]
       case Import(module, imports):
         new_module = const_eval_exp(module, env)
         return [Import(decl.location, module, imports)]

@@ -14,6 +14,6 @@ fun main() {
   let x = *p;
   s = null; // give back signal's permissions
   // write happens sometime in here
-  ! await f1;
+  ! wait f1;
   return x;
 }
