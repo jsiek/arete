@@ -22,6 +22,7 @@ Some of the features that it will explore are:
 The design of Arete is currently captured in a prototype
 implementation that includes 
 * grammar and parser ([Arete.lark](Arete.lark) and [parser.py](parser.py))
+  using the [Lark](https://github.com/lark-parser/lark) parser generater.
 * type checker ([type_check.py](type_check.py))
 * desugaring ([desugar.py](desugar.py))
 * interpreter (an abstract machine) ([machine.py](machine.py))
