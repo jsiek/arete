@@ -29,7 +29,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     |                                            -> value
 
 ?expression: expression_logic "?" expression ":" expression  -> condition
-    | "let" param "=" init "in" expression                   -> let
+    | "let" parameter "=" initializer "in" expression                   -> let
     | expression_logic
 
 ?expression_logic: expression_logic "and" expression_cmp              -> and
@@ -70,17 +70,17 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "-" expression_hi                                 -> neg
     | "not" expression_hi                               -> not
     | "(" expression ")"                                -> paren
-    | "fun" "(" param_list ")" ret_mode block    -> lambda
-    | "new" init                                 -> new
+    | "fun" "(" parameter_list ")" ret_mode block    -> lambda
+    | "new" initializer                                 -> new
     | "[" expression "of" expression "]"                       -> array
-    | "⟨" init_list "⟩"                          -> tuple
-    | expression_hi "(" init_list ")"                   -> call
+    | "⟨" initializer_list "⟩"                          -> tuple
+    | expression_hi "(" initializer_list ")"                   -> call
     | "true"                                     -> true
     | "false"                                    -> false
     | "spawn" expression                                -> future
     | "wait" expression_hi                              -> wait
 
-?statement: expression "=" init ";"                          -> write
+?statement: expression "=" initializer ";"                          -> write
     | expression "<-" expression "of" expression ";"                  -> transfer
     | "!" expression ";"                                -> expr
     | "delete" expression ";"                           -> delete
@@ -95,8 +95,8 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "else" "if" "(" expression ")" block if_rest       -> else_if
     |                                             -> no_else
 
-?statement_list: "let" param "=" init ";" statement_list   -> let_init
-    | "var" IDENT "=" expression ";" statement_list          -> var_init
+?statement_list: "let" parameter "=" initializer ";" statement_list   -> let_initializer
+    | "var" IDENT "=" expression ";" statement_list          -> var_initializer
     | statement statement_list                             -> seq
     | statement                                       -> last_statement
     | "return" expression ";"                           -> return
@@ -108,20 +108,20 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | expression                                        -> single
     | expression "," expression_list                           -> push
 
-?init: expression                                       -> default_init
-    | expression "of" expression                               -> frac_init
+?initializer: expression                                       -> default_initializer
+    | expression "of" expression                               -> frac_initializer
 				                 
-?init_list:                                      -> empty
-    | init                                       -> single
-    | init "," init_list                         -> push
+?initializer_list:                                      -> empty
+    | initializer                                       -> single
+    | initializer "," initializer_list                         -> push
 				                 
-param: IDENT type_opt                          -> read
+parameter: IDENT type_opt                          -> read
     | "!" IDENT type_opt                       -> write
     | "@" IDENT type_opt                       -> none
 				                 
-?param_list:                                     -> empty
-    | param                                      -> single
-    | param "," param_list                       -> push
+?parameter_list:                                     -> empty
+    | parameter                                      -> single
+    | parameter "," parameter_list                       -> push
 
 ?ident_list:                                     -> empty
     | IDENT                                      -> single
@@ -132,7 +132,7 @@ param: IDENT type_opt                          -> read
 
 ?definition: "let" IDENT type_opt "=" expression ";"         -> global
     | "const" IDENT type_opt "=" expression ";"       -> constant
-    | "fun" IDENT "(" param_list ")" ret_type ret_mode block -> function
+    | "fun" IDENT "(" parameter_list ")" ret_type ret_mode block -> function
     | "module" IDENT "exports" ident_list "{" definition_list "}" -> module
     | "from" expression "import" ident_list ";"         -> import
     | "type" IDENT "=" type ";"                  -> type_definition

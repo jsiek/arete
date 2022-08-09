@@ -81,6 +81,28 @@ A pointer whose `permission` is `1` can be used for writing.
 If the pointer is a copy of another pointer, then its `lender` is that
 other pointer.
 
+We define the following operations on pointers.
+
+### Kill
+
+UNDER CONSTRUCTION
+
+### Duplicate
+
+UNDER CONSTRUCTION
+
+### Transfer
+
+UNDER CONSTRUCTION
+
+### Upgrade
+
+UNDER CONSTRUCTION
+
+### Element Address
+
+UNDER CONSTRUCTION
+
 ## Closures
 
 A closure includes information from the originating function (name,
@@ -96,29 +118,7 @@ A *future* has an associated thread.
 A module has a name, a dictionary of exported members, and a dictionary
 of all its members.
 
-# Value Operations
 
-## Kill
-
-UNDER CONSTRUCTION
-
-## Duplicate
-
-UNDER CONSTRUCTION
-
-# Pointer-only Operations
-
-## Transfer
-
-UNDER CONSTRUCTION
-
-## Upgrade
-
-UNDER CONSTRUCTION
-
-## Element Address
-
-UNDER CONSTRUCTION
 
 # Machine Description
 
@@ -223,8 +223,20 @@ Let `C` be the context of the current node runner.
    pop the current frame from the `stack` and then set the
    `return_value` of the current runner to the result value.
    
-5. Otherwise, set the `result` of the current thread to the result value.
+5. Otherwise, set the `result` of the current thread to the result
+   value.
 
+### Finish Statement
+
+UNDER CONSTRUCTION
+
+### Finish Definition
+
+UNDER CONSTRUCTION
+
+### Spawn
+
+UNDER CONSTRUCTION
 
 
 # Language Feature Catalog
@@ -234,15 +246,54 @@ which has three main categories: expressions, statements, and
 definitions. Within each category, the entries are ordered
 alphabetically.
 
-A program is a list of zero or more definitions:
+A *program* is a list of zero or more definitions:
 
 ```
 <definition_list> ::=   | <definition> <definition_list>
 ```
 
-Program execution begins with a call to a function named `main` with
+Program execution begins with a call to the function named `main` with
 no arguments. If there is no such function, the program halts with an
 error.
+
+## Miscellaneous Syntax
+
+This section is about auxilliary syntactic categories that are used by
+the main syntactic elements.
+
+
+```
+<param_kind> ::=   | ! | @
+```
+
+The `param_kind` specifies the permissions required of the argument to
+the parameter. The notation `!` for writable (fraction `1`), `@` is
+for no requirement (any fraction), and the default is readable (any
+fraction greater than `0`).
+
+```
+<parameter> ::= [<param_kind>] <identifier> [: <type>]
+```
+
+The `parameter` category is used for function parameters and other
+variable definitions (e.g. the `let` statement).
+
+```
+<initializer> ::= <expression> | <expression> of <expression>
+```
+
+An initializer specifies what percentage of the permission is taken
+from the result value of the given expression. For example, the
+following initializes variable `y` to be an alias of variable `x`,
+taking 50% of its permissions.
+
+```
+let y = 1/2 of x;
+```
+
+If no percentage is specified and the context of the current action is
+an `ActionCtx`, then use that context's percentage. Otherwise
+use 50%.
 
 ## Definitions
 
@@ -304,13 +355,16 @@ Evaluate the `expression` and halt the program if the result is `false`.
 <statement> ::= { <statement_list> }
 ```
 
-### Expression
+### Expression Statement
 
 ```
 <statement> ::= ! <expression>;
 ```
 
 Evaluate the `expression` for its effects and discard the result.
+
+(Note: the `!` is there to make the grammar unambiguous, which sucks.
+This needs work.)
 
 ### If
 

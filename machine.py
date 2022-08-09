@@ -185,7 +185,7 @@ class Machine:
       else:
         self.result = retval
 
-  def finish_declaration(self, location):
+  def finish_definition(self, location):
     for (p,ctx) in self.current_runner().results:
       if ctx.duplicate:
         p.kill(machine.memory, location)

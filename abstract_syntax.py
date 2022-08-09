@@ -926,7 +926,7 @@ class Global(Exp):
     else:
       machine.memory.write(action.env[self.name], action.results[0][0],
                            self.location)
-      machine.finish_declaration(self.location)
+      machine.finish_definition(self.location)
 
 @dataclass
 class ConstantDef(Exp):
@@ -954,7 +954,7 @@ class TypeDef(Exp):
   def __repr__(self):
     return str(self)
   def step(self, action, machine):
-    machine.finish_declaration(self.location)
+    machine.finish_definition(self.location)
 
   
 @dataclass
@@ -983,7 +983,7 @@ class Function(Decl):
         machine.memory.unchecked_write(action.env[self.name],
                                        action.results[0][0],
                                        self.location)
-        machine.finish_declaration(self.location)
+        machine.finish_definition(self.location)
 
 @dataclass
 class ModuleDef(Decl):
@@ -1012,7 +1012,7 @@ class ModuleDef(Decl):
                    {ex: action.body_env[ex] for ex in self.exports},
                    action.body_env)
       machine.memory.memory[action.env[self.name].address] = mod
-      machine.finish_declaration(self.location)
+      machine.finish_definition(self.location)
 
 @dataclass
 class Import(Decl):
@@ -1038,7 +1038,7 @@ class Import(Decl):
           machine.memory.write(action.env[x], val, self.location)
         else:
           error(self.location, 'module does not export ' + x)
-      machine.finish_declaration(self.location)
+      machine.finish_definition(self.location)
       
 # TODO: instead do allocation and then fill in the result -Jeremy
 def declare_decl(decl, env, mem):
