@@ -1,16 +1,26 @@
-# arete
+# Arete
 
 Arete is an experimental programming language.
 
 Some of the features that it will explore are:
 
-* parallelism
+* parallelism (currently via futures)
+
 * controlled mutability for data-race freedom, memory safety, etc.
-  pointers track their permission: none (0), read (1/2, etc.), write (1)
+
+  pointers have a fractional permission: 
+    * 0 (none), 
+	* between 0 and 1 (read),
+	* 1 (write)
+  
 * gradual typing
+
 * generics with contraints
+
 * modules
 
+
+The following tracks the current status of Arete.
 
 # Value Catalog
 
@@ -37,37 +47,37 @@ Semantically, a program must include at least one definition, for the
 ### Constant
 
 ```
-const <identifier> [: <type>] = <expression>;
+<definition> ::= const <identifier> [: <type>] = <expression>;
 ```
 
 ### Import
 
 ```
-from <expression> import <identifier_list>;
+<definition> ::= from <expression> import <identifier_list>;
 ```
 
 ### Function
 
 ```
-fun <identifier> (<parameter_list>) [-> <type>] [<return_mode>] <block>
+<definition> ::= fun <identifier> (<parameter_list>) [-> <type>] [<return_mode>] <block>
 ```
 
 ### Module
 
 ```
-module <identifier> exports <identifier_list> { <definition_list> }
+<definition> ::= module <identifier> exports <identifier_list> { <definition_list> }
 ```
 
 ### Type Alias
 
 ```
-type <identifier> = <type>;
+<definition> ::= type <identifier> = <type>;
 ```
 
 ### Variable (Global)
 
 ```
-let <identifier> [: <type>] = <expression>;
+<definition> ::= let <identifier> [: <type>] = <expression>;
 ```
 
 ## Statements 
@@ -75,7 +85,7 @@ let <identifier> [: <type>] = <expression>;
 ### Assert
 
 ```
-assert <expression>;
+<statement> ::= assert <expression>;
 ```
 
 Evaluate the `expression` and halt the program if the result is `false`.
@@ -83,19 +93,19 @@ Evaluate the `expression` and halt the program if the result is `false`.
 ### Assignment
 
 ```
-<expression> = <initializer>;
+<statement> ::= <expression> = <initializer>;
 ```
 
 ### Block
 
 ```
-{ <statement_list> }
+<statement> ::= { <statement_list> }
 ```
 
 ### Expression
 
 ```
-! <expression>;
+<statement> ::= ! <expression>;
 ```
 
 Evaluate the `expression` for its effects and discard the result.
@@ -103,31 +113,31 @@ Evaluate the `expression` for its effects and discard the result.
 ### If
 
 ```
-if (<expression>) <block>
-if (<expression>) <block> else <block>
+<statement> ::= if (<expression>) <block>
+<statement> ::= if (<expression>) <block> else <block>
 ```
 
 ### Local Variable
 
 ```
-let <parameter> = <initializer>;
+<statement> ::= let <parameter> = <initializer>;
 ```
 
 ```
-var <identifier> = <expressions>;
+<statement> ::= var <identifier> = <expressions>;
 ```
 
 
 ### Return
 
 ```
-return <expression>;
+<statement> ::= return <expression>;
 ```
 
 ### Transfer Permission
 
 ```
-<expression> <- <expression> of <expression>
+<statement> ::= <expression> <- <expression> of <expression>
 ```
 
 
@@ -136,7 +146,7 @@ return <expression>;
 ### While
 
 ```
-while (<expression>) <block>
+<statement> ::= while (<expression>) <block>
 ```
 
 Repeatedly execute the `block` so long as the `expression` evaluates to `true`.
@@ -147,7 +157,7 @@ Repeatedly execute the `block` so long as the `expression` evaluates to `true`.
 ### Spawn
 
 ```
-spawn <expression>
+<expression> ::= spawn <expression>
 ```
 
 Evaluate the `expression` in a new thread, concurrent with the current thread.
@@ -157,7 +167,7 @@ This *future* can later be passed to `wait` (see below the description for `awai
 ### Wait
 
 ```
-wait <expression>
+<expression> ::= wait <expression>
 ```
 
 The `expression` evaluates to a *future*, then the current thread
