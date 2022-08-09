@@ -292,7 +292,7 @@ class Closure(Value):
     params: list[Any]
     return_mode: str    # 'value' or 'address'
     body: Stmt
-    env: Any # needs work
+    env: dict[str,Pointer]
     __match_args__ = ("name", "params", "return_mode", "body", "env")
     
     def duplicate(self, percentage):
@@ -353,8 +353,8 @@ class Future(Value):
 @dataclass(eq=False)
 class Module(Value):
     name: str
-    exports: dict[str, Value]
-    members: dict[str, Value] # all the members
+    exports: dict[str, Pointer] # only the exports
+    members: dict[str, Pointer] # all the members
     __match_args__ = ("name", "exports")
     def duplicate(self, percentage):
         exports_copy = {x: val.duplicate(percentage) \

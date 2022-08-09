@@ -41,7 +41,7 @@ class NodeRunner:
     return_value: Value  # result of `return` statement
     return_mode: str     # value or address
     context: Context     # rvalue/lvalue/etc.
-    env: dict[str,Value]
+    env: dict[str,Pointer]
     
     
 @dataclass
