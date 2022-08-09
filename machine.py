@@ -123,13 +123,13 @@ class Machine:
           # case current_thread has work to do
           frame = self.current_frame()
           if len(frame.todo) > 0:
-            action = self.current_action()
+            action = self.current_runner()
             if tracing_on():
               print(error_header(action.ast.location))
               print('stepping ' + repr(action))
             action.ast.step(action, self)
             if tracing_on() and len(frame.todo) > 0:
-              log_graphviz('top', self.current_action().env, self.memory.memory)
+              log_graphviz('top', self.current_runner().env, self.memory.memory)
               print(machine.memory)
               print()
             #machine.memory.compute_fractions()
@@ -141,7 +141,7 @@ class Machine:
   # Returns the new action.
   def schedule(self, ast, env, context=ValueCtx(True, Fraction(1,2)),
                return_mode=None):
-      return_mode = self.current_action().return_mode if return_mode is None \
+      return_mode = self.current_runner().return_mode if return_mode is None \
                     else return_mode
       action = NodeRunner(ast, 0, [], None, return_mode, context, env)
       self.current_frame().todo.append(action)
@@ -154,13 +154,13 @@ class Machine:
       if tracing_on():
           print('finish_expression ' + str(result))
           print(self.memory)
-      for (p,ctx) in self.current_action().results:
+      for (p,ctx) in self.current_runner().results:
         if ctx.duplicate:
           p.kill(machine.memory, location)
-      context = self.current_action().context
+      context = self.current_runner().context
       self.current_frame().todo.pop()
       if len(self.current_frame().todo) > 0:
-          self.current_action().results.append((result, context))
+          self.current_runner().results.append((result, context))
       elif len(self.current_thread.stack) > 1:
           self.pop_frame(result)
       else:
@@ -171,22 +171,22 @@ class Machine:
   # Call finish_statement to signal that the current statement action is done.
   # Propagates the return value if there is one.
   def finish_statement(self, location):
-      retval = self.current_action().return_value
+      retval = self.current_runner().return_value
       if tracing_on():
           print('finish_statement ' + str(retval))
-      for (p,ctx) in self.current_action().results:
+      for (p,ctx) in self.current_runner().results:
         if ctx.duplicate:
           p.kill(machine.memory, location)
       self.current_frame().todo.pop()
       if len(self.current_frame().todo) > 0:
-        self.current_action().return_value = retval
+        self.current_runner().return_value = retval
       elif len(self.current_thread.stack) > 1:
         self.pop_frame(retval)
       else:
         self.result = retval
 
   def finish_declaration(self, location):
-    for (p,ctx) in self.current_action().results:
+    for (p,ctx) in self.current_runner().results:
       if ctx.duplicate:
         p.kill(machine.memory, location)
     self.current_frame().todo.pop()
@@ -197,17 +197,17 @@ class Machine:
 
   def pop_frame(self, val):
       self.current_thread.stack.pop()
-      self.current_action().return_value = val
+      self.current_runner().return_value = val
 
   def current_frame(self):
       return self.current_thread.stack[-1]
 
-  def current_action(self):
+  def current_runner(self):
       return self.current_frame().todo[-1]
 
   def spawn(self, exp: Exp, env):
       act = NodeRunner(exp, 0, [], None,
-                   self.current_action().return_mode, # ??
+                   self.current_runner().return_mode, # ??
                    ValueCtx(True, Fraction(1,1)), env)
       frame = Frame([act])
       self.current_thread.num_children += 1
