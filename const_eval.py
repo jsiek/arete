@@ -90,7 +90,7 @@ def const_eval_exp(e, env):
         for p in params:
           if p.ident in body_env.keys():
             del body_env[p.ident]
-        new_body = const_eval_stmt(body, body_env)
+        new_body = const_eval_statement(body, body_env)
         return Lambda(e.location, params, ret_mode, new_body, name)
       case Call(fun, args):
         new_fun = const_eval_exp(fun, env)
@@ -127,18 +127,18 @@ def const_eval_exp(e, env):
       case _:
         error(e.location, 'error in const_eval_exp, unhandled: ' + repr(e)) 
 
-def const_eval_stmt(s, env):
+def const_eval_statement(s, env):
     match s:
       case LetInit(var, init, body):
         new_init = const_eval_init(init, env)
         body_env = env.copy()
         if var.ident in body_env.keys():
           del body_env[var]
-        new_body = const_eval_stmt(body, body_env)
+        new_body = const_eval_statement(body, body_env)
         return LetInit(s.location, var, new_init, new_body)
       case Seq(first, rest):
-        new_first = const_eval_stmt(first, env)
-        new_rest = const_eval_stmt(rest, env)
+        new_first = const_eval_statement(first, env)
+        new_rest = const_eval_statement(rest, env)
         return Seq(s.location, new_first, new_rest)
       case Return(arg):
         new_arg = const_eval_exp(arg, env)
@@ -165,17 +165,17 @@ def const_eval_stmt(s, env):
         return Delete(s.location, new_arg)
       case IfStmt(cond, thn, els):
         new_cond = const_eval_exp(cond, env)
-        new_thn = const_eval_stmt(thn, env)
-        new_els = const_eval_stmt(els, env)
+        new_thn = const_eval_statement(thn, env)
+        new_els = const_eval_statement(els, env)
         return IfStmt(s.location, new_cond, new_thn, new_els)
       case While(cond, body):
         new_cond = const_eval_exp(cond, env)
-        new_body = const_eval_stmt(body, env)
+        new_body = const_eval_statement(body, env)
         return While(s.location, new_cond, new_body)
       case Block(body):
-        return Block(s.location, const_eval_stmt(body, env))
+        return Block(s.location, const_eval_statement(body, env))
       case _:
-        error(s.location, 'error in const_eval_stmt, unhandled: ' + repr(s)) 
+        error(s.location, 'error in const_eval_statement, unhandled: ' + repr(s)) 
 
 def const_eval_decl(decl, env):
     match decl:
@@ -197,7 +197,7 @@ def const_eval_decl(decl, env):
         for p in params:
           if p.ident in body_env.keys():
             del body_env[p.ident]
-        new_body = const_eval_stmt(body, body_env)
+        new_body = const_eval_statement(body, body_env)
         return [Function(decl.location, name, params, return_ty, return_mode,
                          new_body)]
       case ModuleDef(name, exports, body):

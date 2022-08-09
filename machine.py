@@ -30,6 +30,8 @@ from utilities import *
 from parser import parse, set_filename
 from type_check import type_check_decls
 from const_eval import const_eval_decls
+from memory import *
+from graphviz import log_graphviz
 
 @dataclass
 class NodeRunner:

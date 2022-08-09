@@ -186,7 +186,7 @@ def parse_tree_to_ast(e):
         return Seq(e.meta,
                    parse_tree_to_ast(e.children[0]),
                    parse_tree_to_ast(e.children[1]))
-    elif e.data == 'last_stmt':
+    elif e.data == 'last_statement':
         return parse_tree_to_ast(e.children[0])
     elif e.data == 'if' or e.data == 'else_if':
         return IfStmt(e.meta,
@@ -223,7 +223,7 @@ def parse_tree_to_ast(e):
                             str(e.children[0].value),
                             parse_tree_to_type_annot(e.children[1]),
                             parse_tree_to_ast(e.children[2]))
-    elif e.data == 'type_def':
+    elif e.data == 'type_definition':
         return TypeDef(e.meta,
                         str(e.children[0].value),
                         parse_tree_to_type_annot(e.children[1]))

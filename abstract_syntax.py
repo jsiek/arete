@@ -3,6 +3,9 @@ from typing import List, Set, Dict, Tuple, Any
 from lark.tree import Meta
 from fractions import Fraction
 from utilities import *
+from values import *
+from memory import *
+from primitive_operations import eval_prim, compare_ops
 
 verbose = False
 

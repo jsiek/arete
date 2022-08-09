@@ -49,7 +49,7 @@ def desugar_exp(e, env):
         body_env = env.copy()
         for p in params:
             body_env[p.ident] = False
-        new_body = desugar_stmt(body, body_env)
+        new_body = desugar_statement(body, body_env)
         return Lambda(e.location, params, ret_mode, new_body, name)
       case Call(fun, inits):
         new_fun = desugar_exp(fun, env)
@@ -85,13 +85,13 @@ def desugar_exp(e, env):
       case _:
         error(e.location, 'error in desugar_exp, unhandled: ' + repr(e))
     
-def desugar_stmt(s, env):
+def desugar_statement(s, env):
     match s:
       case LetInit(var, init, body):
         new_init = desugar_init(init, env)
         body_env = env.copy()
         body_env[var.ident] = False
-        new_body = desugar_stmt(body, body_env)
+        new_body = desugar_statement(body, body_env)
         return LetInit(s.location, var, new_init, new_body)
       case VarInit(var, rhs, body):
         loc = s.location
@@ -102,7 +102,7 @@ def desugar_stmt(s, env):
           #  =>
           #  let !x = new e in b[[*x]]
           body_env[var] = True
-          new_body = desugar_stmt(body, body_env)
+          new_body = desugar_statement(body, body_env)
           new_exp = New(loc, [Initializer(loc, Frac(loc, Fraction(1,1)),
                                           new_rhs)])
           return LetInit(loc, Param(loc, 'write', var, AnyType(loc)),
@@ -115,7 +115,7 @@ def desugar_stmt(s, env):
           #  =>
           #  let !x = 1 of e in b[[x]]
           body_env[var] = False
-          new_body = desugar_stmt(body, body_env)
+          new_body = desugar_statement(body, body_env)
           return LetInit(loc, Param(loc, 'write', var, AnyType(loc)),
                          Initializer(loc,
                                      Frac(loc, Fraction(1,1)),
@@ -123,8 +123,8 @@ def desugar_stmt(s, env):
                          new_body)
     
       case Seq(first, rest):
-        new_first = desugar_stmt(first, env)
-        new_rest = desugar_stmt(rest, env)
+        new_first = desugar_statement(first, env)
+        new_rest = desugar_statement(rest, env)
         return Seq(s.location, new_first, new_rest)
       case Return(arg):
         new_arg = desugar_exp(arg, env)
@@ -151,17 +151,17 @@ def desugar_stmt(s, env):
         return Delete(s.location, new_arg)
       case IfStmt(cond, thn, els):
         new_cond = desugar_exp(cond, env)
-        new_thn = desugar_stmt(thn, env)
-        new_els = desugar_stmt(els, env)
+        new_thn = desugar_statement(thn, env)
+        new_els = desugar_statement(els, env)
         return IfStmt(s.location, new_cond, new_thn, new_els)
       case While(cond, body):
         new_cond = desugar_exp(cond, env)
-        new_body = desugar_stmt(body, env)
+        new_body = desugar_statement(body, env)
         return While(s.location, new_cond, new_body)
       case Block(body):
-        return Block(s.location, desugar_stmt(body, env))
+        return Block(s.location, desugar_statement(body, env))
       case _:
-        error(s.location, 'error in desugar_stmt, unhandled: ' + repr(s)) 
+        error(s.location, 'error in desugar_statement, unhandled: ' + repr(s)) 
 
 def declare_decl(decl, env):
     match decl:
@@ -185,7 +185,7 @@ def desugar_decl(decl, env):
         body_env = env.copy()
         for p in params:
             body_env[p.ident] = False
-        new_body = desugar_stmt(body, body_env)
+        new_body = desugar_statement(body, body_env)
         return Function(decl.location, name, params, ret_ty, ret_mode, new_body)
       case ModuleDef(name, exports, body):
         new_body = desugar_decls(body, env)

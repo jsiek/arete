@@ -14,7 +14,7 @@ Some of the features that it will explore are:
 
 # Value Catalog
 
-# Machine
+# Machine Description
 
 # Language Feature Catalog
 
@@ -64,7 +64,7 @@ module <identifier> exports <identifier_list> { <definition_list> }
 type <identifier> = <type>;
 ```
 
-### Variable
+### Variable (Global)
 
 ```
 let <identifier> [: <type>] = <expression>;

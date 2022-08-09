@@ -22,102 +22,102 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 ?type_list: type                                 -> single
     | type "," type_list                         -> push
 
-?type_annot: ":" type                            -> just
+?type_opt: ":" type                            -> just
     |                                            -> nothing
 
 ?ret_mode: "&"                                   -> address
     |                                            -> value
 
-?exp: exp_logic "?" exp ":" exp                  -> condition
-    | "let" param "=" init "in" exp              -> let
-    | exp_logic
+?expression: expression_logic "?" expression ":" expression  -> condition
+    | "let" param "=" init "in" expression                   -> let
+    | expression_logic
 
-?exp_logic: exp_logic "and" exp_cmp              -> and
-    | exp_logic "or" exp_cmp                     -> or
-    | exp_cmp			                  
+?expression_logic: expression_logic "and" expression_cmp              -> and
+    | expression_logic "or" expression_cmp                     -> or
+    | expression_cmp			                  
 				                  
-?exp_cmp: exp_cmp "==" exp_add                   -> equal
-    | exp_cmp "!=" exp_add                       -> not_equal
-    | exp_cmp "<" exp_add                        -> less
-    | exp_cmp ">" exp_add                        -> greater
-    | exp_cmp "<=" exp_add                       -> less_equal
-    | exp_cmp ">=" exp_add                       -> greater_equal
-    | exp_add
+?expression_cmp: expression_cmp "==" expression_add                   -> equal
+    | expression_cmp "!=" expression_add                       -> not_equal
+    | expression_cmp "<" expression_add                        -> less
+    | expression_cmp ">" expression_add                        -> greater
+    | expression_cmp "<=" expression_add                       -> less_equal
+    | expression_cmp ">=" expression_add                       -> greater_equal
+    | expression_add
 
-?exp_add: exp_add "+" exp_med                    -> add
-    | exp_add "-" exp_med                        -> sub
-    | exp_med
+?expression_add: expression_add "+" expression_med                    -> add
+    | expression_add "-" expression_med                        -> sub
+    | expression_med
 
-?exp_med: exp_med "%" exp_hi                     -> int_div
-    | exp_med "/" exp_hi                         -> div
-    | exp_med "*" exp_hi                         -> mul
-    | exp_hi
+?expression_med: expression_med "%" expression_hi                     -> int_div
+    | expression_med "/" expression_hi                         -> div
+    | expression_med "*" expression_hi                         -> mul
+    | expression_hi
 
-?exp_hi: INT                                     -> int
-    | "copy" "(" exp ")"                         -> copy
-    | "is_null" "(" exp ")"                      -> is_null
+?expression_hi: INT                                     -> int
+    | "copy" "(" expression ")"                         -> copy
+    | "is_null" "(" expression ")"                      -> is_null
     | "null"                                     -> null
-    | "len" "(" exp ")"                          -> len
-    | "split" "(" exp ")"                        -> split
-    | "join" "(" exp "," exp ")"                 -> join
-    | "permission" "(" exp ")"                   -> permission
-    | "upgrade" "(" exp ")"                      -> upgrade
+    | "len" "(" expression ")"                          -> len
+    | "split" "(" expression ")"                        -> split
+    | "join" "(" expression "," expression ")"                 -> join
+    | "permission" "(" expression ")"                   -> permission
+    | "upgrade" "(" expression ")"                      -> upgrade
     | IDENT                                      -> var
-    | exp_hi "[" exp "]"                         -> index
-    | "*" exp_hi                                 -> deref
-    | "&" exp_hi                                 -> addrof
-    | exp_hi "." IDENT                           -> member
-    | "-" exp_hi                                 -> neg
-    | "not" exp_hi                               -> not
-    | "(" exp ")"                                -> paren
+    | expression_hi "[" expression "]"                         -> index
+    | "*" expression_hi                                 -> deref
+    | "&" expression_hi                                 -> addrof
+    | expression_hi "." IDENT                           -> member
+    | "-" expression_hi                                 -> neg
+    | "not" expression_hi                               -> not
+    | "(" expression ")"                                -> paren
     | "fun" "(" param_list ")" ret_mode block    -> lambda
     | "new" init                                 -> new
-    | "[" exp "of" exp "]"                       -> array
+    | "[" expression "of" expression "]"                       -> array
     | "⟨" init_list "⟩"                          -> tuple
-    | exp_hi "(" init_list ")"                   -> call
+    | expression_hi "(" init_list ")"                   -> call
     | "true"                                     -> true
     | "false"                                    -> false
-    | "spawn" exp                                -> future
-    | "wait" exp_hi                              -> wait
+    | "spawn" expression                                -> future
+    | "wait" expression_hi                              -> wait
 
-?stmt: exp "=" init ";"                          -> write
-    | exp "<-" exp "of" exp ";"                  -> transfer
-    | "!" exp ";"                                -> expr
-    | "delete" exp ";"                           -> delete
-    | "assert" exp ";"                           -> assert
-    | "while" "(" exp ")" block                  -> while
+?statement: expression "=" init ";"                          -> write
+    | expression "<-" expression "of" expression ";"                  -> transfer
+    | "!" expression ";"                                -> expr
+    | "delete" expression ";"                           -> delete
+    | "assert" expression ";"                           -> assert
+    | "while" "(" expression ")" block                  -> while
     | block
-    | if_stmt
+    | if_statement
 
-?if_stmt: "if" "(" exp ")" block if_rest          -> if
+?if_statement: "if" "(" expression ")" block if_rest          -> if
 
 ?if_rest: "else" block                            -> else
-    | "else" "if" "(" exp ")" block if_rest       -> else_if
+    | "else" "if" "(" expression ")" block if_rest       -> else_if
     |                                             -> no_else
 
-?stmt_list: "let" param "=" init ";" stmt_list   -> let_init
-    | "var" IDENT "=" exp ";" stmt_list          -> var_init
-    | stmt stmt_list                             -> seq
-    | stmt                                       -> last_stmt
-    | "return" exp ";"                           -> return
+?statement_list: "let" param "=" init ";" statement_list   -> let_init
+    | "var" IDENT "=" expression ";" statement_list          -> var_init
+    | statement statement_list                             -> seq
+    | statement                                       -> last_statement
+    | "return" expression ";"                           -> return
 
-?block: "{" stmt_list "}"                        -> block
+?block: "{" statement_list "}"                        -> block
     | "{" "}"                                    -> pass
 
-?exp_list:                                       -> empty
-    | exp                                        -> single
-    | exp "," exp_list                           -> push
+?expression_list:                                       -> empty
+    | expression                                        -> single
+    | expression "," expression_list                           -> push
 
-?init: exp                                       -> default_init
-    | exp "of" exp                               -> frac_init
+?init: expression                                       -> default_init
+    | expression "of" expression                               -> frac_init
 				                 
 ?init_list:                                      -> empty
     | init                                       -> single
     | init "," init_list                         -> push
 				                 
-param: IDENT type_annot                          -> read
-    | "!" IDENT type_annot                       -> write
-    | "@" IDENT type_annot                       -> none
+param: IDENT type_opt                          -> read
+    | "!" IDENT type_opt                       -> write
+    | "@" IDENT type_opt                       -> none
 				                 
 ?param_list:                                     -> empty
     | param                                      -> single
@@ -130,17 +130,17 @@ param: IDENT type_annot                          -> read
 ?ret_type: "->" type                             -> just
     |                                            -> nothing
 
-?def: "let" IDENT type_annot "=" exp ";"         -> global
-    | "const" IDENT type_annot "=" exp ";"       -> constant
+?definition: "let" IDENT type_opt "=" expression ";"         -> global
+    | "const" IDENT type_opt "=" expression ";"       -> constant
     | "fun" IDENT "(" param_list ")" ret_type ret_mode block -> function
-    | "module" IDENT "exports" ident_list "{" def_list "}" -> module
-    | "from" exp "import" ident_list ";"         -> import
-    | "type" IDENT "=" type ";"                  -> type_def
+    | "module" IDENT "exports" ident_list "{" definition_list "}" -> module
+    | "from" expression "import" ident_list ";"         -> import
+    | "type" IDENT "=" type ";"                  -> type_definition
 
-?def_list:                                       -> empty
-    | def def_list                               -> push
+?definition_list:                                       -> empty
+    | definition definition_list                               -> push
     
-arete: def_list
+arete: definition_list
 
 %ignore COMMENT
 %ignore LINECOMMENT

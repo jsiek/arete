@@ -291,7 +291,7 @@ def type_check_exp(e, env):
         body_env = env.copy()
         for p in params:
             body_env[p.ident] = p.type_annot
-        ret_type = type_check_stmt(body, body_env)
+        ret_type = type_check_statement(body, body_env)
         return FunctionType(e.location, tuple(p.type_annot for p in params),
                             ret_type)
       case Call(fun, inits):
@@ -380,7 +380,7 @@ def type_check_exp(e, env):
       case _:
         error(e.location, 'error in type_check_exp, unhandled: ' + repr(e)) 
     
-def type_check_stmt(s, env):
+def type_check_statement(s, env):
     match s:
       case LetInit(var, init, body):
         init_type = type_check_init(init, env)
@@ -390,11 +390,11 @@ def type_check_stmt(s, env):
                 + ' is inconsistent with declared type ' + str(type_annot))
         body_env = env.copy()
         body_env[var.ident] = type_annot
-        body_type = type_check_stmt(body, body_env)
+        body_type = type_check_statement(body, body_env)
         return body_type
       case Seq(first, rest):
-        first_type = type_check_stmt(first, env)
-        rest_type = type_check_stmt(rest, env)
+        first_type = type_check_statement(first, env)
+        rest_type = type_check_statement(rest, env)
         return join(first_type, rest_type) # ??
       case Return(arg):
         arg_type = type_check_exp(arg, env)
@@ -425,17 +425,17 @@ def type_check_stmt(s, env):
         return None
       case IfStmt(cond, thn, els):
         cond_type = type_check_exp(cond, env)
-        thn_type = type_check_stmt(thn, env)
-        els_type = type_check_stmt(els, env)
+        thn_type = type_check_statement(thn, env)
+        els_type = type_check_statement(els, env)
         return join(thn_type, els_type)
       case While(cond, body):
         cond_type = type_check_exp(cond, env)
-        body_type = type_check_stmt(body, env)
+        body_type = type_check_statement(body, env)
         return body_type
       case Block(body):
-        return type_check_stmt(body, env)
+        return type_check_statement(body, env)
       case _:
-        error(s.location, 'error in type_check_stmt, unhandled: ' + repr(s)) 
+        error(s.location, 'error in type_check_statement, unhandled: ' + repr(s)) 
 
 def typeof_decl(decl, env):
   match decl:
@@ -484,7 +484,7 @@ def type_check_decl(decl, env):
       body_env = env.copy()
       for p in params:
           body_env[p.ident] = simplify(p.type_annot, env)
-      body_type = type_check_stmt(body, body_env)
+      body_type = type_check_statement(body, body_env)
       if not consistent(body_type, ret_ty):
         error(decl.location, 'return type mismatch:\n' + str(ret_ty) + ' inconsistent with '
               + str(body_type))
