@@ -19,10 +19,35 @@ Some of the features that it will explore are:
 
 * modules
 
+The design of Arete is currently captured in a prototype
+implementation that includes 
+* grammar and parser ([Arete.lark](Arete.lark) and [parser.py](parser.py))
+* type checker ([type_check.py](type_check.py))
+* desugaring ([desugar.py](desugar.py))
+* interpreter (an abstract machine) ([machine.py](machine.py))
 
-The following tracks the current status of Arete.
+
+The following describes the current status of Arete.
 
 # Value Catalog
+
+The values are defined in [values.py](values.py).
+
+## Numbers (integers and fractions)
+
+## Booleans
+
+## Tuples
+
+## Pointers
+
+## Closures
+
+## Futures
+
+## Modules
+
+
 
 # Machine Description
 
@@ -33,14 +58,15 @@ which has three main categories: expressions, statements, and
 definitions. Within each category, the entries are ordered
 alphabetically.
 
-Syntactically, a program is a list of zero or more definitions:
+A program is a list of zero or more definitions:
 
 ```
 <definition_list> ::=   | <definition> <definition_list>
 ```
 
-Semantically, a program must include at least one definition, for the
-`main` function.
+Program execution begins with a call to a function named `main` with
+no arguments. If there is no such function, the program halts with an
+error.
 
 ## Definitions
 
