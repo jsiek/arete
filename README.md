@@ -53,7 +53,7 @@ error and returns `0`.
 	  return x - 2;
 	}
 
-Both `var` and `let` variable are by-reference in C++ lingo; they are
+Both `var` and `let` variables are by-reference (C++ lingo); they are
 aliases for the value produced by their initializing expression (like
 all variables in Java).  In the following, we initialize `y` with `x` and
 declare `y` to also be a mutable variable. We then write `0` to `y`
@@ -95,7 +95,7 @@ the resulting pointer is associated with `x` (with permission
 `1`). Likewise for when `y` is initialized with `40`.  The variables
 `x` and `y` go out of scope at the end of the function, after the
 `return`. When they go out of scope, the associated pointers are
-"killed", and because those pointers have permission `1`, the memory
+*killed*, and because those pointers have permission `1`, the memory
 at their address is deallocated.
 
 
@@ -117,7 +117,7 @@ The following is the current specification of Arete.
 	
 	* [Statements](#statements)
 	
-	* [Expressions](#statements)
+	* [Expressions](#expressions)
 
 # <a name="values"></a>Values
 
