@@ -104,6 +104,7 @@ fields starting with pointer `P`.
 2. If the pointer does not have a living lender
 
     a. if its permission is `1`, delete the memory at its `address`.
+	
 	b. if its permission is greater than `0` but less than `1`, 
 	   halt with an error.
 
