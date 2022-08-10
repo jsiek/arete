@@ -25,13 +25,7 @@ class Number(Value):
   value: numbers.Number
   def equals(self, other):
     return self.value == other.value
-  def initialize(self, kind, location, ret=False):
-    return Number(self.value)
-  def init(self, percent, location):
-    return self.initialize('read', location, False)
   def duplicate(self, percentage):
-    return Number(self.value)
-  def return_copy(self):
     return Number(self.value)
   def kill(self, mem, location, progress=set()):
     pass
@@ -51,13 +45,7 @@ class Boolean(Value):
     value: bool
     def equals(self, other):
         return self.value == other.value
-    def initialize(self, kind, location, ret=False):
-        return Boolean(False, self.value)
-    def init(self, percent, location):
-        return self.initialize('read', location, False)
     def duplicate(self, percentage):
-        return Boolean(self.value)
-    def return_copy(self):
         return Boolean(self.value)
     def kill(self, mem, location, progress=set()):
         pass
@@ -75,17 +63,8 @@ class TupleValue(Value):
     def equals(self, other):
       raise Exception('unimplemented')
     
-    def initialize(self, kind, location, ret=False):
-      raise Exception('unimplemented')
-    
-    def init(self, percent, location):
-      raise Exception('unimplemented')
-    
     def duplicate(self, percentage):
       return TupleValue([elt.duplicate(percentage) for elt in self.elts])
-    
-    def return_copy(self):
-      raise Exception('unimplemented')
     
     def kill(self, mem, location, progress=set()):
       for elt in self.elts:
@@ -186,32 +165,28 @@ class Pointer(Value):
           + '@' + str(self.permission) + ' ' \
             + '(' + str(id(self)) + ')' 
 
-    def transfer(self, percent, other, location):
-        if not isinstance(other, Pointer):
-            error(location, "in transfer, expected pointer, not " + str(other))
-        if self.address != other.address:
+    def transfer(self, percent, source, location):
+        if not isinstance(source, Pointer):
+            error(location, "in transfer, expected pointer, not " + str(source))
+        if self.address != source.address:
             error(location, "cannot transfer between different addresses: "
-                  + str(self.address) + " != " + str(other.address))
-        amount = other.permission * percent
-        other.permission -= amount
+                  + str(self.address) + " != " + str(source.address))
+        amount = source.permission * percent
+        source.permission -= amount
         self.permission += amount
         if tracing_on():
-          print('transferred ' + str(amount) + ' from ' + str(other) + ' to '
+          print('transferred ' + str(amount) + ' from ' + str(source) + ' to '
                 + str(self))
 
     def upgrade(self, location):
         self.lender = find_lender(self.lender)
         if self.lender is None:
-            #error(location, "failed to upgrade " + str(self) + ", no lender")
             pass
         else:
             self.transfer(Fraction(1,1), self.lender, location)
         return self.permission == Fraction(1,1)
-        # if not self.permission == Fraction(1,1):
-        #     error(location, "failed to upgrade pointer " + str(self))
         
     def duplicate(self, percentage):
-        self.lender = find_lender(self.lender)
         if self.address is None:
             ptr = Pointer(None, [], Fraction(1,1), self)
         else:
@@ -230,30 +205,6 @@ class Pointer(Value):
           print('element address ' + str(self) + ' into ' + str(ptr))
         return ptr
         
-    # self: the pointer being initialized from
-    # kind: the permission of the pointer to return
-    def initialize(self, kind, location, ret=False):
-      if kind == 'write':
-          return self.duplicate(1)
-      elif kind == 'read':
-          if ret == True:
-              return self.duplicate(1)
-          else:
-              return self.duplicate(Fraction(1,2))
-      else:
-          raise Exception('initialize unexpected permission: ' + priv)
-
-    # self: the pointer being initialized from
-    # percent: the amount of permission to take from self
-    def init(self, percent, location):
-        return self.duplicate(percent)
-      
-    # Copy the return value of a function.
-    # Similar to initialize with respect to permissions, but
-    # produces a temporary value.
-    def return_copy(self):
-      return self.duplicate(1)
-          
     def kill(self, mem, location, progress=set()):
         if self.address is None:
           return
@@ -268,7 +219,7 @@ class Pointer(Value):
             elif self.permission == Fraction(0,1):
               pass # OK, someone else will delete
             else:
-              warning(location, 'memory leak, killing pointer'
+              error(location, 'memory leak, killing pointer'
                     + ' without lender ' + str(self))
         else:
             self.lender.permission += self.permission
@@ -302,12 +253,6 @@ class Closure(Value):
       return Closure(self.name, self.params, self.return_mode, self.body,
                        env_copy)
     
-    def initialize(self, kind, location, ret=False):
-        return self # ???
-      
-    def init(self, percent, location):
-        return self.initialize('read', location, False)
-      
     def kill(self, mem, location, progress=set()):
       if tracing_on():
         print('kill closure ' + str(self))
@@ -337,10 +282,6 @@ class Future(Value):
     __match_args__ = ("thread",)
     def duplicate(self, percentage):
         return self
-    def initialize(self, kind, location, ret=False):
-        return self # ???
-    def init(self, percent, location):
-        return self.initialize('read', location, False)
     def kill(self, mem, location, progress=set()):
         pass # ???
     def clear(self, mem, location, progress=set()):

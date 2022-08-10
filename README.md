@@ -34,7 +34,7 @@ implementation written in Python 3.10 that includes:
 
 The following describes the current status of Arete.
 
-# Value Catalog
+# Values
 
 A *value* is the runtime object produced by an expression during
 program execution. The kinds of values in Arete are listed below.
@@ -81,27 +81,67 @@ A pointer whose `permission` is `1` can be used for writing.
 If the pointer is a copy of another pointer, then its `lender` is that
 other pointer.
 
+A *null* pointer is a pointer whose `address` is `None`.
+
 We define the following operations on pointers.
 
 ### Kill
 
-UNDER CONSTRUCTION
+We define a *live pointer* to be a pointer whose `address` field
+contains an integer (and not `None`). If a pointer is not live,
+it's *dead*.
+
+We define the *living lender* of a pointer `P` to be the first live
+pointer in the chain of pointers obtain by following the `lender`
+fields starting with pointer `P`.
+
+1. If the pointer has a living lender, then transfer all of this
+   pointer's permission to the living lender.
+   
+2. If the pointer does not have a living lender
+
+    a. if its permission is `1`, delete the memory at its `address`.
+	b. if its permission is greater than `0` but less than `1`, 
+	   halt with an error.
+
+3. Set the `address` of this pointer to `None`.
+
 
 ### Duplicate
 
-UNDER CONSTRUCTION
+Inputs: percentage
+
+1. If the pointer is dead, return a null pointer.
+
+2. If the pointer is alive, create a new pointer and transfer
+   the given percentage from this pointer to the new pointer.
+   Return the new pointer.
 
 ### Transfer
 
-UNDER CONSTRUCTION
+Inputs: source pointer, percentage
 
-### Upgrade
+Let `amount` be the permission of the source pointer multiplied by the
+given percentage.  Decrease the permission of the source pointer by
+`amount` and increase the permission of this pointer by `amount`.
 
-UNDER CONSTRUCTION
 
 ### Element Address
 
-UNDER CONSTRUCTION
+Inputs: index (integer), percentage
+
+1. Create a new pointer whose `path` is a copy of this pointer's
+   `path` but with the given index appended to the end.
+
+2. Transfer the given percentage from this pointer to the new one.
+
+
+### Upgrade
+
+If the pointer has a living lender, transfer all of the lender's
+permission to this pointer. Return `true` or `false` corresponding to
+whether this pointer's permission is equal to `1`.
+
 
 ## Closures
 
@@ -118,6 +158,74 @@ A *future* has an associated thread.
 A module has a name, a dictionary of exported members, and a dictionary
 of all its members.
 
+# Types
+
+## Integers
+
+```
+<type> ::= int
+```
+
+## Rationals
+
+```
+<type> ::= rational
+```
+
+## Booleans
+
+```
+<type> ::= bool
+```
+
+## The Unknown Type (aka. the "any" type or the "dynamic" type)
+
+```
+<type> ::= ?
+```
+
+This type enables gradual typing.
+
+## Tuple Types
+
+```
+<type> ::= ⟨ <type_list> ⟩
+```
+
+## Function Types
+
+```
+<type> ::= ( <type_list> ) -> <type>
+```
+
+## Recursive Types
+
+```
+<type> ::= rec <identifier> in <type>
+```
+
+The `identifier` may occur inside the `type` expression and represents
+the whole `type`. For example, the following type could be used to
+represent a singly-linked list of integers. Each node is a tuple whose
+first element is an integer and whose second element is a pointer to
+another node.
+
+```
+rec X ⟨ int, X* ⟩
+```
+
+(Recursive types are somewhat unweildy to deal with directly, so there
+are plans to add syntactic sugar for them.)
+
+
+## Type Variables
+
+```
+<type> ::= <identifier>
+```
+
+An occurence of a type variable refers to a recursive type.
+(See the above entry about Recursive Types.)
 
 
 # Machine Description
@@ -190,6 +298,11 @@ current thread.
 The *current runner* is the node runner at the top of the `todo`
 stack of the current frame.
 
+### Current Environment
+
+The *current environment* is the environment (`env`) of the current
+node runner.
+
 ### Schedule an AST node
 
 Inputs: AST node, environment, context (defaults to value at 50%),
@@ -238,13 +351,29 @@ UNDER CONSTRUCTION
 
 UNDER CONSTRUCTION
 
+## Memory Operations
 
-# Language Feature Catalog
+### Read
 
-This catalog is organized according to the grammar of the language,
+UNDER CONSTRUCTION
+
+### Write
+
+UNDER CONSTRUCTION
+
+# Language Features
+
+This section is organized according to the grammar of the language,
 which has three main categories: expressions, statements, and
 definitions. Within each category, the entries are ordered
-alphabetically.
+alphabetically. Each entry describe both the syntax of the language
+feature and its runtime behavior (semantics).  The syntax given here
+is a somewhat simplified variant that does not include the encoding of
+precedence.  For the exact grammar rules, see
+[Arete.lark](Arete.lark). Likewise, for the fully precise
+specification of its runtime behavior, read the `step` method of the
+corresponding Python class in
+[abstract_syntax.py](abstract_syntax.py).
 
 A *program* is a list of zero or more definitions:
 
@@ -258,25 +387,27 @@ error.
 
 ## Miscellaneous Syntax
 
-This section is about auxilliary syntactic categories that are used by
-the main syntactic elements.
-
-
-```
-<param_kind> ::=   | ! | @
-```
-
-The `param_kind` specifies the permissions required of the argument to
-the parameter. The notation `!` for writable (fraction `1`), `@` is
-for no requirement (any fraction), and the default is readable (any
-fraction greater than `0`).
+This section is about auxilliary syntactic categories that are used
+later in the definitions of the expressions, statements, and
+definitions.
 
 ```
-<parameter> ::= [<param_kind>] <identifier> [: <type>]
+<parameter> ::= [<privilege>] <identifier> [: <type>]
 ```
 
 The `parameter` category is used for function parameters and other
-variable definitions (e.g. the `let` statement).
+variable definitions (e.g. the `let` statement). (See the 
+definition of `privilege` below.) If no type annotation is present,
+the parameter is given the unknown type `?`.
+
+```
+<privilege> ::=   | ! | @
+```
+
+The `privilege` specifies the permissions required of any argument
+value bound to the associated parameter. The notation `!` is for
+writable (fraction `1`), `@` is for no requirement (any fraction), and
+the default is readable (any fraction greater than `0`).
 
 ```
 <initializer> ::= <expression> | <expression> of <expression>
@@ -291,9 +422,9 @@ taking 50% of its permissions.
 let y = 1/2 of x;
 ```
 
-If no percentage is specified and the context of the current action is
-an `ActionCtx`, then use that context's percentage. Otherwise
-use 50%.
+If no percentage is specified and the context of the current node
+runner is an `AddressCtx`, then use that context's
+percentage. Otherwise use 50%.
 
 ## Definitions
 
@@ -373,15 +504,46 @@ This needs work.)
 <statement> ::= if (<expression>) <block> else <block>
 ```
 
-### Local Variable
+### Local Variable (Let)
 
 ```
-<statement> ::= let <parameter> = <initializer>;
+<statement> ::= let <parameter> = <initializer>; <statement_list>
 ```
 
+1. Schedule the `initializer` in the current environment, with context
+   `AddressCtx` with duplication, requesting the appropriate
+   percentage of permission corresponding to the privilege level of
+   the `parameter` (1 for writable, 1/2 for readable, 0 for none).
+
+2. Copy the current environment and name it `body_env`.
+   
+3. Check that the initializer's result is a pointer and has the
+   permission required by the privilege level of the `parameter`.
+   
+4. Update `body_env` to map the identifier of the `parameter` to the
+   initializer's result.
+
+5. Schedule the following statements in the environment `body_env`.
+
+6. Once the following statements are complete, 
+   kill the initializer's result. 
+   
 ```
-<statement> ::= var <identifier> = <expressions>;
+<statement> ::= var <identifier> = <expression>;
 ```
+
+The `var` statement desugars into a `let` statement as follows.
+
+```
+var x = e;
+```
+turns into
+```
+let !x = 1/1 of e;
+```
+
+That is, the permission level of `x` is writable and the
+requested percentage is 100%.
 
 
 ### Return
@@ -389,6 +551,17 @@ This needs work.)
 ```
 <statement> ::= return <expression>;
 ```
+
+1. Schedule the `expression`. If the `return_mode` of the current node
+   runner is `value`, using `ValueCtx` with duplication and 100%. If
+   the `return_mode` is `address`, use `AddressCtx` with duplication
+   and 100%.
+
+2. Set the `return_value` of the current node runner to
+   a duplicate (at 100%) of the expression's result.
+
+3. Finish this statement.
+
 
 ### Transfer Permission
 
@@ -409,6 +582,182 @@ Repeatedly execute the `block` so long as the `expression` evaluates to `true`.
 
 
 ## Expressions
+
+### Address Of
+
+```
+<expression> ::= & <expression>
+```
+
+1. Schedule `expression` in address context, requesting 100% of its
+   permission, and with duplication as specified by the current
+   node runner's context.
+   
+2. If the current node runner's context is a value context,
+   if the context is with duplication, let `result` 
+
+3. If the current node runner's context is an address context, 
+   halt with an error.
+
+
+
+### Array Creation
+
+```
+<expression> ::= [ <expression> of <expression> ]
+```
+
+UNDER CONSTRUCTION
+
+
+### Call
+
+```
+<expression> ( <initializer_list> )
+```
+
+1. Schedule the `expression` in value context with duplicaton
+   requesting `1/2` permission.  The result must be a closure.
+
+2. Schedule each `initializer` (left to right) in address context
+   requesting the percentage appropriate to the corresponding
+   parameter of the closure. (Same as for `let` statements.)
+   
+3. Copy the closure's environment into `body_env`. Add an item to
+   `body_env`, mapping each parameter to the corresponding result from
+   its initializer.  Check that the initialer is a pointer and has
+   enough permission for the privilege level of the parameter and
+   halt with an error if the permission is too low.
+
+4. Create a new frame and push it onto the `stack` of the current thread.
+   
+5. Schedule the body of the closure with the environment `body_env`
+   and the closure's return mode.
+
+6. Upon completion of the body, kill all of the initializers.
+   If the current node runner's `return_value` is `None`,
+   set it to the void value.
+   
+     a. If the current node runner's context is a value context, and
+        its return mode is `value`, let `result` be the runner's
+        `return_value`.  If the runner's return mode is `address`,
+        then the runner's `return_value` is a pointer; let `result` be
+        the value read from memory at that address.  Kill the pointer.
+
+     b. If the current node runner's context is a address context, and
+	    its return mode is `value`, allocate the runner's `return_value`
+		in memory and let `result` be the new address.
+		If the return mode is `address`, let `result` be the 
+        runner's `return_value`.
+
+7. Finish this expression with `result`.
+
+
+### False Literal
+
+```
+<expression> ::= false
+```
+
+### Index
+
+```
+<expression> ::= <expression> [ <expression> ]
+```
+
+### Integer Literal
+
+```
+<expression> ::= <integer>
+```
+
+1. If the current node runner's context is a value context, let
+   `result` be the `integer`.
+   
+2. If the current node runner's context is an address context,
+   allocate the `integer` in memory and let `result` be the allocated
+   pointer.
+
+3. Finish this expression with `result`.
+
+### Member Access
+
+```
+<expression> ::= <expression> . <identifier>
+```
+
+1. Schedule `expression` in address context with duplication,
+   requesting 50% of its permission.
+   
+2. Read from the resulting pointer, which must produce a module value.
+   If `identifier` is not a name exported by the module, halt with an error.
+   Otherwise, let `ptr` be the associated pointer for the `identifier`
+   in the module's exports.
+   
+3. If the current node runner's context is a value context,
+   let `result` be the value of reading `ptr` from memory with
+   the runner's context.
+
+4. If the current node runner's context is an address context, and if
+   the context is with duplication, let `result` be a duplicate of
+   `ptr` taking the percentage specified in the node runner's context.
+   If the context is without duplicatoin, let `result` be `ptr`.
+   
+5. Finish this expression with `result`.
+
+### Null Pointer Literal
+
+```
+<expression> ::= null
+```
+
+UNDER CONSTRUCTION
+
+### Primitive Call
+
+```
+<expression> ::= <prim-op> ( <expression_list> )
+```
+
+UNDER CONSTRUCTION
+
+### True Literal
+
+```
+<expression> ::= true
+```
+
+UNDER CONSTRUCTION
+
+### Tuple
+
+```
+<expression> ::= ⟨ <initializer_list> ⟩
+```
+
+UNDER CONSTRUCTION
+
+### Variable (Occurence)
+
+```
+<expression> ::= <identifier>
+```
+
+1. If the identifier is not in the current environment, halt with an
+   error.
+
+2. If the current runner's context is a value context, read from
+   memory using the identifier's address (from the current
+   environment) according to the current runner's context.
+
+3. If the current runner's context is an address context with
+   duplication, then duplicate the identifier's address (from the
+   current environment) at 100% and call it the `result`. If the
+   context is without duplication, then the `result` is the
+   identifier's address (from the current environment).
+   
+4. Instruct the machine to finish this expression with the `result`.
+
 
 ### Spawn
 

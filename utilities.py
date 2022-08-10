@@ -70,7 +70,7 @@ def writable(frac):
     return frac == Fraction(1, 1)
 
 def readable(frac):
-    return Fraction(0, 1) < frac and frac < Fraction(1, 1)
+    return Fraction(0, 1) < frac and frac < Frrunner(1, 1)
 
 def none(frac):
     return frac == Fraction(0, 1)

@@ -22,21 +22,21 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 ?type_list: type                                 -> single
     | type "," type_list                         -> push
 
-?type_opt: ":" type                            -> just
+?type_opt: ":" type                              -> just
     |                                            -> nothing
 
 ?ret_mode: "&"                                   -> address
     |                                            -> value
 
-?expression: expression_logic "?" expression ":" expression  -> condition
-    | "let" parameter "=" initializer "in" expression                   -> let
+?expression: expression_logic "?" expression ":" expression    -> condition
+    | "let" parameter "=" initializer "in" expression          -> let
     | expression_logic
 
-?expression_logic: expression_logic "and" expression_cmp              -> and
+?expression_logic: expression_logic "and" expression_cmp       -> and
     | expression_logic "or" expression_cmp                     -> or
     | expression_cmp			                  
 				                  
-?expression_cmp: expression_cmp "==" expression_add                   -> equal
+?expression_cmp: expression_cmp "==" expression_add            -> equal
     | expression_cmp "!=" expression_add                       -> not_equal
     | expression_cmp "<" expression_add                        -> less
     | expression_cmp ">" expression_add                        -> greater
@@ -44,11 +44,11 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | expression_cmp ">=" expression_add                       -> greater_equal
     | expression_add
 
-?expression_add: expression_add "+" expression_med                    -> add
+?expression_add: expression_add "+" expression_med             -> add
     | expression_add "-" expression_med                        -> sub
     | expression_med
 
-?expression_med: expression_med "%" expression_hi                     -> int_div
+?expression_med: expression_med "%" expression_hi              -> int_div
     | expression_med "/" expression_hi                         -> div
     | expression_med "*" expression_hi                         -> mul
     | expression_hi
@@ -56,32 +56,32 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 ?expression_hi: INT                                     -> int
     | "copy" "(" expression ")"                         -> copy
     | "is_null" "(" expression ")"                      -> is_null
-    | "null"                                     -> null
+    | "null"                                            -> null
     | "len" "(" expression ")"                          -> len
     | "split" "(" expression ")"                        -> split
     | "join" "(" expression "," expression ")"                 -> join
     | "permission" "(" expression ")"                   -> permission
     | "upgrade" "(" expression ")"                      -> upgrade
-    | IDENT                                      -> var
-    | expression_hi "[" expression "]"                         -> index
+    | IDENT                                             -> var
+    | expression_hi "[" expression "]"                  -> index
     | "*" expression_hi                                 -> deref
     | "&" expression_hi                                 -> addrof
     | expression_hi "." IDENT                           -> member
     | "-" expression_hi                                 -> neg
     | "not" expression_hi                               -> not
     | "(" expression ")"                                -> paren
-    | "fun" "(" parameter_list ")" ret_mode block    -> lambda
+    | "fun" "(" parameter_list ")" ret_mode block       -> lambda
     | "new" initializer                                 -> new
-    | "[" expression "of" expression "]"                       -> array
+    | "[" expression "of" expression "]"                -> array
     | "⟨" initializer_list "⟩"                          -> tuple
-    | expression_hi "(" initializer_list ")"                   -> call
-    | "true"                                     -> true
-    | "false"                                    -> false
+    | expression_hi "(" initializer_list ")"            -> call
+    | "true"                                            -> true
+    | "false"                                           -> false
     | "spawn" expression                                -> future
     | "wait" expression_hi                              -> wait
 
-?statement: expression "=" initializer ";"                          -> write
-    | expression "<-" expression "of" expression ";"                  -> transfer
+?statement: expression "=" initializer ";"              -> write
+    | expression "<-" expression "of" expression ";"    -> transfer
     | "!" expression ";"                                -> expr
     | "delete" expression ";"                           -> delete
     | "assert" expression ";"                           -> assert
@@ -89,39 +89,39 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | block
     | if_statement
 
-?if_statement: "if" "(" expression ")" block if_rest          -> if
+?if_statement: "if" "(" expression ")" block if_rest    -> if
 
-?if_rest: "else" block                            -> else
-    | "else" "if" "(" expression ")" block if_rest       -> else_if
-    |                                             -> no_else
+?if_rest: "else" block                                  -> else
+    | "else" "if" "(" expression ")" block if_rest      -> else_if
+    |                                                   -> no_else
 
 ?statement_list: "let" parameter "=" initializer ";" statement_list   -> let_initializer
-    | "var" IDENT "=" expression ";" statement_list          -> var_initializer
-    | statement statement_list                             -> seq
-    | statement                                       -> last_statement
+    | "var" IDENT "=" expression ";" statement_list     -> var_initializer
+    | statement statement_list                          -> seq
+    | statement                                         -> last_statement
     | "return" expression ";"                           -> return
 
-?block: "{" statement_list "}"                        -> block
-    | "{" "}"                                    -> pass
+?block: "{" statement_list "}"                          -> block
+    | "{" "}"                                           -> pass
 
 ?expression_list:                                       -> empty
     | expression                                        -> single
-    | expression "," expression_list                           -> push
+    | expression "," expression_list                    -> push
 
-?initializer: expression                                       -> default_initializer
-    | expression "of" expression                               -> frac_initializer
+?initializer: expression                                -> default_initializer
+    | expression "of" expression                        -> frac_initializer
 				                 
 ?initializer_list:                                      -> empty
     | initializer                                       -> single
-    | initializer "," initializer_list                         -> push
+    | initializer "," initializer_list                  -> push
 				                 
-parameter: IDENT type_opt                          -> read
+parameter: IDENT type_opt                      -> read
     | "!" IDENT type_opt                       -> write
     | "@" IDENT type_opt                       -> none
 				                 
 ?parameter_list:                                     -> empty
     | parameter                                      -> single
-    | parameter "," parameter_list                       -> push
+    | parameter "," parameter_list                   -> push
 
 ?ident_list:                                     -> empty
     | IDENT                                      -> single
@@ -130,15 +130,15 @@ parameter: IDENT type_opt                          -> read
 ?ret_type: "->" type                             -> just
     |                                            -> nothing
 
-?definition: "let" IDENT type_opt "=" expression ";"         -> global
-    | "const" IDENT type_opt "=" expression ";"       -> constant
-    | "fun" IDENT "(" parameter_list ")" ret_type ret_mode block -> function
+?definition: "let" IDENT type_opt "=" expression ";"              -> global
+    | "const" IDENT type_opt "=" expression ";"                   -> constant
+    | "fun" IDENT "(" parameter_list ")" ret_type ret_mode block  -> function
     | "module" IDENT "exports" ident_list "{" definition_list "}" -> module
-    | "from" expression "import" ident_list ";"         -> import
-    | "type" IDENT "=" type ";"                  -> type_definition
+    | "from" expression "import" ident_list ";"                   -> import
+    | "type" IDENT "=" type ";"                                   -> type_definition
 
-?definition_list:                                       -> empty
-    | definition definition_list                               -> push
+?definition_list:                                                 -> empty
+    | definition definition_list                                  -> push
     
 arete: definition_list
 

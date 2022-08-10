@@ -119,7 +119,7 @@ class Memory:
     # for addr in self.memory.keys():
     #   if (fraction[addr] != Fraction(0,1)) \
     #      and (fraction[addr] != Fraction(1,1)):
-    #     print('**warning fraction[' + str(addr) + '] == ' + str(fraction[addr]))
+    #     print('**warning fraction[' + str(addr) + '] == ' + str(frrunner[addr]))
     return fraction_dict
 
 def allocate_locals(var_priv_vals, env, mem, location):

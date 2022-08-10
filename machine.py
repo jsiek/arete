@@ -5,8 +5,8 @@
 # per thread:
 #   procedure call stack of frames
 #   per frame:
-#     todo: list of actions
-#     action is an AST node, a state, and env
+#     todo: list of runners
+#     runner is an AST node, a state, and env
 
 # API or coroutines?
 
@@ -14,7 +14,7 @@
 #   step(state, env, machine)
 
 # Machine methods:
-#   schedule(ast, env) returns the action
+#   schedule(ast, env) returns the runner
 #   finish_expression(value)
 #   finish_statement()
 #   finish_and_return(value)
@@ -123,33 +123,33 @@ class Machine:
           # case current_thread has work to do
           frame = self.current_frame()
           if len(frame.todo) > 0:
-            action = self.current_runner()
+            runner = self.current_runner()
             if tracing_on():
-              print(error_header(action.ast.location))
-              print('stepping ' + repr(action))
-            action.ast.step(action, self)
+              print(error_header(runner.ast.location))
+              print('stepping ' + repr(runner))
+            runner.ast.step(runner, self)
             if tracing_on() and len(frame.todo) > 0:
               log_graphviz('top', self.current_runner().env, self.memory.memory)
               print(machine.memory)
               print()
             #machine.memory.compute_fractions()
-            action.state += 1
+            runner.state += 1
           else:
             self.current_thread.stack.pop()
 
   # Call schedule to start the evaluation of an AST node.
-  # Returns the new action.
+  # Returns the new runner.
   def schedule(self, ast, env, context=ValueCtx(True, Fraction(1,2)),
                return_mode=None):
       return_mode = self.current_runner().return_mode if return_mode is None \
                     else return_mode
-      action = NodeRunner(ast, 0, [], None, return_mode, context, env)
-      self.current_frame().todo.append(action)
-      return action
+      runner = NodeRunner(ast, 0, [], None, return_mode, context, env)
+      self.current_frame().todo.append(runner)
+      return runner
 
   # Call finish_expression to signal that the current expression
-  # action is finished and register the value it produced with the
-  # previous action.
+  # runner is finished and register the value it produced with the
+  # previous runner.
   def finish_expression(self, result, location):
       if tracing_on():
           print('finish_expression ' + str(result))
@@ -168,7 +168,7 @@ class Machine:
               print('finished thread ' + str(result))
           self.current_thread.result = result
 
-  # Call finish_statement to signal that the current statement action is done.
+  # Call finish_statement to signal that the current statement runner is done.
   # Propagates the return value if there is one.
   def finish_statement(self, location):
       retval = self.current_runner().return_value
