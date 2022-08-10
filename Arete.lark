@@ -25,7 +25,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 ?type_opt: ":" type                              -> just
     |                                            -> nothing
 
-?ret_mode: "&"                                   -> address
+?return_mode: "&"                                   -> address
     |                                            -> value
 
 ?expression: expression_logic "?" expression ":" expression    -> condition
@@ -70,7 +70,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "-" expression_hi                                 -> neg
     | "not" expression_hi                               -> not
     | "(" expression ")"                                -> paren
-    | "fun" "(" parameter_list ")" ret_mode block       -> lambda
+    | "fun" "(" parameter_list ")" return_mode block       -> lambda
     | "new" initializer                                 -> new
     | "[" expression "of" expression "]"                -> array
     | "⟨" initializer_list "⟩"                          -> tuple
@@ -132,7 +132,7 @@ parameter: IDENT type_opt                      -> read
 
 ?definition: "let" IDENT type_opt "=" expression ";"              -> global
     | "const" IDENT type_opt "=" expression ";"                   -> constant
-    | "fun" IDENT "(" parameter_list ")" ret_type ret_mode block  -> function
+    | "fun" IDENT "(" parameter_list ")" ret_type return_mode block  -> function
     | "module" IDENT "exports" ident_list "{" definition_list "}" -> module
     | "from" expression "import" ident_list ";"                   -> import
     | "type" IDENT "=" type ";"                                   -> type_definition

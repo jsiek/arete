@@ -355,6 +355,8 @@ UNDER CONSTRUCTION
 
 ### Read
 
+Inputs: pointer, context
+
 UNDER CONSTRUCTION
 
 ### Write
@@ -474,11 +476,26 @@ percentage. Otherwise use 50%.
 
 Evaluate the `expression` and halt the program if the result is `false`.
 
-### Assignment
+### Assignment (Write)
 
 ```
 <statement> ::= <expression> = <initializer>;
 ```
+
+1. Schedule the `initializer` in a value context with duplication
+  requesting 50%.
+  
+2. Schedule the `expression` in an address context with duplication
+  requesting 100%. The result must be a pointer.
+
+3. Write the result of the initializer to the pointer.
+
+4. Finish this statement.
+
+(The order of evaluation here does not follow our usual left-to-right
+ policy. Using left-to-right for assignment triggers errors in many of
+ our test cases. I have not yet investigated why this is.)
+
 
 ### Block
 
@@ -570,8 +587,6 @@ requested percentage is 100%.
 ```
 
 
-
-
 ### While
 
 ```
@@ -594,11 +609,16 @@ Repeatedly execute the `block` so long as the `expression` evaluates to `true`.
    node runner's context.
    
 2. If the current node runner's context is a value context,
-   if the context is with duplication, let `result` 
+   if the context is with duplication, let `result` be
+   a duplicate of the result of `expression`, taking
+   the percentage specified by the runner's context.
+   If the context is without duplication, let `result` be
+   the result of `expression`.
 
 3. If the current node runner's context is an address context, 
    halt with an error.
 
+4. Finish this expression with `result`.
 
 
 ### Array Creation
@@ -659,11 +679,52 @@ UNDER CONSTRUCTION
 <expression> ::= false
 ```
 
+### Function (aka. lambda, anonymous function)
+
+```
+<expression> ::= fun ( <parameter_list> ) <return_mode> <block>
+```
+
+The *free variables* of a function are those variables that occur
+inside `block` without an enclosing variable binding in the `block` or
+by this function's parameters.
+
+1. Create an environment named `clos_env` with a duplicate (50%)
+   for each free variable of the function.
+2. Create a closure value with the `clos_env` and the other
+   information from this function (parameter list, return mode, and body).
+3. If the current node runner's context is a value context,
+   let `results` be the closure.
+4. If the current node runner's context is an address context,
+   allocate the closure in memory and let `result` be its pointer.
+5. Finish this expression with `result`.
+
+
 ### Index
 
 ```
 <expression> ::= <expression> [ <expression> ]
 ```
+
+1. Schedule the first `expression` in a value context with duplication
+   requesting 50% of its permission.  Let `aggregate` be the result.
+   
+2. Schedule the second `expression` in a value context with
+   duplication requesting 50% of its permission.  Let `index` be the
+   result, which must be an integer.
+   
+3. If the current node runner's context is a value context
+   with duplication, let `result` be a duplicate at 100%
+   of the value at the `index` of the tuple.
+   Without duplication, let `result` be the value at the `index` of
+   the tuple.
+   
+4. If the current node runner's context is an address context, let
+   `result` be the *element address* of the `aggregate` at the
+   `index`.
+   
+5. Finish this expression with `result`.
+
 
 ### Integer Literal
 
