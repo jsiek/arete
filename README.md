@@ -34,7 +34,10 @@ implementation written in Python 3.10 that includes:
 
 # Examples
 
-There are lots of example programs in the [tests](tests) directory.
+There are lots of example programs in the [tests](tests) directory,
+including [double-linked lists](tests/dlist.rte), [binary
+trees](tests/avl.rte), and [parallel merge
+sort](tests/par_merge_sort.rte).
 
 Here we look at a couple examples that demonstrate how mutation is
 controlled via fractional permissions in Arete.
@@ -454,6 +457,16 @@ UNDER CONSTRUCTION
 
 UNDER CONSTRUCTION
 
+### Deallocate
+
+Inputs: address
+
+1. Kill the value that is in memory at the given address.
+
+2. Delete the entry for this address in the memory.
+
+
+
 # <a name="features"></a>Language Features
 
 This section is organized according to the grammar of the language,
@@ -595,6 +608,18 @@ Evaluate the `expression` and halt the program if the result is `false`.
 ```
 <statement> ::= { <statement_list> }
 ```
+
+### Delete
+
+```
+<statement> ::= delete <expression>;
+```
+
+1. Schedule the `expression` in value context with duplication
+   requesting 100%. The result must be a pointer.
+
+2. Deallocate the memory associated with the pointer.
+
 
 ### Expression Statement
 
