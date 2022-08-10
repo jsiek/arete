@@ -115,7 +115,7 @@ fields starting with pointer `P`.
 
 Inputs: percentage
 
-1. If the pointer is dead, return a null pointer.
+1. If the pointer is null, return a null pointer.
 
 2. If the pointer is alive, create a new pointer and transfer
    the given percentage from this pointer to the new pointer.
