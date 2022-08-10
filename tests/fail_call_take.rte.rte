@@ -1,0 +1,14 @@
+function inc(!p) {
+  *p = *p + 1;
+  return *p;
+}
+
+function main() {
+  let !q = new 0;
+  let p = q; // create a read-only alias, causing q to lose write privilege
+  ! inc(q);    // initializing writable pointer requires writable pointer
+  *q = *q + 1;
+  return *p - *q;
+}
+
+

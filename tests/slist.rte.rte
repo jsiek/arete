@@ -1,0 +1,42 @@
+function listof(data) {
+  return new data, null;
+}
+
+function push(data, !list) {
+  return new data, 1 of list;
+}
+
+let head = 0;
+let tail = 1;
+
+function is_last(node) {
+  if (is_null(node)) {
+    return false;
+  } else {
+    return is_null(node[tail]);
+  }
+}
+
+// Split the list into two parts, with the second
+// part just containing the last element.
+function remove_last(!n) {
+  if (is_null(n)) {
+    return 0;
+  } else {
+    if (is_last(n[tail])) {
+      let !q = n[tail];
+      n[tail] = null;
+      return q;
+    } else {
+      return remove_last(n[tail]);
+    }
+  }
+}
+
+function main() {
+  let !one_two = push(1, listof(2));
+  let !two_null = remove_last(one_two);
+  let one = one_two[head];
+  let two = two_null[head];
+  return one + one - two;
+}

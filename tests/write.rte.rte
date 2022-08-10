@@ -1,0 +1,6 @@
+function main() {
+  let !x = new 10;
+  *x = 20;
+  let y = *x;
+  return y - 20;
+}

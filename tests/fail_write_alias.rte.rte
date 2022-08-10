@@ -1,0 +1,6 @@
+function main() {
+  let x = new 42;
+  let y = x;
+  *x = 0; // error: pointer does not have write privilege
+  return *y;
+}

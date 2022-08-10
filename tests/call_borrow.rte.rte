@@ -1,0 +1,11 @@
+function inc(!p) {
+  *p = *p + 1;
+}
+
+function main() {
+  let !q = new 0;
+  ! inc(q);
+  *q = *q + 1;
+  let a = *q;
+  return a - 2;
+}

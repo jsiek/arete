@@ -1,0 +1,114 @@
+let front = 0;
+let back = 1;
+let data = 0;
+let prev = 1;
+let next = 2;
+let none = 0;
+let half = 1/2;
+let all = 1;
+
+function listof(data) {
+  let !p = new data, null, null;
+  return split(p);
+}
+
+function push(data, !lst) {
+  let !first = new data, null , null;
+  if (lst[front] == lst[back]) { // lst is a 1 element list
+    /*
+      first: * -1-> [ A , / , / ]
+      
+      lst: * -> [ * , * ]
+                  |.5 |.5
+                  V   V
+		  [ B , / , / ]
+    */
+    let !n = join(lst[front], lst[back]);
+    n[prev] = none of first;
+    first[next] = half of n;
+    n[prev] <- half of first;
+    /*
+      first: *-.5-> [ A , / , * ]
+                    ^         |
+                    |.5       |.5
+      n: -.5-> [ B, * , / ]<--|
+    */
+    lst[front] = all of first;
+    lst[back] = all of n;
+    return lst;
+  } else { // lst has at least 2 elements
+    /*
+      first: *-1-> [ A, / , / ]
+      
+      lst: *-1->[ * , * ]
+		.5|  .5\____________________________
+		  |           ___.5___             |
+		  V           V       \            V
+		  [ B , / , * ]  [ C , * , * ] ... [ Z , * , / ]
+		            |    ^         |             |
+		            |___/          |             |   
+			      .5            \-.5->  <-.5-/
+     */
+    lst[front] <- all of lst[front][next][prev];
+    lst[front][prev] = none of first;
+    lst[front][next][prev] <- half of lst[front];
+    first[next] = all of lst[front];
+    first[next][prev] <- half of first;
+    lst[front] = all of first;
+    /*
+           lst: *-1-> [ * , * ]
+                      .5|   \____.5_______________________________
+			V                                         |
+	              [ A, / , * ]                                |
+				 |           |--.5---             |
+				 V           V       \            V
+				 [ B , * , * ]  [ C , * , * ] ... [ Z , * , / ]
+				           |    ^         |             |
+			                   |    |         |             |
+				           \-.5-/         \-.5->   <-.5-/
+     */
+    return lst;
+  }
+}
+
+function check_nodes_permissions(node) {
+  if (not is_null(node[next])) {
+    assert permission(node[next]) == half;
+    ! check_nodes_permissions(all of node[next]);
+  }
+  if (not is_null(node[prev])) {
+    assert permission(node[prev]) == half;
+  }
+}
+
+function check_list_permissions(list) {
+  let first = all of list[front];
+  let last = all of list[back];
+  assert permission(first) == half;
+  assert permission(last) == half;
+  ! check_nodes_permissions(all of first);
+}
+
+function delete_nodes(node, last) {
+  if (node == last) {
+    delete join(node, last);
+  } else {
+    node <- all of node[next][prev];
+    ! delete_nodes(all of node[next], all of last);
+    delete node;
+  }
+}
+
+function delete_list(!list) {
+  ! delete_nodes(all of list[front], all of list[back]);
+}
+
+function main() {
+  let !three = listof(3);
+  let !two_three = push(2, three);
+  let !one_two_three = push(1, two_three);
+  ! check_list_permissions(all of one_two_three);
+  let one = one_two_three[front][data];
+  ! delete_list(one_two_three);
+  return one - 1;
+}

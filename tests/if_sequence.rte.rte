@@ -1,0 +1,12 @@
+function main() {
+  let !p = new 0;
+  if (true) {
+    *p = *p + 1;
+  }
+  if (true) {
+    *p = *p + 1;
+    *p = *p + 1;
+  }
+  let three = *p;
+  return three - 3;
+}

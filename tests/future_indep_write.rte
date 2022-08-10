@@ -1,0 +1,13 @@
+fun write(!p, v) {
+  *p = v;
+}
+
+fun main() {
+  let !a = new 0;
+  let !b = new 0;
+  let f2 = spawn write(b, -42);
+  let f1 = spawn write(a, 42);
+  ! wait f1;
+  ! wait f2;
+  return *a + *b;
+}

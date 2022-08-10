@@ -1,0 +1,10 @@
+function main() {
+  let !x = new (new 10);
+  {
+    let y = x; // x and y are aliases to the same mutable cell
+    **x = 0;   // pointer does not have write privilege
+    **y = 1;
+  }
+  let a = **x - 1;
+  return a;
+}

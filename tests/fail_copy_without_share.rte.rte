@@ -1,0 +1,6 @@
+function main() {
+  let !x = new 42;
+  let y = x; // error: read privilege requires no writers
+  *x = 0;
+  return *y;
+}

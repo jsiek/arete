@@ -1,0 +1,108 @@
+// AVL Tree (UNDER CONSTRUCTION)
+// tree layout: [root]
+let root = 0;
+// node layout: [data, left, right, parent, height]
+let data = 0;
+let left = 1;
+let right = 2;
+let parent = 3;
+let height = 4;
+
+// Common fractions
+let none = 0;
+let half = 1/2;
+let all = 1;
+
+function find(key, node, parent) {
+  if (is_null(node)) {
+    return parent;
+  }
+  if (key < node[data]) {
+    return find(key, all of node[left], all of node);
+  }
+  if (node[data] < key) {
+    return find(key, all of node[right], all of node);
+  }
+  return node;
+}
+
+function gather_permission(node) {
+  if (not is_null(node[left])) {
+    node <- all of node[left][parent];
+  }
+  if (not is_null(node[right])) {
+    node <- all of node[right][parent];
+  }
+  assert permission(node) == 1;
+}
+
+function scatter_permission(node) {
+  if (not is_null(node[left])) {
+    node[left][parent] <- half of node;
+  }
+  if (not is_null(node[right])) {
+    node[right][parent] <- half of node;
+  }
+}
+
+function set_left(!node, !new_left) {
+  assert permission(node) == 1;
+  assert permission(new_left) == 1;
+  node[left] = all of new_left;
+  if (not is_null(new_left)) {
+    node[left][parent] = node;
+  }
+}
+
+function set_right(!node, !new_right) {
+  assert permission(node) == 1;
+  assert permission(new_right) == 1;
+  node[right] = all of new_right;
+  if (not is_null(node[right])) {
+    node[right][parent] = node;
+  }
+}
+
+function insert(key, !tree) {
+  if (is_null(tree[root])) {
+    tree[root] = new key, null, null, null, 0;
+  } else {
+    let node = all of find(key, all of tree[root], null);
+    if (key < node[data]) {
+      let !new_node = new key, null, null, null, 0;
+      ! gather_permission(all of node);
+      ! set_left(node, new_node);
+      ! scatter_permission(all of node);
+    }
+    if (node[data] < key) {
+      let !new_node = new key, null, null, null, 0;
+      ! gather_permission(all of node);
+      ! set_right(node, new_node);
+      ! scatter_permission(all of node);
+    }
+  }
+}
+
+function delete_node(node) {
+  if (not is_null(node)) {
+    ! gather_permission(all of node);
+    ! delete_node(all of node[left]);
+    ! delete_node(all of node[right]);
+    delete node;
+  }
+}
+
+function delete_tree(!tree) {
+  ! delete_node(all of tree[root]);
+}
+
+function main() {
+  let !tree = new null;
+  ! insert(5, tree);
+  ! insert(10, tree);
+  ! insert(1, tree);
+  let ten = (let t = find(10, tree[root])
+             in t[data]);
+  ! delete_tree(tree);
+  return ten - 10;
+}

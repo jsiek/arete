@@ -1,0 +1,20 @@
+/*
+
+Idea is to use permission like a mutex to allowed shared mutable state
+among two threads.
+
+*/
+
+fun inc(@q) {
+  while (not (upgrade(&q))) { }
+  *q = *q + 1;
+}
+
+fun main() {
+  let !p = new 0;
+  let t1 = spawn inc(p);
+  let t2 = spawn inc(p);
+  ! wait t1;
+  ! wait t2;
+  return *p - 2;
+}
