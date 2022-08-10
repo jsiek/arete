@@ -117,9 +117,9 @@ Inputs: percentage
 
 1. If the pointer is null, return a null pointer.
 
-2. If the pointer is alive, create a new pointer and transfer
-   the given percentage from this pointer to the new pointer.
-   Return the new pointer.
+2. If the pointer is alive, create a new pointer with the same address
+   and transfer the given percentage from this pointer to the new
+   pointer.  Return the new pointer.
 
 ### Transfer
 
