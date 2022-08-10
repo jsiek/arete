@@ -34,8 +34,6 @@ implementation written in Python 3.10 that includes:
 
 The following is the current specification of Arete.
 
-We define the term *environment* to be a dictionary mapping variable
-names to addresses.
 
 # Values
 
@@ -46,6 +44,9 @@ The values are defined in [values.py](values.py).
 
 All values are first class in the sense that they can be store in
 memory, passed as argument to functions, etc.
+
+We define the term *environment* to be a dictionary mapping variable
+names to pointers. (Pointers are a kind of value defined below.)
 
 ## Numbers
 
@@ -157,12 +158,12 @@ parameters, body, etc.) and an environment.
 
 ## Futures
 
-A *future* has an associated thread. 
+A *future* value has an associated thread. 
 
 ## Modules
 
-A module has a name, a dictionary of exported members, and a dictionary
-of all its members.
+A module has a name, an environment of exported members, and an
+environment of all its members.
 
 # Types
 
