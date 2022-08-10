@@ -933,10 +933,10 @@ UNDER CONSTRUCTION
    environment) according to the current runner's context.
 
 3. If the current runner's context is an address context with
-   duplication, then duplicate the identifier's address (from the
-   current environment) at 100% and call it the `result`. If the
-   context is without duplication, then the `result` is the
-   identifier's address (from the current environment).
+   duplication, then let `result` be a duplicate the identifier's
+   address (from the current environment) at 100%. If the context is
+   without duplication, then the `result` is the identifier's address
+   (from the current environment).
    
 4. Instruct the machine to finish this expression with the `result`.
 
