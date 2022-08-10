@@ -34,7 +34,66 @@ implementation written in Python 3.10 that includes:
 
 # Examples
 
+There are lots of example programs in the [tests](tests) directory.
 
+Here we look at a couple examples that demonstrate how mutation is
+controlled via fractional permissions in Arete.
+
+Mutable variables are declared with `var` and immutable ones are
+declared with `let`. For example, the following program runs without
+error and returns `0`.
+
+	fun main() {
+	  var x = 42;
+	  let y = 40;
+	  x = x - y;
+	  return x - 2;
+	}
+
+Both `var` and `let` variable are by-reference in C++ lingo; they are
+aliases for the value produced by their initializing expression (like
+all variables in Java).  In the following, we initialize `y` with `x` and
+declare `y` to also be a mutable variable. We then write `0` to `y`
+and `1` to `x`.
+
+	fun main() {
+	  var x = 42;
+	  var y = x;
+	  y = 0;
+	  x = 1;
+	  return x;
+	}
+
+This program halts with an error at `x = 1`, saying that
+the pointer (associated with `x`) does not have write permission. 
+
+In Arete, each pointer has a fraction to control whether it is allowed
+to read or write. A positive fraction allows it to read and a fraction
+of `1` allows it to write.
+
+The pointer associated with variable `x` starts out with a permission
+of `1`, but when we initialize `y` with `x`, all of its permission is
+transfered to the new pointer for `y`. So the write to `y` executes
+successfully, but the later write to `x` is an error because by that
+time, `x` has `0` permission.
+
+Getting back to the first example, let us discuss memory allocation
+and deallocation.
+
+	fun main() {
+	  var x = 42;
+	  let y = 40;
+	  x = x - y;
+	  return x - 2;
+	}
+
+When `x` is initialized with `42`, memory for `42` is allocated and
+the resulting pointer is associated with `x` (with permission
+`1`). Likewise for when `y` is initialized with `40`.  The variables
+`x` and `y` go out of scope at the end of the function, after the
+`return`. When they go out of scope, the associated pointers are
+"killed", and because those pointers have permission `1`, the memory
+at their address is deallocated.
 
 
 # Specification Table of Contents
@@ -416,8 +475,10 @@ A *program* is a list of zero or more definitions:
 ```
 
 Program execution begins with a call to the function named `main` with
-no arguments. If there is no such function, the program halts with an
-error.
+no arguments. Once the execution of `main` is finished, the program
+exits with the return value of `main` provided memory is empty. If
+memory is non-empty, then the program halts with an error. If there
+is no such `main` function, the program halts with an error.
 
 ## <a name="auxiliary"></a>Auxiliary Syntax
 

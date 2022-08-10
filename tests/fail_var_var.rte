@@ -1,6 +1,7 @@
 fun main() {
   var x = 42;
-  let y = 42;
-  x = x - y;
+  var y = x;
+  y = 0;
+  x = 1;
   return x;
 }

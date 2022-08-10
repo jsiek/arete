@@ -4,7 +4,6 @@ from fractions import Fraction
 from typing import Any
 from ast_base import Stmt
 from utilities import *
-from graphviz import log_graphviz
 
 @dataclass
 class Value:
@@ -362,8 +361,6 @@ def delete_env(label, env, mem, loc):
       else:
         # this is to deal with cycles due to recursive functions -Jeremy
         ptr.clear(mem, loc)
-      if tracing_on():
-        log_graphviz(label, env, mem.memory)
     for x in deletes:
         del env[x]
         
