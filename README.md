@@ -34,6 +34,9 @@ implementation written in Python 3.10 that includes:
 
 The following is the current specification of Arete.
 
+We define the term *environment* to be a dictionary mapping variable
+names to addresses.
+
 # Values
 
 A *value* is the runtime object produced by an expression during
@@ -150,8 +153,7 @@ whether this pointer's permission is equal to `1`.
 ## Closures
 
 A closure includes information from the originating function (name,
-parameters, body, etc.) and a dictionary mapping the names of its free
-variables to pointers.
+parameters, body, etc.) and an environment.
 
 ## Futures
 
@@ -282,10 +284,7 @@ Each `NodeRunner` has
 * `return_mode` (the strings `value` or `address`) is whether the enclosing
   function expects to return a value or address.
 
-* `env` a dictionary mapping all the in-scope variables to their addresses.
-
-We define the term *environment* to be a dictionary mapping variable
-names to addresses.
+* `env` an environment mapping all the in-scope variables to their addresses.
 
 ## Machine Operations
 
