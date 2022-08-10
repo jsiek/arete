@@ -797,6 +797,8 @@ UNDER CONSTRUCTION
 <expression> ::= false
 ```
 
+(Similar to the case for integer literals.)
+
 ### Function (aka. lambda, anonymous function)
 
 ```
@@ -909,7 +911,7 @@ UNDER CONSTRUCTION
 <expression> ::= true
 ```
 
-UNDER CONSTRUCTION
+(Similar to the case for integer literals.)
 
 ### Tuple
 
@@ -917,7 +919,20 @@ UNDER CONSTRUCTION
 <expression> ::= ⟨ <initializer_list> ⟩
 ```
 
-UNDER CONSTRUCTION
+1. Schedule each `initializer` (left-to-right) in a value context
+   with duplication requesting 50% permission.
+   
+2. Create a tuple value whose elements are duplicates (at 100%)
+   of the results of the initializers.
+   
+3. If the current node runner's context is a value context, 
+   let `result` be the tuple.
+   
+4. If the current node runner's context is an address context, 
+   allocate the tuple in memory and let `result` be a pointer
+   to that memory.
+
+5. Finish this expression with `result`.
 
 ### Variable (Occurence)
 
