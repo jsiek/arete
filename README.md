@@ -99,9 +99,11 @@ the resulting pointer is associated with `x` (with permission
 at their address is deallocated.
 
 
-# Specification Table of Contents
+# Specification 
 
-The following is the current specification of Arete.
+This is the current specification of the Arete language.
+
+**Table of Contents**
 
 * [Values](#values)
 
