@@ -718,7 +718,26 @@ Repeatedly execute the `block` so long as the `expression` evaluates to `true`.
 
 ## <a name="expressions"></a>Expressions
 
-### Address Of
+
+**Table of Contents**
+
+* [Address Of](#addressof)
+* [Array Creation](#array)
+* [Call](#call)
+* [False Literal](#false)
+* [Function (Lambda)](#function)
+* [Index](#index) (into a tuple or array)
+* [Integer Literal](#integer)
+* [Member Access](#member)
+* [Null Pointer Literal](#null)
+* [Primitive Call](#primitive)
+* [True Literal](#true)
+* [Tuple Creation](#tuple)
+* [Variable](#variable)
+* [Spawn](#spawn) a future
+* [Wait](#wait) on a future
+
+### <a name="addressof"></a>Address Of
 
 ```
 <expression> ::= & <expression>
@@ -741,7 +760,7 @@ Repeatedly execute the `block` so long as the `expression` evaluates to `true`.
 4. Finish this expression with `result`.
 
 
-### Array Creation
+### <a name="array"></a>Array Creation
 
 ```
 <expression> ::= [ <expression> of <expression> ]
@@ -750,7 +769,7 @@ Repeatedly execute the `block` so long as the `expression` evaluates to `true`.
 UNDER CONSTRUCTION
 
 
-### Call
+### <a name="call"></a>Call
 
 ```
 <expression> ( <initializer_list> )
@@ -793,7 +812,7 @@ UNDER CONSTRUCTION
 7. Finish this expression with `result`.
 
 
-### False Literal
+### <a name="false"></a>False Literal
 
 ```
 <expression> ::= false
@@ -801,7 +820,7 @@ UNDER CONSTRUCTION
 
 (Similar to the case for integer literals.)
 
-### Function (aka. lambda, anonymous function)
+### <a name="function"></a>Function (aka. lambda, anonymous function)
 
 ```
 <expression> ::= fun ( <parameter_list> ) <return_mode> <block>
@@ -825,7 +844,7 @@ by this function's parameters.
  mutable or to capture a variable's value.)
 
 
-### Index
+### <a name="index"></a> Index
 
 ```
 <expression> ::= <expression> [ <expression> ]
@@ -851,7 +870,7 @@ by this function's parameters.
 5. Finish this expression with `result`.
 
 
-### Integer Literal
+### <a name="integer"></a>Integer Literal
 
 ```
 <expression> ::= <integer>
@@ -866,7 +885,7 @@ by this function's parameters.
 
 3. Finish this expression with `result`.
 
-### Member Access
+### <a name="member"></a>Member Access
 
 ```
 <expression> ::= <expression> . <identifier>
@@ -891,7 +910,7 @@ by this function's parameters.
    
 5. Finish this expression with `result`.
 
-### Null Pointer Literal
+### <a name="null"></a>Null Pointer Literal
 
 ```
 <expression> ::= null
@@ -899,7 +918,7 @@ by this function's parameters.
 
 UNDER CONSTRUCTION
 
-### Primitive Call
+### <a name="primitive"></a>Primitive Call
 
 ```
 <expression> ::= <prim-op> ( <expression_list> )
@@ -907,15 +926,15 @@ UNDER CONSTRUCTION
 
 UNDER CONSTRUCTION
 
-### True Literal
+### <a name="true"></a>True Literal
 
 ```
 <expression> ::= true
 ```
 
-(Similar to the case for integer literals.)
+(Similar to the case for [integer literals](#integer).)
 
-### Tuple
+### <a name="tuple"></a>Tuple Creation
 
 ```
 <expression> ::= ⟨ <initializer_list> ⟩
@@ -936,7 +955,7 @@ UNDER CONSTRUCTION
 
 5. Finish this expression with `result`.
 
-### Variable (Occurence)
+### <a name="variable"></a>Variable (Occurence)
 
 ```
 <expression> ::= <identifier>
@@ -958,7 +977,7 @@ UNDER CONSTRUCTION
 4. Instruct the machine to finish this expression with the `result`.
 
 
-### Spawn
+### <a name="spawn"></a>Spawn a Future
 
 ```
 <expression> ::= spawn <expression>
@@ -968,7 +987,7 @@ Evaluate the `expression` in a new thread, concurrent with the current thread.
 Immediately returns a *future* associated with the new thread.
 This *future* can later be passed to `wait` (see below the description for `await`).
 
-### Wait
+### <a name="wait"></a>Wait on a Future
 
 ```
 <expression> ::= wait <expression>
