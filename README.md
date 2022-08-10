@@ -35,16 +35,27 @@ implementation written in Python 3.10 that includes:
 # Examples
 
 
+
+
+# Specification Table of Contents
+
 The following is the current specification of Arete.
 
-
-# Table of Contents
-
 * [Values](#values)
-* [Types](#types)
-* [Machine](#machine)
-* Language Features
 
+* [Types](#types)
+
+* [Machine](#machine)
+
+* [Language Features](#features)
+
+    * [Auxiliary Syntax](#auxiliary)
+
+    * [Definitions](#definitions)
+	
+	* [Statements](#statements)
+	
+	* [Expressions](#statements)
 
 # <a name="values"></a>Values
 
@@ -384,7 +395,7 @@ UNDER CONSTRUCTION
 
 UNDER CONSTRUCTION
 
-# Language Features
+# <a name="features"></a>Language Features
 
 This section is organized according to the grammar of the language,
 which has three main categories: expressions, statements, and
@@ -408,7 +419,7 @@ Program execution begins with a call to the function named `main` with
 no arguments. If there is no such function, the program halts with an
 error.
 
-## Miscellaneous Syntax
+## <a name="auxiliary"></a>Auxiliary Syntax
 
 This section is about auxilliary syntactic categories that are used
 later in the definitions of the expressions, statements, and
@@ -449,7 +460,7 @@ If no percentage is specified and the context of the current node
 runner is an `AddressCtx`, then use that context's
 percentage. Otherwise use 50%.
 
-## Definitions
+## <a name="definitions"></a>Definitions
 
 ### Constant
 
@@ -487,7 +498,7 @@ percentage. Otherwise use 50%.
 <definition> ::= let <identifier> [: <type>] = <expression>;
 ```
 
-## Statements 
+## <a name="statements"></a>Statements 
 
 ### Assert
 
@@ -617,7 +628,7 @@ requested percentage is 100%.
 Repeatedly execute the `block` so long as the `expression` evaluates to `true`.
 
 
-## Expressions
+## <a name="expressions"></a>Expressions
 
 ### Address Of
 
