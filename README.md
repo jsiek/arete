@@ -41,6 +41,9 @@ program execution. The kinds of values in Arete are listed below.
 
 The values are defined in [values.py](values.py).
 
+All values are first class in the sense that they can be store in
+memory, passed as argument to functions, etc.
+
 ## Numbers
 
 The numbers currently include integers and fractions.
