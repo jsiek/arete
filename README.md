@@ -32,10 +32,21 @@ implementation written in Python 3.10 that includes:
 * interpreting (an abstract machine) ([machine.py](machine.py))
 
 
+# Examples
+
+
 The following is the current specification of Arete.
 
 
-# Values
+# Table of Contents
+
+* [Values](#values)
+* [Types](#types)
+* [Machine](#machine)
+* Language Features
+
+
+# <a name="values"></a>Values
 
 A *value* is the runtime object produced by an expression during
 program execution. The kinds of values in Arete are listed below.
@@ -165,7 +176,7 @@ A *future* value has an associated thread.
 A module has a name, an environment of exported members, and an
 environment of all its members.
 
-# Types
+# <a name="types"></a>Types
 
 A comma-separated list of types is a `type_list`.
 
@@ -241,7 +252,7 @@ An occurence of a type variable refers to a recursive type.
 (See the above entry about Recursive Types.)
 
 
-# Machine Description
+# <a name="machine"></a>Machine Description
 
 The *machine* has
 
@@ -708,6 +719,9 @@ by this function's parameters.
 4. If the current node runner's context is an address context,
    allocate the closure in memory and let `result` be its pointer.
 5. Finish this expression with `result`.
+
+(There are plans to provide a way to capture free variables that are
+ mutable or to capture a variable's value.)
 
 
 ### Index
