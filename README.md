@@ -25,14 +25,14 @@ implementation written in Python 3.10 that includes:
 
 * constant evaluation ([const_eval.py](const_eval.py))
 
-* type checking ([type_check.py](type_check.py))
+* type checking ([type_check.py](type_check.py)) (in progress!)
 
 * desugaring ([desugar.py](desugar.py))
 
 * interpreting (an abstract machine) ([machine.py](machine.py))
 
 
-The following describes the current status of Arete.
+The following is the current specification of Arete.
 
 # Values
 
