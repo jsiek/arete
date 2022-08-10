@@ -167,6 +167,12 @@ environment of all its members.
 
 # Types
 
+A comma-separated list of types is a `type_list`.
+
+```
+<type_list> ::= <type> | <type> , <type_list>
+```
+
 ## Integers
 
 ```
