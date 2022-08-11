@@ -81,7 +81,7 @@ class Machine:
       self.push_frame()
       loc = main.location
       call_main = Call(loc, Var(loc, 'main'), [])
-      self.schedule(call_main, env, ValueCtx(True, Fraction(1,2)),
+      self.schedule(call_main, env, ValueCtx(True, True, Fraction(1,2)),
                     return_mode='-no-return-mode-')
       self.loop()
       if tracing_on():
@@ -138,7 +138,7 @@ class Machine:
 
   # Call schedule to start the evaluation of an AST node.
   # Returns the new runner.
-  def schedule(self, ast, env, context=ValueCtx(True, Fraction(1,2)),
+  def schedule(self, ast, env, context=ValueCtx(True, False, Fraction(1,2)),
                return_mode=None):
       return_mode = self.current_runner().return_mode if return_mode is None \
                     else return_mode
@@ -207,7 +207,7 @@ class Machine:
   def spawn(self, exp: Exp, env):
       act = NodeRunner(exp, 0, [], None,
                        self.current_runner().return_mode, # ??
-                       ValueCtx(True, Fraction(1,1)), env)
+                       ValueCtx(True, False, Fraction(1,1)), env)
       frame = Frame([act])
       self.current_thread.num_children += 1
       thread = Thread([frame], None, self.current_thread, 0)

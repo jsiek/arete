@@ -98,6 +98,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 ?statement_list: "def" parameter "=" initializer ";" statement_list   -> def_stmt
     | "let" IDENT "=" expression ";" statement_list     -> let_stmt
     | "var" IDENT "=" expression ";" statement_list     -> var_stmt
+    | "inout" IDENT "=" expression ";" statement_list   -> inout_stmt
     | statement statement_list                          -> seq
     | statement                                         -> last_statement
     | "return" expression ";"                           -> return

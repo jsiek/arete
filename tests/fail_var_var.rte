@@ -2,6 +2,5 @@ fun main() {
   var x = 42;
   var y = x;
   y = 0;
-  x = 1;
-  return x;
+  return x + y;
 }

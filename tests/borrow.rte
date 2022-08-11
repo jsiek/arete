@@ -1,8 +1,7 @@
 fun main() {
   var q = 1;
-  { var p = q;
+  { inout p = q;
     p = p + 1; }
   q = q + 1;
-  def a = q;
-  return a - 3;
+  return q - 3;
 }

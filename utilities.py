@@ -21,7 +21,8 @@ def tracing_on():
 
 @dataclass
 class Context:
-    duplicate: bool
+    duplicate: bool   # make a copy of the pointer?
+    consume: bool     # kill the source after the copy?
 
 # Want the value of the expression (not its address).
 # If the value is a pointer, duplicate with the specified percentage

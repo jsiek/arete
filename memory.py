@@ -68,7 +68,7 @@ class Memory:
     return self.get_tuple_element(self.memory[address], path, loc)
 
   # TODO: move duplicate logic to callers?
-  def read(self, ptr, location, context=ValueCtx(True, Fraction(1,1))):
+  def read(self, ptr, location, context=ValueCtx(True, False, Fraction(1,1))):
       if not isinstance(ptr, Pointer):
           error(location, 'in read expected a pointer, not ' + str(ptr))
       if none(ptr.permission):

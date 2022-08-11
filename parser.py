@@ -161,15 +161,20 @@ def parse_tree_to_ast(e):
                        parse_tree_to_ast(e.children[1]),
                        parse_tree_to_ast(e.children[2]))
     elif e.data == 'let_stmt':
-        return Let(e.meta,
-                   e.children[0].value,
-                   parse_tree_to_ast(e.children[1]),
-                   parse_tree_to_ast(e.children[2]))
+        return BindingStmt(e.meta, 'let',
+                           e.children[0].value,
+                           parse_tree_to_ast(e.children[1]),
+                           parse_tree_to_ast(e.children[2]))
     elif e.data == 'var_stmt':
-        return VarInit(e.meta,
-                       e.children[0].value,
-                       parse_tree_to_ast(e.children[1]),
-                       parse_tree_to_ast(e.children[2]))
+        return BindingStmt(e.meta, 'var',
+                           e.children[0].value,
+                           parse_tree_to_ast(e.children[1]),
+                           parse_tree_to_ast(e.children[2]))
+    elif e.data == 'inout_stmt':
+        return BindingStmt(e.meta, 'inout',
+                           e.children[0].value,
+                           parse_tree_to_ast(e.children[1]),
+                           parse_tree_to_ast(e.children[2]))
     elif e.data == 'return':
         return Return(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'write':

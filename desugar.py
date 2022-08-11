@@ -92,20 +92,13 @@ def desugar_statement(s, env):
         body_env[var.ident] = False
         new_body = desugar_statement(body, body_env)
         return DefInit(s.location, var, new_init, new_body)
-      case VarInit(var, rhs, body):
+      case BindingStmt(kind, var, rhs, body):
         loc = s.location
         new_rhs = desugar_exp(rhs, env)
         body_env = env.copy()
         body_env[var] = False
         new_body = desugar_statement(body, body_env)
-        return VarInit(loc, var, new_rhs, new_body)
-      case Let(var, rhs, body):
-        loc = s.location
-        new_rhs = desugar_exp(rhs, env)
-        body_env = env.copy()
-        body_env[var] = False
-        new_body = desugar_statement(body, body_env)
-        return Let(loc, var, new_rhs, new_body)
+        return BindingStmt(loc, kind, var, new_rhs, new_body)
       case Seq(first, rest):
         new_first = desugar_statement(first, env)
         new_rest = desugar_statement(rest, env)
