@@ -684,7 +684,7 @@ class Let(Exp):
             | (self.body.free_vars() - set([self.var.ident]))
     def step(self, runner, machine):
       if runner.state == 0:
-        context = AddressCtx(True, Fraction(1,2))
+        context = AddressCtx(True, Fraction(1,1))
         machine.schedule(self.arg, runner.env, context)
       elif runner.state == 1:
         val = runner.results[0][0]
