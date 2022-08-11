@@ -1,0 +1,7 @@
+fun main() {
+  let a = 0;
+  let b = a;
+  var c = b;
+  c = 0;
+  return c + a;
+}

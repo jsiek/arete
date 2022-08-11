@@ -1,0 +1,7 @@
+fun main() {
+  var q = 1;
+  { var r = q;
+    r = r + 1; }
+  q = q + 1;       // error, q died when it was bound to r
+  return q - 3;
+}
