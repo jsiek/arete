@@ -1,6 +1,6 @@
 fun main() {
   var x = 42;
-  let y = 42;
+  def y = 42;
   x = x - y;
   return x;
 }

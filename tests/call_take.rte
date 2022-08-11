@@ -4,7 +4,7 @@ fun inc(!p) {
 }
 
 fun main() {
-  let !q = 0;
-  let a = inc(q);
+  def !q = 0;
+  def a = inc(q);
   return a - 1;
 }

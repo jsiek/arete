@@ -358,7 +358,7 @@ def type_check_exp(e, env):
           error(e.location, 'in conditional, branches must be consistent, not '
                 + str(cond_type))
         return join(thn_type, els_type)
-      case Let(var, init, body):
+      case DefExp(var, init, body):
         init_type = type_check_init(init, env)
         body_env = env.copy()
         body_env[var.ident] = init_type
@@ -382,7 +382,7 @@ def type_check_exp(e, env):
     
 def type_check_statement(s, env):
     match s:
-      case LetInit(var, init, body):
+      case DefInit(var, init, body):
         init_type = type_check_init(init, env)
         type_annot = simplify(var.type_annot, env)
         if not consistent(init_type, type_annot):
@@ -390,6 +390,12 @@ def type_check_statement(s, env):
                 + ' is inconsistent with declared type ' + str(type_annot))
         body_env = env.copy()
         body_env[var.ident] = type_annot
+        body_type = type_check_statement(body, body_env)
+        return body_type
+      case VarInit(var, rhs, body):
+        rhs_type = type_check_exp(rhs, env)
+        body_env = env.copy()
+        body_env[var] = rhs_type
         body_type = type_check_statement(body, body_env)
         return body_type
       case Seq(first, rest):

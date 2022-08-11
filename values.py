@@ -14,17 +14,19 @@ class Value:
 
 @dataclass
 class Void(Value):
-    def kill(self, mem, loc, progress=set()):
-      pass
-    def clear(self, mem, loc, progress=set()):
-      pass
+  def kill(self, mem, loc, progress=set()):
+    pass
+  def clear(self, mem, loc, progress=set()):
+    pass
+  def duplicate(self, percentage, location):
+    pass
 
 @dataclass
 class Number(Value):
   value: numbers.Number
   def equals(self, other):
     return self.value == other.value
-  def duplicate(self, percentage):
+  def duplicate(self, percentage, location):
     return Number(self.value)
   def kill(self, mem, location, progress=set()):
     pass
@@ -44,7 +46,7 @@ class Boolean(Value):
     value: bool
     def equals(self, other):
         return self.value == other.value
-    def duplicate(self, percentage):
+    def duplicate(self, percentage, location):
         return Boolean(self.value)
     def kill(self, mem, location, progress=set()):
         pass
@@ -62,8 +64,8 @@ class TupleValue(Value):
     def equals(self, other):
       raise Exception('unimplemented')
     
-    def duplicate(self, percentage):
-      return TupleValue([elt.duplicate(percentage) for elt in self.elts])
+    def duplicate(self, percentage, loc):
+      return TupleValue([elt.duplicate(percentage, loc) for elt in self.elts])
     
     def kill(self, mem, location, progress=set()):
       for elt in self.elts:
@@ -185,7 +187,7 @@ class Pointer(Value):
             self.transfer(Fraction(1,1), self.lender, location)
         return self.permission == Fraction(1,1)
         
-    def duplicate(self, percentage):
+    def duplicate(self, percentage, location):
         if self.address is None:
             ptr = Pointer(None, [], Fraction(1,1), self)
         else:
@@ -196,7 +198,7 @@ class Pointer(Value):
           print('duplicated ' + str(self) + ' into ' + str(ptr))
         return ptr
     
-    def element_address(self, i, percentage):
+    def element_address(self, i, percentage, location):
         other_priv = self.permission * percentage
         self.permission -= other_priv
         ptr = Pointer(self.address, self.path + [i], other_priv, self)
@@ -245,10 +247,10 @@ class Closure(Value):
     env: dict[str,Pointer]
     __match_args__ = ("name", "params", "return_mode", "body", "env")
     
-    def duplicate(self, percentage):
+    def duplicate(self, percentage, loc):
       if tracing_on():
         print('duplicating closure ' + str(self))
-      env_copy = {x: v.duplicate(Fraction(1,2)) for x,v in self.env.items()}
+      env_copy = {x: v.duplicate(Fraction(1,2), loc) for x,v in self.env.items()}
       return Closure(self.name, self.params, self.return_mode, self.body,
                        env_copy)
     
@@ -279,7 +281,7 @@ class Closure(Value):
 class Future(Value):
     thread: Any
     __match_args__ = ("thread",)
-    def duplicate(self, percentage):
+    def duplicate(self, percentage, loc):
         return self
     def kill(self, mem, location, progress=set()):
         pass # ???
@@ -296,8 +298,8 @@ class Module(Value):
     exports: dict[str, Pointer] # only the exports
     members: dict[str, Pointer] # all the members
     __match_args__ = ("name", "exports")
-    def duplicate(self, percentage):
-        exports_copy = {x: val.duplicate(percentage) \
+    def duplicate(self, percentage, loc):
+        exports_copy = {x: val.duplicate(percentage, loc) \
                         for x,val in self.exports.items()}
         return Module(self.name, exports_copy)
     def __str__(self):

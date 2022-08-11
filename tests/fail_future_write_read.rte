@@ -5,13 +5,13 @@ fun write(!q, v, @signal) {
 }
 
 fun main() {
-  let !p = new 0;
-  let !signal = new 0;
+  def !p = new 0;
+  def !signal = new 0;
   var s = signal; // take some of signal's permissions
-  let f1 = spawn write(p, 42, signal);
+  def f1 = spawn write(p, 42, signal);
   // wait for f1 to start and acquire p
   while (permission(p) > 0) { }
-  let x = *p;
+  def x = *p;
   s = null; // give back signal's permissions
   // write happens sometime in here
   ! wait f1;

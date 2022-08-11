@@ -1,8 +1,8 @@
 module M
   exports empty, push, front, rest, map
 {
-  let all = 1;
-  let empty = null;
+  def all = 1;
+  def empty = null;
   fun push(data, rest) {
     return ⟨data, all of rest⟩;
   }
@@ -21,9 +21,9 @@ module M
 from M import empty, push, front, rest;
 
 fun main() {
-  let !ls1 = push(0, push(1, push(2, empty)));
-  let inc = fun (x) { return x + 1; };
-  let !ls2 = M.map(inc, ls1); // test . operator
-  let three = front(rest(rest(ls2)));
+  def !ls1 = push(0, push(1, push(2, empty)));
+  def inc = fun (x) { return x + 1; };
+  def !ls2 = M.map(inc, ls1); // test . operator
+  def three = front(rest(rest(ls2)));
   return three - 3;
 }

@@ -1,8 +1,8 @@
 function main() {
-  let !p = new 0;
-  let copy1 = function() { return p; };
-  let copy2 = copy1;
-  let !q = join(copy1(), copy2());
+  def !p = new 0;
+  def copy1 = function() { return p; };
+  def copy2 = copy1;
+  def !q = join(copy1(), copy2());
   *p = 1;
   *q = 2;
   return *p;

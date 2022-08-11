@@ -29,7 +29,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     |                                            -> value
 
 ?expression: expression_logic "?" expression ":" expression    -> condition
-    | "let" parameter "=" initializer "in" expression          -> let
+    | "def" parameter "=" initializer "in" expression          -> def
     | expression_logic
 
 ?expression_logic: expression_logic "and" expression_cmp       -> and
@@ -95,7 +95,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "else" "if" "(" expression ")" block if_rest      -> else_if
     |                                                   -> no_else
 
-?statement_list: "let" parameter "=" initializer ";" statement_list   -> let_initializer
+?statement_list: "def" parameter "=" initializer ";" statement_list   -> def_initializer
     | "var" IDENT "=" expression ";" statement_list     -> var_initializer
     | statement statement_list                          -> seq
     | statement                                         -> last_statement
@@ -130,7 +130,7 @@ parameter: IDENT type_opt                      -> read
 ?ret_type: "->" type                             -> just
     |                                            -> nothing
 
-?definition: "let" IDENT type_opt "=" expression ";"              -> global
+?definition: "def" IDENT type_opt "=" expression ";"              -> global
     | "const" IDENT type_opt "=" expression ";"                   -> constant
     | "fun" IDENT "(" parameter_list ")" ret_type return_mode block  -> function
     | "module" IDENT "exports" ident_list "{" definition_list "}" -> module

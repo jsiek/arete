@@ -1,5 +1,5 @@
 fun main() {
-  let x = true;
-  let y = false;
+  def x = true;
+  def y = false;
   return x ? (y ? 1 : 0) : 1;
 }

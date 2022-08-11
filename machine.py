@@ -43,7 +43,6 @@ class NodeRunner:
     context: Context     # rvalue/lvalue/etc.
     env: dict[str,Pointer]
     
-    
 @dataclass
 class Frame:
     todo: list[NodeRunner]
@@ -207,8 +206,8 @@ class Machine:
 
   def spawn(self, exp: Exp, env):
       act = NodeRunner(exp, 0, [], None,
-                   self.current_runner().return_mode, # ??
-                   ValueCtx(True, Fraction(1,1)), env)
+                       self.current_runner().return_mode, # ??
+                       ValueCtx(True, Fraction(1,1)), env)
       frame = Frame([act])
       self.current_thread.num_children += 1
       thread = Thread([frame], None, self.current_thread, 0)

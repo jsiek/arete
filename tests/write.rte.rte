@@ -1,6 +1,6 @@
 function main() {
-  let !x = new 10;
+  def !x = new 10;
   *x = 20;
-  let y = *x;
+  def y = *x;
   return y - 20;
 }

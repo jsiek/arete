@@ -7,7 +7,7 @@ type node_t = rec X in ⟨int, X, X⟩*;
 type list_t = ⟨node_t, node_t⟩;
 
 fun listof(dat: int) -> ⟨node_t, node_t⟩ {
-  let !p = new ⟨dat, null, null⟩;
+  def !p = new ⟨dat, null, null⟩;
   return split(p);
 }
 
@@ -32,9 +32,9 @@ fun next(node: node_t) -> node_t & {
 }
 
 fun push(dat: int, !lst: list_t) -> list_t {
-  let !first: node_t = new ⟨dat, null, null⟩;
+  def !first: node_t = new ⟨dat, null, null⟩;
   if (front(lst) == back(lst)) { // lst is a 1 element list
-    let !n: node_t = copy(join(lst[0], lst[1]));
+    def !n: node_t = copy(join(lst[0], lst[1]));
     prev(all of n) = none of first;
     next(all of first) = half of n;
     (*n)[1] <- half of first;
@@ -65,8 +65,8 @@ fun check_nodes_permissions(node: node_t) {
 }
 
 fun check_list_permissions(list: list_t) {
-  let first = copy(front(all of list));
-  let last = copy(back(all of list));
+  def first = copy(front(all of list));
+  def last = copy(back(all of list));
   assert permission(first) == half;
   assert permission(last) == half;
   ! check_nodes_permissions(all of first);
@@ -90,11 +90,11 @@ fun delete_list(!list: list_t) {
 }
 
 fun main() {
-  let !three: list_t = listof(3);
-  let !two_three: list_t = push(2, three);
-  let !one_two_three: list_t = push(1, two_three);
+  def !three: list_t = listof(3);
+  def !two_three: list_t = push(2, three);
+  def !one_two_three: list_t = push(1, two_three);
   ! check_list_permissions(all of one_two_three);
-  let one: int = copy(data(front(one_two_three)));
+  def one: int = copy(data(front(one_two_three)));
   ! delete_list(one_two_three);
   return one - 1;
 }

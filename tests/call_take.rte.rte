@@ -4,7 +4,7 @@ function inc(!p) {
 }
 
 function main() {
-  let !q = new 0;
-  let a = inc(q);
+  def !q = new 0;
+  def a = inc(q);
   return a - 1;
 }

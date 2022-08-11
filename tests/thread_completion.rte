@@ -3,8 +3,8 @@ fun write(!p, v) {
 }
 
 fun main() {
-  let !p = new 1;
-  let t = spawn spawn write(p, 0);
+  def !p = new 1;
+  def t = spawn spawn write(p, 0);
   ! wait t;
   return *p;
 }

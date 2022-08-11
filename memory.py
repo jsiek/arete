@@ -78,7 +78,7 @@ class Memory:
 
       val = self.raw_read(ptr.address, ptr.path, location)
       if context.duplicate:
-          retval = val.duplicate(ptr.permission * context.percentage)
+          retval = val.duplicate(ptr.permission * context.percentage, location)
       else:
           retval = val
       if tracing_on():
@@ -90,7 +90,7 @@ class Memory:
   def unchecked_write(self, ptr, val, location):
       old_val = self.get_tuple_element(self.memory[ptr.address], ptr.path,
                                        location)
-      val_copy = val.duplicate(1)
+      val_copy = val.duplicate(1, location)
       self.memory[ptr.address] = \
           self.set_tuple_element(self.memory[ptr.address],
                                  ptr.path, val_copy, location)
@@ -122,23 +122,30 @@ class Memory:
     #     print('**warning fraction[' + str(addr) + '] == ' + str(frrunner[addr]))
     return fraction_dict
 
+def bind_parameter(var, privilege, val, env, mem, location):
+    if privilege == 'write' and isinstance(val, Pointer) \
+       and val.permission != Fraction(1,1):
+        error(location, 'need writable pointer, not ' + str(val))
+    elif privilege == 'read' \
+         and isinstance(val, Pointer) \
+         and (not val.address is None) \
+         and val.permission == Fraction(0,1):
+        error(location, 'need readable pointer, not ' + str(val))
+    if not isinstance(val, Pointer):
+      error(location, 'for variable initialization, expected a pointer, not ' + str(val))
+    env[var] = val
+
 def allocate_locals(var_priv_vals, env, mem, location):
     for var, priv, val in var_priv_vals:
-        if priv == 'write' and isinstance(val, Pointer) \
-           and val.permission != Fraction(1,1):
-            error(location, 'need writable pointer, not ' + str(val))
-        elif priv == 'read' and isinstance(val, Pointer) \
-                  and (not val.address is None) \
-                  and val.permission == Fraction(0,1):
-            error(location, 'need readable pointer, not ' + str(val))
-        if not isinstance(val, Pointer):
-          error(location, 'for variable initialization, expected a pointer, not ' + str(val))
-        env[var] = val
+        bind_parameter(var, priv, val, env, mem, location)
 
+def deallocate_parameter(var, env, mem, location):
+    if tracing_on():
+      print('deallocating local variable: ' + var)
+    ptr = env[var]
+    ptr.kill(mem, location)
+        
 def deallocate_locals(vars, env, mem, location):
     for var in vars:
-        if tracing_on():
-          print('deallocating local variable: ' + var)
-        ptr = env[var]
-        ptr.kill(mem, location)
+        deallocate_parameter(var, env, mem, location)
 

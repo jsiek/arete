@@ -1,11 +1,11 @@
 fun main() {
-  let n = 10;
-  let !a = [n of 0];
+  def n = 10;
+  def !a = [n of 0];
   var i = 0;
   while (i < len(a)) {
     a[i] = i;
     i = i + 1;
   }
-  let last = a[9];
+  def last = a[9];
   return last - 9;
 }

@@ -1,17 +1,17 @@
 // AVL Tree (UNDER CONSTRUCTION)
 // tree layout: [root]
-let root = 0;
+def root = 0;
 // node layout: [data, left, right, parent, height]
-let data = 0;
-let left = 1;
-let right = 2;
-let parent = 3;
-let height = 4;
+def data = 0;
+def left = 1;
+def right = 2;
+def parent = 3;
+def height = 4;
 
 // Common fractions
-let none = 0;
-let half = 1/2;
-let all = 1;
+def none = 0;
+def half = 1/2;
+def all = 1;
 
 function find(key, node, parent) {
   if (is_null(node)) {
@@ -67,15 +67,15 @@ function insert(key, !tree) {
   if (is_null(tree[root])) {
     tree[root] = new key, null, null, null, 0;
   } else {
-    let node = all of find(key, all of tree[root], null);
+    def node = all of find(key, all of tree[root], null);
     if (key < node[data]) {
-      let !new_node = new key, null, null, null, 0;
+      def !new_node = new key, null, null, null, 0;
       ! gather_permission(all of node);
       ! set_left(node, new_node);
       ! scatter_permission(all of node);
     }
     if (node[data] < key) {
-      let !new_node = new key, null, null, null, 0;
+      def !new_node = new key, null, null, null, 0;
       ! gather_permission(all of node);
       ! set_right(node, new_node);
       ! scatter_permission(all of node);
@@ -97,11 +97,11 @@ function delete_tree(!tree) {
 }
 
 function main() {
-  let !tree = new null;
+  def !tree = new null;
   ! insert(5, tree);
   ! insert(10, tree);
   ! insert(1, tree);
-  let ten = (let t = find(10, tree[root])
+  def ten = (let t = find(10, tree[root])
              in t[data]);
   ! delete_tree(tree);
   return ten - 10;

@@ -3,9 +3,9 @@ fun write(!p, v) {
 }
 
 fun main() {
-  let !a = new 0;
-  let f1 = spawn write(a, 42);
-  let f2 = spawn write(a, -42); // need writable pointer
+  def !a = new 0;
+  def f1 = spawn write(a, 42);
+  def f2 = spawn write(a, -42); // need writable pointer
   ! wait f1;
   ! wait f2;
   return *a;

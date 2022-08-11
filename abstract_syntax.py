@@ -57,7 +57,7 @@ class Initializer:
       machine.schedule(self.arg, runner.env, ctx)
     else:
       val = runner.results[1][0]
-      val_copy = val.duplicate(1)
+      val_copy = val.duplicate(1, self.location)
       machine.finish_expression(val_copy, self.location)
       
 # Expressions
@@ -203,7 +203,7 @@ class Member(Exp):
             result = machine.memory.read(ptr, self.location, runner.context)
           elif isinstance(runner.context, AddressCtx):
             if runner.context.duplicate:
-              result = ptr.duplicate(runner.context.percentage)
+              result = ptr.duplicate(runner.context.percentage, self.location)
             else:
               result = ptr
           else:
@@ -230,7 +230,7 @@ class New(Exp):
       if runner.state == 0:
         machine.schedule(self.init, runner.env, ValueCtx(True, Fraction(1,1)))
       else:
-        ptr = machine.memory.allocate(runner.results[0][0].duplicate(1))
+        ptr = machine.memory.allocate(runner.results[0][0].duplicate(1, self.location))
         if isinstance(runner.context, ValueCtx):
             result = ptr
         elif isinstance(runner.context, AddressCtx):
@@ -259,7 +259,7 @@ class Array(Exp):
         sz = runner.results[0][0]
         val = runner.results[1][0]
         size = to_integer(sz, self.location)
-        vals = [val.duplicate(Fraction(1,2)) for i in range(0,size-1)]
+        vals = [val.duplicate(Fraction(1,2), self.location) for i in range(0,size-1)]
         vals.append(val)
         array = TupleValue(vals)
         if isinstance(runner.context, ValueCtx):
@@ -284,7 +284,7 @@ class TupleExp(Exp):
       if runner.state < len(self.inits):
         machine.schedule(self.inits[runner.state], runner.env)
       else:
-        tup = TupleValue([val.duplicate(1) for (val,ctx) in runner.results])
+        tup = TupleValue([val.duplicate(1, self.location) for (val,ctx) in runner.results])
         if isinstance(runner.context, ValueCtx):
           result = tup
         elif isinstance(runner.context, AddressCtx):
@@ -311,11 +311,9 @@ class Var(Exp):
           result = machine.memory.read(ptr, self.location, runner.context)
         elif isinstance(runner.context, AddressCtx):
           if runner.context.duplicate:
-            result = ptr.duplicate(runner.context.percentage)
+            result = ptr.duplicate(runner.context.percentage, self.location)
           else:
             result = ptr
-        else:
-          raise Exception('in Var.step, bad context ' + repr(runner.context))
         machine.finish_expression(result, self.location)
 
 @dataclass
@@ -404,7 +402,7 @@ class Index(Exp):
           if not isinstance(tup, TupleValue):
             error(self.location, 'expected a tuple, not ' + str(tup))
           if runner.context.duplicate:
-            result = tup.elts[int(i)].duplicate(1)
+            result = tup.elts[int(i)].duplicate(1, self.location)
           else:
             result = tup.elts[int(i)]
         elif isinstance(runner.context, AddressCtx):
@@ -412,7 +410,7 @@ class Index(Exp):
               print('in Index.step, AddressCtx')
           ptr = runner.results[0][0]
           # what if not runner.context.duplicate? -Jeremy
-          result = ptr.element_address(int(i), runner.context.percentage)
+          result = ptr.element_address(int(i), runner.context.percentage, self.location)
         else:
           error(self.location, 'unrecognized context ' + repr(runner.context))
         
@@ -458,7 +456,7 @@ class AddressOf(Exp):
         if isinstance(runner.context, ValueCtx):
           ptr = runner.results[0][0]
           if runner.context.duplicate:
-            result = ptr.duplicate(runner.context.percentage)
+            result = ptr.duplicate(runner.context.percentage, self.location)
           else:
             result = ptr
         else:
@@ -487,7 +485,7 @@ class Lambda(Exp):
             if not x in runner.env.keys():
               error(self.location, 'in closure, undefined variable ' + x)
             v = runner.env[x]
-            clos_env[x] = v.duplicate(Fraction(1,2))            
+            clos_env[x] = v.duplicate(Fraction(1,2), self.location)            
             # if not (v is None):
             #     clos_env[x] = v.duplicate(Fraction(1,2))
             # else:
@@ -526,11 +524,11 @@ class IfExp(Exp):
         else:
           machine.schedule(self.els, runner.env, runner.context)
       elif runner.state == 2:
-        result = runner.results[1][0].duplicate(1)
+        result = runner.results[1][0].duplicate(1, self.location)
         machine.finish_expression(result, self.location)
     
 @dataclass
-class Let(Exp):
+class DefExp(Exp):
     var: Param
     init: Initializer
     body: Exp
@@ -557,7 +555,7 @@ class Let(Exp):
       else:
         deallocate_locals([self.var.ident], runner.body_env, machine.memory,
                           self.location)
-        result = runner.results[1][0].duplicate(1)
+        result = runner.results[1][0].duplicate(1, self.location)
         machine.finish_expression(result, self.location)
 
 @dataclass
@@ -634,17 +632,17 @@ class Seq(Stmt):
       machine.schedule(self.rest, runner.env)
     
 @dataclass
-class LetInit(Exp):
+class DefInit(Exp):
     var: Param
     init: Initializer
     body: Stmt
     __match_args__ = ("var", "init", "body")
     def __str__(self):
       if verbose:
-        return "let " + str(self.var) + " = " + str(self.init) + ";\n" \
+        return "def " + str(self.var) + " = " + str(self.init) + ";\n" \
             + str(self.body)
       else:
-        return "let " + str(self.var) + " = " + str(self.init) + "; ..."
+        return "def " + str(self.var) + " = " + str(self.init) + "; ..."
     def __repr__(self):
         return str(self)
     def free_vars(self):
@@ -657,15 +655,50 @@ class LetInit(Exp):
       elif runner.state == 1:
         val = runner.results[0][0]
         runner.body_env = runner.env.copy()
-        var_priv_vals = [(self.var.ident, self.var.kind, val)]
-        allocate_locals(var_priv_vals, runner.body_env, machine.memory,
-                        self.init.location)
+        bind_parameter(self.var.ident, self.var.kind, val,
+                       runner.body_env, machine.memory,
+                       self.init.location)
         machine.schedule(self.body, runner.body_env)
       else:
-        deallocate_locals([self.var.ident], runner.body_env,
-                          machine.memory, self.location)
+        deallocate_parameter(self.var.ident, runner.body_env,
+                             machine.memory, self.location)
         machine.finish_statement(self.location)
 
+# This is meant to have the same semantics as the `let` in Val.        
+@dataclass
+class Let(Exp):
+    var: Param
+    arg: Exp
+    body: Stmt
+    __match_args__ = ("var", "arg", "body")
+    def __str__(self):
+      if verbose:
+        return "let " + str(self.var) + " = " + str(self.arg) + ";\n" \
+            + str(self.body)
+      else:
+        return "let " + str(self.var) + " = " + str(self.arg) + "; ..."
+    def __repr__(self):
+        return str(self)
+    def free_vars(self):
+        return self.arg.free_vars() \
+            | (self.body.free_vars() - set([self.var.ident]))
+    def step(self, runner, machine):
+      if runner.state == 0:
+        context = AddressCtx(True, Fraction(1,2))
+        machine.schedule(self.arg, runner.env, context)
+      elif runner.state == 1:
+        val = runner.results[0][0]
+        runner.body_env = runner.env.copy()
+        bind_parameter(self.var.ident, self.var.kind, val,
+                       runner.body_env, machine.memory,
+                       self.init.location)
+        machine.schedule(self.body, runner.body_env)
+      else:
+        deallocate_parameter(self.var.ident, runner.body_env,
+                          machine.memory, self.location)
+        machine.finish_statement(self.location)
+        
+# This is meant to have the same semantics as the `var` in Val.
 @dataclass
 class VarInit(Exp):
     var: str
@@ -683,6 +716,21 @@ class VarInit(Exp):
     def free_vars(self):
         return self.rhs.free_vars() \
             | (self.body.free_vars() - set([self.var]))
+    def step(self, runner, machine):
+      if runner.state == 0:
+        context = AddressCtx(True, Fraction(1,1))
+        machine.schedule(self.rhs, runner.env, context)
+      elif runner.state == 1:
+        val = runner.results[0][0]
+        runner.body_env = runner.env.copy()
+        bind_parameter(self.var, 'write', val,
+                       runner.body_env, machine.memory,
+                       self.rhs.location)
+        machine.schedule(self.body, runner.body_env)
+      else:
+        deallocate_parameter(self.var, runner.body_env,
+                             machine.memory, self.location)
+        machine.finish_statement(self.location)
 
 # Dimitri:
 # return values are always evaluated for their rvalue
@@ -705,7 +753,7 @@ class Return(Stmt):
           context = AddressCtx(True, Fraction(1,1))
         machine.schedule(self.arg, runner.env, context)
       else:
-        runner.return_value = runner.results[0][0].duplicate(1)
+        runner.return_value = runner.results[0][0].duplicate(1, self.location)
         machine.finish_statement(self.location)
     
 @dataclass

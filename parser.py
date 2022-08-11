@@ -144,19 +144,19 @@ def parse_tree_to_ast(e):
                      parse_tree_to_ast(e.children[0]),
                      parse_tree_to_ast(e.children[1]),
                      parse_tree_to_ast(e.children[2]))
-    elif e.data == 'let':
-        return Let(e.meta,
-                   parse_tree_to_param(e.children[0]),
-                   parse_tree_to_ast(e.children[1]),
-                   parse_tree_to_ast(e.children[2]))
+    elif e.data == 'def':
+        return DefExp(e.meta,
+                      parse_tree_to_param(e.children[0]),
+                      parse_tree_to_ast(e.children[1]),
+                      parse_tree_to_ast(e.children[2]))
     elif e.data == 'future':
         return FutureExp(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'wait':
         return Wait(e.meta, parse_tree_to_ast(e.children[0]))
     
     # statements
-    elif e.data == 'let_initializer':
-        return LetInit(e.meta,
+    elif e.data == 'def_initializer':
+        return DefInit(e.meta,
                        parse_tree_to_param(e.children[0]),
                        parse_tree_to_ast(e.children[1]),
                        parse_tree_to_ast(e.children[2]))

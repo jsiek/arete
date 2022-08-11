@@ -1,11 +1,11 @@
 function main() {
-  let n = 10;
-  let !a = new [n] 0;
-  let !i = new 0;
+  def n = 10;
+  def !a = new [n] 0;
+  def !i = new 0;
   while (*i < n) {
     a[*i] = *i;
     *i = *i + 1;
   }
-  let last = a[9];
+  def last = a[9];
   return last - 9;
 }

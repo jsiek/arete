@@ -1,6 +1,6 @@
 function main() {
-  let !x = new (new 10);
+  def !x = new (new 10);
   **x = 1;
-  let a = **x - 1;
+  def a = **x - 1;
   return a;
 }

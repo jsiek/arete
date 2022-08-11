@@ -8,7 +8,7 @@ compare_ops = { 'less': lambda x, y: x < y,
 def eval_prim(op, vals, machine, location):
     match op:
       case 'copy':
-        return vals[0].duplicate(1)
+        return vals[0].duplicate(1, location)
       case 'len':
         tup = vals[0]
         if not isinstance(tup, TupleValue):
@@ -67,14 +67,14 @@ def eval_prim(op, vals, machine, location):
             return Boolean(False)
       case 'split':
         ptr = vals[0]
-        ptr1 = ptr.duplicate(Fraction(1, 2))
-        ptr2 = ptr.duplicate(Fraction(1, 1))
+        ptr1 = ptr.duplicate(Fraction(1, 2), location)
+        ptr2 = ptr.duplicate(Fraction(1, 1), location)
         # is this allocation necessary?
         #return machine.memory.allocate(TupleValue([ptr1, ptr2]))
         return TupleValue([ptr1, ptr2])
       case 'join':
         ptr1, ptr2 = vals
-        ptr = ptr1.duplicate(1)
+        ptr = ptr1.duplicate(1, location)
         ptr.transfer(1, ptr2, location)
         return ptr
       case 'permission':

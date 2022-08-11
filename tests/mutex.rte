@@ -11,9 +11,9 @@ fun inc(@q) {
 }
 
 fun main() {
-  let !p = new 0;
-  let t1 = spawn inc(p);
-  let t2 = spawn inc(p);
+  def !p = new 0;
+  def t1 = spawn inc(p);
+  def t2 = spawn inc(p);
   ! wait t1;
   ! wait t2;
   return *p - 2;

@@ -1,3 +1,7 @@
+# This desugaring pass currently just copies the AST but this pass is
+# here to make it easier in the future to define some language
+# features by desugaring into other language features.
+
 from abstract_syntax import *
 from utilities import *
 
@@ -17,12 +21,7 @@ def desugar_init(init, env):
 def desugar_exp(e, env):
     match e:
       case Var(x):
-        if x not in env:
-            error(e.location, 'use of undefined variable ' + x)
-        if env[x]:
-            return Index(e.location, e, Int(e.location, 0))
-        else:
-            return e
+        return e
       case Int(n):
         return e
       case Frac(f):
@@ -70,12 +69,12 @@ def desugar_exp(e, env):
         new_thn = desugar_exp(thn, env)
         new_els = desugar_exp(els, env)
         return IfExp(e.location, new_cond, new_thn, new_els)
-      case Let(var, init, body):
+      case DefExp(var, init, body):
         new_init = desugar_init(init, env)
         body_env = env.copy()
         body_env[var.ident] = False
         new_body = desugar_exp(body, body_env)
-        return Let(e.location, var, new_init, new_body)
+        return DefExp(e.location, var, new_init, new_body)
       case FutureExp(arg):
         new_arg = desugar_exp(arg, env)
         return FutureExp(e.location, new_arg)
@@ -87,41 +86,19 @@ def desugar_exp(e, env):
     
 def desugar_statement(s, env):
     match s:
-      case LetInit(var, init, body):
+      case DefInit(var, init, body):
         new_init = desugar_init(init, env)
         body_env = env.copy()
         body_env[var.ident] = False
         new_body = desugar_statement(body, body_env)
-        return LetInit(s.location, var, new_init, new_body)
+        return DefInit(s.location, var, new_init, new_body)
       case VarInit(var, rhs, body):
         loc = s.location
         new_rhs = desugar_exp(rhs, env)
         body_env = env.copy()
-        if False:
-          #  var x = e in b[[x]]
-          #  =>
-          #  let !x = new e in b[[*x]]
-          body_env[var] = True
-          new_body = desugar_statement(body, body_env)
-          new_exp = New(loc, [Initializer(loc, Frac(loc, Fraction(1,1)),
-                                          new_rhs)])
-          return LetInit(loc, Param(loc, 'write', var, AnyType(loc)),
-                         Initializer(loc,
-                                     Frac(loc, Fraction(1,1)),
-                                     new_exp),
-                         new_body)
-        else:
-          #  var x = e in b[[x]]
-          #  =>
-          #  let !x = 1 of e in b[[x]]
-          body_env[var] = False
-          new_body = desugar_statement(body, body_env)
-          return LetInit(loc, Param(loc, 'write', var, AnyType(loc)),
-                         Initializer(loc,
-                                     Frac(loc, Fraction(1,1)),
-                                     new_rhs),
-                         new_body)
-    
+        body_env[var] = False
+        new_body = desugar_statement(body, body_env)
+        return VarInit(loc, var, new_rhs, new_body)
       case Seq(first, rest):
         new_first = desugar_statement(first, env)
         new_rest = desugar_statement(rest, env)

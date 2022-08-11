@@ -1,12 +1,12 @@
 function f(y) {
-  let !x = new y;
-  let z = *x;
+  def !x = new y;
+  def z = *x;
   return *z - *y;
 }
 
 function main() {
-  let !y = new 42;
-  let a = f(y);
+  def !y = new 42;
+  def a = f(y);
   return a;
 }
 

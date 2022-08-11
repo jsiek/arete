@@ -111,13 +111,13 @@ def const_eval_exp(e, env):
         new_thn = const_eval_exp(thn, env)
         new_els = const_eval_exp(els, env)
         return IfExp(e.location, new_cond, new_thn, new_els)
-      case Let(var, init, body):
+      case DefExp(var, init, body):
         new_init = const_eval_init(init, env)
         body_env = env.copy()
         if var.ident in body_env.keys():
           del body_env[var.ident]
         new_body = const_eval_exp(body, env)
-        return Let(e.location, var, new_init, new_body)
+        return DefExp(e.location, var, new_init, new_body)
       case FutureExp(arg):
         new_arg = const_eval_exp(arg, env)
         return FutureExp(e.location, new_arg)
@@ -129,13 +129,20 @@ def const_eval_exp(e, env):
 
 def const_eval_statement(s, env):
     match s:
-      case LetInit(var, init, body):
+      case DefInit(var, init, body):
         new_init = const_eval_init(init, env)
         body_env = env.copy()
         if var.ident in body_env.keys():
           del body_env[var]
         new_body = const_eval_statement(body, body_env)
-        return LetInit(s.location, var, new_init, new_body)
+        return DefInit(s.location, var, new_init, new_body)
+      case VarInit(var, rhs, body):
+        new_rhs = const_eval_exp(rhs, env)
+        body_env = env.copy()
+        if var in body_env.keys():
+          del body_env[var]
+        new_body = const_eval_statement(body, body_env)
+        return VarInit(s.location, var, new_rhs, new_body)
       case Seq(first, rest):
         new_first = const_eval_statement(first, env)
         new_rest = const_eval_statement(rest, env)

@@ -1,19 +1,19 @@
-let front = 0;
-let back = 1;
-let data = 0;
-let prev = 1;
-let next = 2;
-let none = 0;
-let half = 1/2;
-let all = 1;
+def front = 0;
+def back = 1;
+def data = 0;
+def prev = 1;
+def next = 2;
+def none = 0;
+def half = 1/2;
+def all = 1;
 
 function listof(data) {
-  let !p = new data, null, null;
+  def !p = new data, null, null;
   return split(p);
 }
 
 function push(data, !lst) {
-  let !first = new data, null , null;
+  def !first = new data, null , null;
   if (lst[front] == lst[back]) { // lst is a 1 element list
     /*
       first: * -1-> [ A , / , / ]
@@ -23,7 +23,7 @@ function push(data, !lst) {
                   V   V
 		  [ B , / , / ]
     */
-    let !n = join(lst[front], lst[back]);
+    def !n = join(lst[front], lst[back]);
     n[prev] = none of first;
     first[next] = half of n;
     n[prev] <- half of first;
@@ -82,8 +82,8 @@ function check_nodes_permissions(node) {
 }
 
 function check_list_permissions(list) {
-  let first = all of list[front];
-  let last = all of list[back];
+  def first = all of list[front];
+  def last = all of list[back];
   assert permission(first) == half;
   assert permission(last) == half;
   ! check_nodes_permissions(all of first);
@@ -104,11 +104,11 @@ function delete_list(!list) {
 }
 
 function main() {
-  let !three = listof(3);
-  let !two_three = push(2, three);
-  let !one_two_three = push(1, two_three);
+  def !three = listof(3);
+  def !two_three = push(2, three);
+  def !one_two_three = push(1, two_three);
   ! check_list_permissions(all of one_two_three);
-  let one = one_two_three[front][data];
+  def one = one_two_three[front][data];
   ! delete_list(one_two_three);
   return one - 1;
 }

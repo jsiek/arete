@@ -3,9 +3,9 @@ function inc(!p) {
 }
 
 function main() {
-  let !q = new 0;
+  def !q = new 0;
   ! inc(q);
   *q = *q + 1;
-  let a = *q;
+  def a = *q;
   return a - 2;
 }

@@ -31,6 +31,10 @@ implementation written in Python 3.10 that includes:
 
 * interpreting (an abstract machine) ([machine.py](machine.py))
 
+The design of Arete is heavily based on discussions with Dave Abrahams
+and Dimitri Racordon about their Val language and it is influenced by
+the design of the Carbon language.
+
 
 # Examples
 
@@ -723,7 +727,7 @@ Repeatedly execute the `block` so long as the `expression` evaluates to `true`.
 
 * [Address Of](#addressof)
 * [Array Creation](#array)
-* [Call](#call)
+* [Call](#call) a fuction
 * [False Literal](#false)
 * [Function (Lambda)](#function)
 * [Index](#index) (into a tuple or array)
@@ -968,11 +972,11 @@ UNDER CONSTRUCTION
    memory using the identifier's address (from the current
    environment) according to the current runner's context.
 
-3. If the current runner's context is an address context with
-   duplication, then let `result` be a duplicate the identifier's
-   address (from the current environment) at 100%. If the context is
-   without duplication, then the `result` is the identifier's address
-   (from the current environment).
+3. Otherwise the current runner's context is an address context.  If
+   it is with duplication, then let `result` be a duplicate the
+   identifier's address (from the current environment) at 100%. If the
+   context is without duplication, then the `result` is the
+   identifier's address (from the current environment).
    
 4. Instruct the machine to finish this expression with the `result`.
 

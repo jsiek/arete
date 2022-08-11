@@ -74,15 +74,15 @@ fun insert(key: int, !tree: tree_t) {
   if (is_null(*tree)) {
     *tree = new ⟨key, null, null, null, 0⟩;
   } else {
-    let node: node_t = all of find(key, all of *tree, null);
+    def node: node_t = all of find(key, all of *tree, null);
     if (key < (*node)[data]) {
-      let !new_node: node_t = new ⟨key, null, null, null, 0⟩;
+      def !new_node: node_t = new ⟨key, null, null, null, 0⟩;
       ! gather_permission(all of node);
       ! set_left(node, new_node);
       ! scatter_permission(all of node);
     }
     if ((*node)[data] < key) {
-      let !new_node: node_t = new ⟨key, null, null, null, 0⟩;
+      def !new_node: node_t = new ⟨key, null, null, null, 0⟩;
       ! gather_permission(all of node);
       ! set_right(node, new_node);
       ! scatter_permission(all of node);
@@ -104,11 +104,11 @@ fun delete_tree(!tree: tree_t) {
 }
 
 fun main() {
-  let !tree: tree_t = new null;
+  def !tree: tree_t = new null;
   ! insert(5, tree);
   ! insert(10, tree);
   ! insert(1, tree);
-  let ten: int = (let n: node_t = find(10, *tree, null)
+  def ten: int = (def n: node_t = find(10, *tree, null)
                   in copy((*n)[data]));
   ! delete_tree(tree);
   return ten - 10;

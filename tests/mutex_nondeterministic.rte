@@ -11,9 +11,9 @@ fun write2(@q) {
 }
 
 fun main() {
-  let !p = new 0;
-  let t1 = spawn write1(p);
-  let t2 = spawn write2(p);
+  def !p = new 0;
+  def t1 = spawn write1(p);
+  def t2 = spawn write2(p);
   ! wait t2;
   ! wait t1;
   if (*p == 1) {
