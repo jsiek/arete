@@ -664,7 +664,7 @@ class DefInit(Exp):
                              machine.memory, self.location)
         machine.finish_statement(self.location)
 
-# This is meant to have the same semantics as the `let` in Val.        
+# This is meant to have the same semantics as the `let` statement in Val.
 @dataclass
 class Let(Exp):
     var: Param
@@ -681,24 +681,25 @@ class Let(Exp):
         return str(self)
     def free_vars(self):
         return self.arg.free_vars() \
-            | (self.body.free_vars() - set([self.var.ident]))
+            | (self.body.free_vars() - set([self.var]))
     def step(self, runner, machine):
       if runner.state == 0:
-        context = AddressCtx(True, Fraction(1,1))
+        context = AddressCtx(True, Fraction(1,2))
         machine.schedule(self.arg, runner.env, context)
       elif runner.state == 1:
         val = runner.results[0][0]
+        val.kill_zero = True
         runner.body_env = runner.env.copy()
-        bind_parameter(self.var.ident, self.var.kind, val,
+        bind_parameter(self.var, 'read', val,
                        runner.body_env, machine.memory,
-                       self.init.location)
+                       self.arg.location)
         machine.schedule(self.body, runner.body_env)
       else:
-        deallocate_parameter(self.var.ident, runner.body_env,
+        deallocate_parameter(self.var, runner.body_env,
                           machine.memory, self.location)
         machine.finish_statement(self.location)
         
-# This is meant to have the same semantics as the `var` in Val.
+# This is meant to have the same semantics as the `var` statement in Val.
 @dataclass
 class VarInit(Exp):
     var: str

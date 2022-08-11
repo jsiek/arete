@@ -1,0 +1,5 @@
+fun main() {
+  var x = 0;
+  let y = x;
+  return y;
+}

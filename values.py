@@ -124,6 +124,7 @@ class Pointer(Value):
     path: list[int]      # the path through nested tuples
     permission: Fraction   # none is 0, read is 1/n, write is 1/1
     lender: Value          # who this pointer borrowed from, if any
+    kill_zero: bool = False # kill when permission goes to zero (let-bound)
     
     __match_args__ = ("address", "path", "permission")
 
@@ -174,6 +175,8 @@ class Pointer(Value):
                   + str(self.address) + " != " + str(source.address))
         amount = source.permission * percent
         source.permission -= amount
+        if source.kill_zero and source.permission <= Fraction(0,1):
+            source.address = None
         self.permission += amount
         if tracing_on():
           print('transferred ' + str(amount) + ' from ' + str(source) + ' to '
@@ -192,8 +195,10 @@ class Pointer(Value):
             ptr = Pointer(None, [], Fraction(1,1), self)
         else:
             other_priv = self.permission * percentage
-            self.permission -= other_priv
             ptr = Pointer(self.address, self.path, other_priv, self)
+            self.permission -= other_priv
+            if self.kill_zero and self.permission <= Fraction(0,1):
+              self.address = None
         if tracing_on():
           print('duplicated ' + str(self) + ' into ' + str(ptr))
         return ptr

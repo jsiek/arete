@@ -136,6 +136,13 @@ def const_eval_statement(s, env):
           del body_env[var]
         new_body = const_eval_statement(body, body_env)
         return DefInit(s.location, var, new_init, new_body)
+      case Let(var, rhs, body):
+        new_rhs = const_eval_exp(rhs, env)
+        body_env = env.copy()
+        if var in body_env.keys():
+          del body_env[var]
+        new_body = const_eval_statement(body, body_env)
+        return Let(s.location, var, new_rhs, new_body)
       case VarInit(var, rhs, body):
         new_rhs = const_eval_exp(rhs, env)
         body_env = env.copy()

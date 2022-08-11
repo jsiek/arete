@@ -1,0 +1,7 @@
+fun main() {
+  def x = 1;
+  def !y = x;
+  var z = y;
+  z = 0;
+  return z;
+}

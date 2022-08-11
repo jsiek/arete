@@ -95,8 +95,9 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "else" "if" "(" expression ")" block if_rest      -> else_if
     |                                                   -> no_else
 
-?statement_list: "def" parameter "=" initializer ";" statement_list   -> def_initializer
-    | "var" IDENT "=" expression ";" statement_list     -> var_initializer
+?statement_list: "def" parameter "=" initializer ";" statement_list   -> def_stmt
+    | "let" IDENT "=" expression ";" statement_list     -> let_stmt
+    | "var" IDENT "=" expression ";" statement_list     -> var_stmt
     | statement statement_list                          -> seq
     | statement                                         -> last_statement
     | "return" expression ";"                           -> return

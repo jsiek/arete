@@ -392,6 +392,12 @@ def type_check_statement(s, env):
         body_env[var.ident] = type_annot
         body_type = type_check_statement(body, body_env)
         return body_type
+      case Let(var, rhs, body):
+        rhs_type = type_check_exp(rhs, env)
+        body_env = env.copy()
+        body_env[var] = rhs_type
+        body_type = type_check_statement(body, body_env)
+        return body_type
       case VarInit(var, rhs, body):
         rhs_type = type_check_exp(rhs, env)
         body_env = env.copy()

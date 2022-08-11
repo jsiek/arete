@@ -155,12 +155,17 @@ def parse_tree_to_ast(e):
         return Wait(e.meta, parse_tree_to_ast(e.children[0]))
     
     # statements
-    elif e.data == 'def_initializer':
+    elif e.data == 'def_stmt':
         return DefInit(e.meta,
                        parse_tree_to_param(e.children[0]),
                        parse_tree_to_ast(e.children[1]),
                        parse_tree_to_ast(e.children[2]))
-    elif e.data == 'var_initializer':
+    elif e.data == 'let_stmt':
+        return Let(e.meta,
+                   e.children[0].value,
+                   parse_tree_to_ast(e.children[1]),
+                   parse_tree_to_ast(e.children[2]))
+    elif e.data == 'var_stmt':
         return VarInit(e.meta,
                        e.children[0].value,
                        parse_tree_to_ast(e.children[1]),
