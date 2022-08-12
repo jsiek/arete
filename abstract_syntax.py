@@ -364,7 +364,7 @@ class Index(Exp):
               print('in Index.step, AddressCtx')
           res = duplicate_if_temporary(runner.results[0], self.location)
           ptr = res.value
-          result = Result(True, PointerOffset(ptr, int(i)))
+          result = Result(runner.results[0].temporary, PointerOffset(ptr, int(i)))
         else:
           error(self.location, 'unrecognized context ' + repr(runner.context))
         machine.finish_expression(result, self.location)
