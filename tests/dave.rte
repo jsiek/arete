@@ -1,6 +1,6 @@
 fun main() {
-  def x = 1;
-  def !y = x;
+  let x = 1;
+  var y = x;
   var z = y;
   z = 0;
   return z;
