@@ -47,7 +47,7 @@ graph_number = 0
   
 def log_graphviz(label, env, mem):
     global graph_number
-    filename = "env_mem_" + str(graph_number) + ".dot"
+    filename = "logs/env_mem_" + str(graph_number) + ".dot"
     graph_number += 1
     file = open(filename, 'w')
     file.write(generate_graphviz(label, env, mem))

@@ -31,7 +31,7 @@ fun remove_last(!n : list_t) -> list_t {
     return null;
   } else {
     if (is_last(next(n))) {
-      def !q = copy(next(1 of n)); // want all permissions to next(n)
+      var q = copy(next(1 of n)); // want all permissions to next(n)
       next(1 of n) = null;
       return q;
     } else {
@@ -41,9 +41,9 @@ fun remove_last(!n : list_t) -> list_t {
 }
 
 fun main() {
-  def !one_two : list_t = push(1, listof(2));
-  def !two_null : list_t = remove_last(one_two);
-  def one : int = data(one_two);
-  def two : int = data(two_null);
+  var one_two = push(1, listof(2));
+  var two_null = remove_last(one_two);
+  let one = data(one_two);
+  let two = data(two_null);
   return one + one - two;
 }

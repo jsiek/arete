@@ -1,8 +1,0 @@
-fun main() {
-  def x = 1;
-  {
-    var y = x;
-    y = 0;
-  }
-  return x;
-}
