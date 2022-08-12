@@ -1,4 +1,0 @@
-function main() {
-  def x = 10;
-  return x + -10;
-}

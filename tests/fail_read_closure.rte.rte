@@ -1,9 +1,0 @@
-function main() {
-  def !p = new 0;
-  def copy1 = function() { return p; };
-  def copy2 = copy1;
-  def !q = join(copy1(), copy2());
-  *p = 1;
-  *q = 2;
-  return *p;
-}

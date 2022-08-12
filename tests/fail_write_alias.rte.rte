@@ -1,6 +1,0 @@
-function main() {
-  def x = new 42;
-  def y = x;
-  *x = 0; // error: pointer does not have write privilege
-  return *y;
-}

@@ -1,6 +1,0 @@
-function main() {
-  def !x = new 42;
-  def y = x; // error: read privilege requires no writers
-  *x = 0;
-  return *y;
-}

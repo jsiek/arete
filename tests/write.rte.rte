@@ -1,6 +1,0 @@
-function main() {
-  def !x = new 10;
-  *x = 20;
-  def y = *x;
-  return y - 20;
-}

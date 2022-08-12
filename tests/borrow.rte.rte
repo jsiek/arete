@@ -1,8 +1,0 @@
-function main() {
-  def !q = new 1;
-  { def !p = q;
-    *p = *p + 1; }
-  *q = *q + 1;
-  def a = *q;
-  return a - 3;
-}
