@@ -1,0 +1,11 @@
+fun main() {
+  var x = 1;
+  var w = 0;
+  {
+    inout y = x;
+    var z = y;
+    w = z;
+  }
+  x = 0;
+  return x + w - 1;
+}

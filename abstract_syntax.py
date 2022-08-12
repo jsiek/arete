@@ -721,8 +721,16 @@ class BindingStmt(Exp):
                        self.arg.location)
         machine.schedule(self.body, runner.body_env)
       else:
+        if self.kind == 'inout':
+            if runner.body_env[self.var].permission != Fraction(1,1):
+                error(self.location, 'failed to restore inout variable '
+                      + 'to full\npermission by the end of its scope')
+            if runner.body_env[self.var].lender.address is None:
+                error(self.location, "inout can't return ownership because"
+                      + " previous owner died")
+                
         deallocate_parameter(self.var, runner.body_env,
-                          machine.memory, self.location)
+                             machine.memory, self.location)
         machine.finish_statement(self.location)
         
 # Dimitri:
