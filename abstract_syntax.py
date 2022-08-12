@@ -355,18 +355,19 @@ class Index(Exp):
           tup = runner.results[0].value
           if not isinstance(tup, TupleValue):
             error(self.location, 'expected a tuple, not ' + str(tup))
-          result = tup.elts[int(i)]
+          val = tup.elts[int(i)]
+          if runner.results[0].temporary:
+              val = val.duplicate(1, self.location)
+          result = Result(runner.results[0].temporary, val)
         elif isinstance(runner.context, AddressCtx):
           if tracing_on():
               print('in Index.step, AddressCtx')
           res = duplicate_if_temporary(runner.results[0], self.location)
           ptr = res.value
-          #result = ptr.element_address(int(i), Fraction(1,1), self.location)
-          result = PointerOffset(ptr, int(i))
+          result = Result(True, PointerOffset(ptr, int(i)))
         else:
           error(self.location, 'unrecognized context ' + repr(runner.context))
-        
-        machine.finish_expression(Result(False, result), self.location)
+        machine.finish_expression(result, self.location)
 
 @dataclass
 class Deref(Exp):

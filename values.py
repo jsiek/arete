@@ -125,6 +125,10 @@ def priv_str(priv):
   else:
     return str(priv)
 
+def short_id(object):
+    s = str(id(object))
+    return s[len(s)-4:]
+
 @dataclass
 class Pointer(Value):
     address: int
@@ -160,15 +164,15 @@ class Pointer(Value):
         return str(path[0])
       else:
         return str(path[0]) + '.' + self.path_str(path[1:])
-      
+
     def __str__(self):
         self.lender = find_lender(self.lender)
         if self.address is None:
           return 'null'
         return "ptr(" + str(self.address) + '.' + self.path_str(self.path) \
           + "@" + priv_str(self.permission) \
-          + "(" + str(id(self)) + ")" \
-          + ("->" + str(id(self.lender)) if not self.lender is None else "") \
+          + "(" + short_id(self) + ")" \
+          + ("->" + short_id(self.lender) if not self.lender is None else "") \
           + ")"
       
     def __repr__(self):
@@ -222,7 +226,7 @@ class Pointer(Value):
             if self.kill_zero and self.permission <= Fraction(0,1):
               self.address = None
         if tracing_on():
-          print('duplicated ' + str(self) + ' into ' + str(ptr))
+          print('duplicated ' + str(self) + '\n\tinto ' + str(ptr))
         return ptr
     
     def element_address(self, i, percentage, location):
@@ -289,13 +293,18 @@ class PointerOffset(Value):
     def duplicate(self, percentage, location):
         other_priv = self.ptr.get_permission() * percentage
         self.ptr.set_permission(self.ptr.get_permission() - other_priv)
-        return Pointer(self.ptr.get_address(),
+        ptr = Pointer(self.ptr.get_address(),
                        self.ptr.get_path() + [self.offset],
                        other_priv, self.get_pointer())
+        if tracing_on():
+            print('duplicating PointerOffset to produce\n\t '
+                  + str(ptr))
+        return ptr
 
     def kill(self, mem, loc):
+        # TODO: change to just killing the part
         # kill the whole thing
-        ptr.kill(mem, loc)
+        self.ptr.kill(mem, loc)
         
 @dataclass
 class Closure(Value):

@@ -3,95 +3,60 @@ const none = 0;
 const half = 1/2;
 const all = 1;
 
-fun listof(dat) {
-  var p = new ⟨dat, null, null⟩;
+const data = 0;
+const pred = 1;
+const succ = 2;
+
+const head = 0;
+const tail = 1;
+
+fun listof(let dat) {
+  var p = &⟨dat, null, null⟩;
   return split(p);
 }
 
-fun front(lst) & {
-  return lst[0];
-}
-
-fun back(lst) & {
-  return lst[1];
-}
-
-fun data(node) & {
-  return (*node)[0];
-}
-
-fun prev(node) & {
-  return (*node)[1];
-}
-
-fun next(node) & {
-  return (*node)[2];
-}
-
-fun push(dat, !lst) {
-  var first = new ⟨dat, null, null⟩;
-  if (front(lst) == back(lst)) { // lst is a 1 element list
+fun push(let dat, var lst) {
+  var first = &⟨dat, null, null⟩;
+  if (lst[head] == lst[tail]) { // lst is a 1 element list
     var n = copy(join(lst[0], lst[1]));
-    prev(all of n) = none of first;
-    next(all of first) = half of n;
+    (*n)[pred] = none of first;
+    (*first)[succ] = half of n;
     (*n)[1] <- half of first;
-    front(all of lst) = all of first;
-    back(all of lst) = all of n;
+    lst[head] = first;
+    lst[tail] = n;
     return lst;
   } else { // lst has at least 2 elements
-    lst[0] <- all of (*((*(lst[0]))[2]))[1];
-    (*front(all of lst))[1] = none of first;
+    lst[head] <- all of (*((*(lst[0]))[2]))[1];
+    (*lst[head])[1] = none of first;
     (*((*(lst[0]))[2]))[1] <- half of lst[0];
-    next(all of first) = front(all of lst);
+    (*first)[succ] = lst[head];
     (*((*first)[2]))[1] <- half of first;
-    front(all of lst) = all of first;
+    lst[head] = first;
     return lst;
   }
 }
 
-fun check_nodes_permissions(node) {
-  if (not is_null(node)) {
-    if (not is_null(next(node))) {
-      assert permission((*node)[2]) == half;
-      ! check_nodes_permissions(next(all of node));
-    }
-    if (not is_null(prev(node))) {
-      assert permission((*node)[1]) == half;
-    }
-  }
-}
-
-fun check_list_permissions(list) {
-  let first = copy(front(all of list));
-  let last = copy(back(all of list));
-  assert permission(first) == half;
-  assert permission(last) == half;
-  ! check_nodes_permissions(all of first);
-}
-
-fun delete_nodes(node, last) {
+fun delete_nodes(var node, last) {
   if (not is_null(node)) {
     if (node == last) {
       delete join(node, last);
     } else {
       node <- all of (*((*node)[2]))[1];
-      ! delete_nodes(copy(next(all of node)), all of last);
+      ! delete_nodes(copy((*node)[succ]), all of last);
       delete node;
     }
   }
 }
 
-fun delete_list(!list) {
-  ! delete_nodes(copy(front(all of list)),
-                 copy(back(all of list)));
+fun delete_list(var list) {
+  ! delete_nodes(copy(list[head]), copy(list[tail]));
 }
 
 fun main() {
   var three = listof(3);
   var two_three = push(2, three);
   var one_two_three = push(1, two_three);
-  ! check_list_permissions(all of one_two_three);
-  let one = copy(data(front(one_two_three)));
+  let one = copy(one_two_three[head][data]);
   ! delete_list(one_two_three);
   return one - 1;
 }
