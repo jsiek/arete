@@ -1,6 +1,6 @@
 fun main() {
-  def x = new 42;
-  def y = x;
-  *x = 0; // error: pointer does not have write privilege
-  return *y;
+  let x = 42;
+  let y = x;
+  x = 0;     // pointer does not have write permission
+  return y;
 }

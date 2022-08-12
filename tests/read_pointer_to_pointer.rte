@@ -1,12 +1,12 @@
-fun f(y) {
-  def x = ⟨ y, 777 ⟩;
-  def z = x[0];
+fun f(let y) {
+  let x = ⟨ y, 777 ⟩;
+  let z = x[0];
   return z - y;
 }
 
 fun main() {
-  def y = 42;
-  def a = f(y);
+  let y = 42;
+  let a = f(y);
   return a;
 }
 

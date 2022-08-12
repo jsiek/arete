@@ -1,8 +1,8 @@
-fun front(ls) & { return ls[0]; }
+fun front(let ls) & { return ls[0]; }
 
-fun rest(ls) & { return ls[1]; }
+fun rest(let ls) & { return ls[1]; }
 
-fun map(f, ls) {
+fun map(let f, let ls) {
   if (is_null(ls)) {
     return null;
   } else {
@@ -10,11 +10,11 @@ fun map(f, ls) {
   }
 }
 
-fun inc(x) { return x + 1; }
+fun inc(let x) { return x + 1; }
 
 fun main() {
-  def !ls1 = ⟨0, ⟨1, ⟨2, null⟩⟩⟩;
-  def !ls2 = map(inc, ls1);
-  def three = front(rest(rest(ls2)));
+  var ls1 = ⟨0, ⟨1, ⟨2, null⟩⟩⟩;
+  var ls2 = map(inc, ls1);
+  let three = front(rest(rest(ls2)));
   return three - 3;
 }

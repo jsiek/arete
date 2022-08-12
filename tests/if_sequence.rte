@@ -1,5 +1,5 @@
 fun main() {
-  def !p = 0;
+  var p = 0;
   if (true) {
     p = p + 1;
   }
@@ -7,6 +7,6 @@ fun main() {
     p = p + 1;
     p = p + 1;
   }
-  def three = p;
+  let three = p;
   return three - 3;
 }

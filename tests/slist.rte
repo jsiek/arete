@@ -1,20 +1,20 @@
-fun listof(data) {
-  return new ⟨data, null⟩;
+fun listof(let data) {
+  return &⟨data, null⟩;
 }
 
-fun push(data, !list) {
-  return new ⟨data, 1 of list⟩;
+fun push(let data, var list) {
+  return &⟨data, list⟩;
 }
 
-fun data(node) & {
+fun data(let node) & {
   return (*node)[0];
 }
 
-fun next(node) & {
+fun next(let node) & {
   return (*node)[1];
 }
 
-fun is_last(node) {
+fun is_last(let node) {
   if (is_null(node)) {
     return false;
   } else {
@@ -24,16 +24,16 @@ fun is_last(node) {
 
 // Split the list into two parts, with the second
 // part just containing the last element.
-fun remove_last(!n) {
+fun remove_last(inout n) {
   if (is_null(n)) {
     return null;
   } else {
     if (is_last(next(n))) {
-      var q = copy(next(1 of n)); // want all permissions to next(n)
-      next(1 of n) = null;
+      var q = copy((*n)[1]); // want all permissions to next(n)
+      (*n)[1] = null;
       return q;
     } else {
-      return remove_last(next(1 of n));
+      return remove_last((*n)[1]);
     }
   }
 }

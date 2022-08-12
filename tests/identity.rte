@@ -1,4 +1,4 @@
-fun id(x) { return x; }
+fun id(let x) { return x; }
 
 fun main() {
   return id(0);

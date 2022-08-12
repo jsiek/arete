@@ -1,14 +1,14 @@
-fun inc(!p) {
-  *p = *p + 1;
-  return *p;
+fun inc(inout p) {
+  p = p + 1;
+  return p;
 }
 
 fun main() {
-  var q = new 0;
+  var q = 0;
   let p = q; // create a read-only alias, causing q to lose write privilege
-  ! inc(q);    // initializing writable pointer requires writable pointer
-  *q = *q + 1;
-  return *p - *q;
+  ! inc(q);    // initializing inout pointer requires 1/1 pointer
+  q = q + 1;
+  return p - q;
 }
 
 

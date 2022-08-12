@@ -119,27 +119,6 @@ def join(ty1, ty2):
     case (_, _):
       return ty1
     
-def type_check_init(init, env):
-    match init:
-      case Initializer(loc, percent, arg):
-        if percent == 'default':
-          percent_type = RationalType(init.location)
-        else:
-          percent_type = type_check_exp(percent, env)
-        percent_type = unfold(percent_type)
-        if isinstance(percent_type, RationalType) \
-           or isinstance(percent_type, IntType):
-          arg_type = type_check_exp(arg, env)
-          return arg_type
-        elif isinstance(percent_type, AnyType):
-          return AnyType(loc)
-        else:
-          error(init.location, 'in initializer, expected percentage '
-                + 'not ' + str(percent_type))
-      case _:
-        error(init.location, 'in type_check_init, expected an initializer, not '
-              + repr(init))
-
 def type_check_prim(location, op, arg_types):
     arg_types = [unfold(arg_ty) for arg_ty in arg_types]
     match op:
@@ -251,6 +230,21 @@ def type_check_prim(location, op, arg_types):
   
 def type_check_exp(e, env):
     match e:
+      case Initializer(loc, percent, arg):
+        if percent == 'default':
+          percent_type = RationalType(init.location)
+        else:
+          percent_type = type_check_exp(percent, env)
+        percent_type = unfold(percent_type)
+        if isinstance(percent_type, RationalType) \
+           or isinstance(percent_type, IntType):
+          arg_type = type_check_exp(arg, env)
+          return arg_type
+        elif isinstance(percent_type, AnyType):
+          return AnyType(loc)
+        else:
+          error(init.location, 'in initializer, expected percentage '
+                + 'not ' + str(percent_type))
       case Var(x):
         if x not in env:
             error(e.location, 'use of undefined variable ' + x)
@@ -273,9 +267,6 @@ def type_check_exp(e, env):
             error(e.location, "module " + str(arg) + " does not contain "
                   + field)
         return mod_type.member_types[field]
-      case New(init):
-        init_type = type_check_init(init, env)
-        return PointerType(e.location, init_type)
       case Array(size, arg):
         size_type = type_check_exp(size, env)
         arg_type = type_check_exp(arg, env)
@@ -285,7 +276,7 @@ def type_check_exp(e, env):
                   + str(size_type))
         return ArrayType(e.location, arg_type)
       case TupleExp(inits):
-        init_types = tuple(type_check_init(init, env) for init in inits)
+        init_types = tuple(type_check_exp(init, env) for init in inits)
         return TupleType(e.location, init_types)
       case Lambda(params, ret_mode, body, name):
         body_env = env.copy()
@@ -296,7 +287,7 @@ def type_check_exp(e, env):
                             ret_type)
       case Call(fun, inits):
         fun_type = type_check_exp(fun, env)
-        arg_types = [type_check_init(init, env) for init in inits]
+        arg_types = [type_check_exp(init, env) for init in inits]
         fun_type = unfold(fun_type)
         if isinstance(fun_type, FunctionType):
           for (param_ty, arg_ty) in zip(fun_type.param_types, arg_types):
@@ -345,7 +336,7 @@ def type_check_exp(e, env):
                 + str(arg_type))
       case AddressOf(arg):
         arg_type = type_check_exp(arg, env)
-        return arg_type # or pointer to arg_type? -Jeremy
+        return PointerType(e.location, arg_type)
       case IfExp(cond, thn, els):
         cond_type = type_check_exp(cond, env)
         thn_type = type_check_exp(thn, env)
@@ -359,11 +350,20 @@ def type_check_exp(e, env):
                 + str(cond_type))
         return join(thn_type, els_type)
       case DefExp(var, init, body):
-        init_type = type_check_init(init, env)
+        init_type = type_check_exp(init, env)
         body_env = env.copy()
         body_env[var.ident] = init_type
         body_type = type_check_exp(body, body_env)
         return body_type
+      case BindingExp(param, rhs, body):
+        rhs_type = type_check_exp(rhs, env)
+        type_annot = simplify(param.type_annot, env)
+        if not consistent(rhs_type, type_annot):
+          error(e.location, 'type of initializer ' + str(rhs_type) + '\n'
+                + ' is inconsistent with declared type ' + str(type_annot))
+        body_env = env.copy()
+        body_env[param.ident] = rhs_type
+        body_type = type_check_exp(body, body_env)
       case FutureExp(arg):
         arg_type = type_check_exp(arg, env)
         return FutureType(e.location, arg_type)
@@ -383,7 +383,7 @@ def type_check_exp(e, env):
 def type_check_statement(s, env):
     match s:
       case DefInit(var, init, body):
-        init_type = type_check_init(init, env)
+        init_type = type_check_exp(init, env)
         type_annot = simplify(var.type_annot, env)
         if not consistent(init_type, type_annot):
           error(s.location, 'initializing type ' + str(init_type) + '\n'
@@ -392,10 +392,14 @@ def type_check_statement(s, env):
         body_env[var.ident] = type_annot
         body_type = type_check_statement(body, body_env)
         return body_type
-      case BindingStmt(kind, var, rhs, body):
+      case BindingStmt(param, rhs, body):
         rhs_type = type_check_exp(rhs, env)
+        type_annot = simplify(param.type_annot, env)
+        if not consistent(rhs_type, type_annot):
+          error(s.location, 'type of initializer ' + str(rhs_type) + '\n'
+                + ' is inconsistent with declared type ' + str(type_annot))
         body_env = env.copy()
-        body_env[var] = rhs_type
+        body_env[param.ident] = rhs_type
         body_type = type_check_statement(body, body_env)
         return body_type
       case Seq(first, rest):
@@ -409,7 +413,7 @@ def type_check_statement(s, env):
         return None
       case Write(lhs, rhs):
         lhs_type = type_check_exp(lhs, env)
-        rhs_type = type_check_init(rhs, env)
+        rhs_type = type_check_exp(rhs, env)
         # TODO
         return None
       case Transfer(lhs, percent, rhs):

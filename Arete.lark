@@ -30,6 +30,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 
 ?expression: expression_logic "?" expression ":" expression    -> condition
     | "def" parameter "=" initializer "in" expression          -> def
+    | binding_kind IDENT "=" expression "in" expression        -> binding_exp
     | expression_logic
 
 ?expression_logic: expression_logic "and" expression_cmp       -> and
@@ -71,7 +72,6 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "not" expression_hi                               -> not
     | "(" expression ")"                                -> paren
     | "fun" "(" parameter_list ")" return_mode block       -> lambda
-    | "new" initializer                                 -> new
     | "[" expression "of" expression "]"                -> array
     | "⟨" initializer_list "⟩"                          -> tuple
     | expression_hi "(" initializer_list ")"            -> call
@@ -95,10 +95,14 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "else" "if" "(" expression ")" block if_rest      -> else_if
     |                                                   -> no_else
 
+?binding_kind: "let"                                    -> let
+    | "var"                                             -> var
+    | "inout"                                           -> inout
+    | "sink"                                            -> sink
+    | "set"                                             -> set
+
 ?statement_list: "def" parameter "=" initializer ";" statement_list   -> def_stmt
-    | "let" IDENT "=" expression ";" statement_list     -> let_stmt
-    | "var" IDENT "=" expression ";" statement_list     -> var_stmt
-    | "inout" IDENT "=" expression ";" statement_list   -> inout_stmt
+    | binding_kind IDENT "=" expression ";" statement_list -> binding_stmt
     | statement statement_list                          -> seq
     | statement                                         -> last_statement
     | "return" expression ";"                           -> return
@@ -120,6 +124,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 parameter: IDENT type_opt                      -> read
     | "!" IDENT type_opt                       -> write
     | "@" IDENT type_opt                       -> none
+    | binding_kind IDENT type_opt              -> binding
 				                 
 ?parameter_list:                                     -> empty
     | parameter                                      -> single

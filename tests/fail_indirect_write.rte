@@ -1,10 +1,10 @@
 fun main() {
-  def !x = new (new 10);
+  var x = &⟨&⟨10⟩⟩;
   {
-    def y = x; // x and y are aliases to the same mutable cell
-    **x = 0;   // pointer does not have write privilege
-    **y = 1;
+    let y = x; // x and y are aliases to the same mutable cell
+    (*(*x)[0])[0] = 0;   // pointer does not have write privilege
+    (*(*y)[0])[0] = 1;
   }
-  def a = **x - 1;
+  let a = (*(*x)[0])[0] - 1;
   return a;
 }

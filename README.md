@@ -57,6 +57,8 @@ error and returns `0`.
 	  return x - 2;
 	}
 
+TODO: inout variables
+
 Both `var` and `let` variables are by-reference (C++ lingo); they are
 aliases for the value produced by their initializing expression (like
 all variables in Java).  In the following, we initialize `y` with `x` and
@@ -65,9 +67,9 @@ and `1` to `x`.
 
 	fun main() {
 	  var x = 42;
-	  var y = x;
-	  y = 0;
+	  inout y = x;
 	  x = 1;
+	  y = 0;
 	  return x;
 	}
 

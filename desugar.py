@@ -5,8 +5,8 @@
 from abstract_syntax import *
 from utilities import *
 
-def desugar_init(init, env):
-    match init:
+def desugar_exp(e, env):
+    match e:
       case Initializer(loc, percent, arg):
         if percent == 'default':
             new_percent = 'default'
@@ -14,12 +14,6 @@ def desugar_init(init, env):
             new_percent = desugar_exp(percent, env)
         new_arg = desugar_exp(arg, env)
         return Initializer(loc, new_percent, new_arg)
-      case _:
-        error(init.location, 'in desugar_init, expected an initializer, not '
-              + repr(init))
-
-def desugar_exp(e, env):
-    match e:
       case Var(x):
         return e
       case Int(n):
@@ -34,15 +28,12 @@ def desugar_exp(e, env):
       case Member(arg, field):
         new_arg = desugar_exp(arg, env)
         return Member(e.location, new_arg, field)
-      case New(init):
-        new_init = desugar_init(init, env)
-        return New(e.location, new_init)
       case Array(size, arg):
         new_size = desugar_exp(size, env)
         new_arg = desugar_exp(arg, env)
         return Array(e.location, new_size, new_arg)
       case TupleExp(inits):
-        new_inits = [desugar_init(init, env) for init in inits]
+        new_inits = [desugar_exp(init, env) for init in inits]
         return TupleExp(e.location, new_inits)
       case Lambda(params, ret_mode, body, name):
         body_env = env.copy()
@@ -52,7 +43,7 @@ def desugar_exp(e, env):
         return Lambda(e.location, params, ret_mode, new_body, name)
       case Call(fun, inits):
         new_fun = desugar_exp(fun, env)
-        new_inits = [desugar_init(init, env) for init in inits]
+        new_inits = [desugar_exp(init, env) for init in inits]
         return Call(e.location, new_fun, new_inits)
       case Index(arg, index):
         new_arg = desugar_exp(arg, env)
@@ -69,8 +60,15 @@ def desugar_exp(e, env):
         new_thn = desugar_exp(thn, env)
         new_els = desugar_exp(els, env)
         return IfExp(e.location, new_cond, new_thn, new_els)
+      case BindingExp(param, rhs, body):
+        loc = e.location
+        new_rhs = desugar_exp(rhs, env)
+        body_env = env.copy()
+        body_env[param.ident] = False
+        new_body = desugar_exp(body, body_env)
+        return BindingExp(loc, param, new_rhs, new_body)
       case DefExp(var, init, body):
-        new_init = desugar_init(init, env)
+        new_init = desugar_exp(init, env)
         body_env = env.copy()
         body_env[var.ident] = False
         new_body = desugar_exp(body, body_env)
@@ -87,18 +85,18 @@ def desugar_exp(e, env):
 def desugar_statement(s, env):
     match s:
       case DefInit(var, init, body):
-        new_init = desugar_init(init, env)
+        new_init = desugar_exp(init, env)
         body_env = env.copy()
         body_env[var.ident] = False
         new_body = desugar_statement(body, body_env)
         return DefInit(s.location, var, new_init, new_body)
-      case BindingStmt(kind, var, rhs, body):
+      case BindingStmt(param, rhs, body):
         loc = s.location
         new_rhs = desugar_exp(rhs, env)
         body_env = env.copy()
-        body_env[var] = False
+        body_env[param.ident] = False
         new_body = desugar_statement(body, body_env)
-        return BindingStmt(loc, kind, var, new_rhs, new_body)
+        return BindingStmt(loc, param, new_rhs, new_body)
       case Seq(first, rest):
         new_first = desugar_statement(first, env)
         new_rest = desugar_statement(rest, env)
@@ -110,7 +108,7 @@ def desugar_statement(s, env):
         return Pass(s.location)
       case Write(lhs, rhs):
         new_lhs = desugar_exp(lhs, env)
-        new_rhs = desugar_init(rhs, env)
+        new_rhs = desugar_exp(rhs, env)
         return Write(s.location, new_lhs, new_rhs)
       case Transfer(lhs, percent, rhs):
         new_lhs = desugar_exp(lhs, env)

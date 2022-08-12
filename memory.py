@@ -68,7 +68,7 @@ class Memory:
     return self.get_tuple_element(self.memory[address], path, loc)
 
   # TODO: move duplicate logic to callers?
-  def read(self, ptr, location, context=ValueCtx(True, False, Fraction(1,1))):
+  def read(self, ptr, location):
       if not isinstance(ptr, Pointer):
           error(location, 'in read expected a pointer, not ' + str(ptr))
       if none(ptr.permission):
@@ -77,10 +77,7 @@ class Memory:
           error(location, 'in read, bad address: ' + str(ptr.address))
 
       val = self.raw_read(ptr.address, ptr.path, location)
-      if context.duplicate:
-          retval = val.duplicate(ptr.permission * context.percentage, location)
-      else:
-          retval = val
+      retval = val.duplicate(ptr.permission, location)
       if tracing_on():
           print('read from ' + str(ptr))
           print('    value: ' + str(self.memory[ptr.address]))
@@ -88,22 +85,23 @@ class Memory:
       return retval
 
   def unchecked_write(self, ptr, val, location):
-      old_val = self.get_tuple_element(self.memory[ptr.address], ptr.path,
-                                       location)
+      address = ptr.get_address()
+      path = ptr.get_path()
+      old_val = self.get_tuple_element(self.memory[address], path, location)
       val_copy = val.duplicate(1, location)
-      self.memory[ptr.address] = \
-          self.set_tuple_element(self.memory[ptr.address],
-                                 ptr.path, val_copy, location)
+      self.memory[address] = \
+          self.set_tuple_element(self.memory[address],
+                                 path, val_copy, location)
       if tracing_on():
         print('wrote ' + str(val_copy) + ' into ' + str(ptr))
       old_val.kill(self, location)
     
   def write(self, ptr, val, location):
-      if not isinstance(ptr, Pointer):
+      if not (isinstance(ptr, Pointer) or isinstance(ptr, PointerOffset)):
           error(location, 'in write expected a pointer, not ' + str(ptr))
-      if not writable(ptr.permission):
+      if not writable(ptr.get_permission()):
           error(location, 'pointer does not have write permission: ' + str(ptr))
-      if not self.valid_address(ptr.address):
+      if not self.valid_address(ptr.get_address()):
           error(location, 'in write, bad address: ' + str(ptr.address))
       self.unchecked_write(ptr, val, location)
 
@@ -122,30 +120,57 @@ class Memory:
     #     print('**warning fraction[' + str(addr) + '] == ' + str(frrunner[addr]))
     return fraction_dict
 
-def bind_parameter(var, privilege, val, env, mem, location):
-    if privilege == 'write' and isinstance(val, Pointer) \
-       and val.permission != Fraction(1,1):
-        error(location, 'need writable pointer, not ' + str(val))
-    elif privilege == 'read' \
-         and isinstance(val, Pointer) \
-         and (not val.address is None) \
-         and val.permission == Fraction(0,1):
-        error(location, 'need readable pointer, not ' + str(val))
-    if not isinstance(val, Pointer):
-      error(location, 'for variable initialization, expected a pointer, not ' + str(val))
-    env[var] = val
+def bind_param(param, res : Result, env, mem, loc):
+  val = res.value
+  if not (isinstance(val, Pointer) or isinstance(val, PointerOffset)):
+    error(loc, 'for binding, expected a pointer, not ' + str(val))
+  if res.temporary:
+    env[param.ident] = val
+    
+  if param.kind == 'let':
+    if (not val.get_address() is None) \
+         and val.get_permission() == Fraction(0,1):
+      error(loc, 'let binding requires non-zero permission, not '
+            + str(val))
+    if not res.temporary:      
+      env[param.ident] = val.duplicate(Fraction(1,2), loc)
+    env[param.ident].kill_zero = True
 
-def allocate_locals(var_priv_vals, env, mem, location):
-    for var, priv, val in var_priv_vals:
-        bind_parameter(var, priv, val, env, mem, location)
-
-def deallocate_parameter(var, env, mem, location):
-    if tracing_on():
-      print('deallocating local variable: ' + var)
-    ptr = env[var]
-    ptr.kill(mem, location)
+  elif param.kind == 'var' or param.kind == 'inout':
+    if val.get_permission() != Fraction(1,1):
+      error(loc, param.kind + ' binding requires permission 1/1, not '
+            + str(val))
+    if not res.temporary:
+      env[param.ident] = val.duplicate(Fraction(1,1), loc)
+      if param.kind == 'var':
+        val.kill(mem, loc)
+    
+  elif param.kind == 'def':  
+    if param.privilege == 'write':
+      if val.get_permission() != Fraction(1,1):
+        error(loc, 'need writable pointer, not ' + str(val))
+      if not res.temporary:
+        env[param.ident] = val.duplicate(Fraction(1,1), loc)
+    elif param.privilege == 'read' and (not val.address is None):
+      if val.permission == Fraction(0,1):
+        error(loc, 'need readable pointer, not ' + str(val))
+      if not res.temporary:
+        env[param.ident] = val.duplicate(Fraction(1,2), loc)
+  else:
+    error(loc, 'unrecognsized kind of parameter: ' + param.kind)
+    
+def inout_end_of_life(ptr, source, loc):
+    if ptr.permission != Fraction(1,1):
+        error(loc, 'failed to restore inout variable '
+              + 'to full\npermission by the end of its scope')
+    if source.address is None:
+        error(loc, "inout can't return ownership because"
+              + " previous owner died")
+    ptr.transfer(Fraction(1,1), source, loc)
         
-def deallocate_locals(vars, env, mem, location):
-    for var in vars:
-        deallocate_parameter(var, env, mem, location)
+def dealloc_param(param, arg, env, mem, loc):
+  ptr = env[param.ident]
+  if param.kind == 'inout':
+    inout_end_of_life(ptr, arg.value, loc)
+  ptr.kill(mem, loc)
 

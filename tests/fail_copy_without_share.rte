@@ -1,6 +1,6 @@
 fun main() {
-  def !x = new 42;
-  def y = x; // error: read privilege requires no writers
-  *x = 0;
-  return *y;
+  var x = 42;
+  let y = x;
+  x = 0;    // pointer does not have write permission
+  return y;
 }

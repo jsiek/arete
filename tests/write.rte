@@ -1,7 +1,7 @@
 fun main() {
-  def !x = 10;
-  def z = copy(x); // otherwise z is an alias for x
+  var x = 10;
+  let z = copy(x); // otherwise z is an alias for x
   x = 20;
-  def y = x;
+  let y = x;
   return y - z - 10;
 }

@@ -15,29 +15,23 @@ def tracing_on():
   return trace
 
 # Context information:
-#    1. do you want value or address of the expression? (i.e. rvalue/lvalue)
-#       a) how much permission do you want? (give a percentage)
-#    2. duplicate (normal) or no duplicate (for permission ops)?
+# do you want value or address of the expression? (i.e. rvalue/lvalue)
 
 @dataclass
 class Context:
-    duplicate: bool   # make a copy of the pointer?
-    consume: bool     # kill the source after the copy?
+  pass
 
 # Want the value of the expression (not its address).
-# If the value is a pointer, duplicate with the specified percentage
-# of its permission.
 # (rvalue)
 @dataclass
 class ValueCtx(Context):
-  percentage : Fraction
+  pass
 
-# Want a copy of the address of the expression's result with
-# the specified percentage of its permission.
+# Want the address of the expression's result.
 # (lvalue)
 @dataclass
 class AddressCtx(Context):
-  percentage : Fraction
+  pass
 
 def priv_to_percent(priv):
   if priv == 'write':

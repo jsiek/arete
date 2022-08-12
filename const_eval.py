@@ -11,19 +11,6 @@ import sys
 import copy
 from utilities import *
 
-def const_eval_init(init, env):
-    match init:
-      case Initializer(loc, percent, arg):
-        if percent == 'default':
-          new_percent = 'default'
-        else:
-          new_percent = const_eval_exp(percent, env)
-        new_arg = const_eval_exp(arg, env)
-        return Initializer(loc, new_percent, new_arg)
-      case _:
-        error(init.location, 'in const_eval_init, expected an initializer, not '
-              + str(init))
-
 def is_constant(e):
   match e:
     case Int(n):
@@ -58,6 +45,13 @@ def const_eval_prim(loc, op, args):
   
 def const_eval_exp(e, env):
     match e:
+      case Initializer(loc, percent, arg):
+        if percent == 'default':
+          new_percent = 'default'
+        else:
+          new_percent = const_eval_exp(percent, env)
+        new_arg = const_eval_exp(arg, env)
+        return Initializer(loc, new_percent, new_arg)
       case Var(x):
         if x in env:
           return env[x]
@@ -75,15 +69,12 @@ def const_eval_exp(e, env):
       case Member(arg, field):
         new_arg = const_eval_exp(arg, env)
         return Member(e.location, new_arg, field)
-      case New(init):
-        new_init = const_eval_init(init, env)
-        return New(e.location, new_init)
       case Array(size, arg):
         new_size = const_eval_exp(size, env)
         new_arg = const_eval_exp(arg, env)
         return Array(e.location, new_size, new_arg)
       case TupleExp(inits):
-        new_inits = [const_eval_init(init, env) for init in inits]
+        new_inits = [const_eval_exp(init, env) for init in inits]
         return TupleExp(e.location, new_inits)
       case Lambda(params, ret_mode, body, name):
         body_env = env.copy()
@@ -94,7 +85,7 @@ def const_eval_exp(e, env):
         return Lambda(e.location, params, ret_mode, new_body, name)
       case Call(fun, args):
         new_fun = const_eval_exp(fun, env)
-        new_args = [const_eval_init(arg, env) for arg in args]
+        new_args = [const_eval_exp(arg, env) for arg in args]
         return Call(e.location, new_fun, new_args)
       case Index(arg, index):
         new_arg = const_eval_exp(arg, env)
@@ -112,12 +103,19 @@ def const_eval_exp(e, env):
         new_els = const_eval_exp(els, env)
         return IfExp(e.location, new_cond, new_thn, new_els)
       case DefExp(var, init, body):
-        new_init = const_eval_init(init, env)
+        new_init = const_eval_exp(init, env)
         body_env = env.copy()
         if var.ident in body_env.keys():
           del body_env[var.ident]
         new_body = const_eval_exp(body, env)
         return DefExp(e.location, var, new_init, new_body)
+      case BindingExp(param, rhs, body):
+        new_rhs = const_eval_exp(rhs, env)
+        body_env = env.copy()
+        if param.ident in body_env.keys():
+          del body_env[param.ident]
+        new_body = const_eval_exp(body, body_env)
+        return BindingExp(e.location, param, new_rhs, new_body)
       case FutureExp(arg):
         new_arg = const_eval_exp(arg, env)
         return FutureExp(e.location, new_arg)
@@ -130,19 +128,19 @@ def const_eval_exp(e, env):
 def const_eval_statement(s, env):
     match s:
       case DefInit(var, init, body):
-        new_init = const_eval_init(init, env)
+        new_init = const_eval_exp(init, env)
         body_env = env.copy()
         if var.ident in body_env.keys():
           del body_env[var]
         new_body = const_eval_statement(body, body_env)
         return DefInit(s.location, var, new_init, new_body)
-      case BindingStmt(kind, var, rhs, body):
+      case BindingStmt(param, rhs, body):
         new_rhs = const_eval_exp(rhs, env)
         body_env = env.copy()
-        if var in body_env.keys():
-          del body_env[var]
+        if param.ident in body_env.keys():
+          del body_env[param.ident]
         new_body = const_eval_statement(body, body_env)
-        return BindingStmt(s.location, kind, var, new_rhs, new_body)
+        return BindingStmt(s.location, param, new_rhs, new_body)
       case Seq(first, rest):
         new_first = const_eval_statement(first, env)
         new_rest = const_eval_statement(rest, env)
@@ -154,7 +152,7 @@ def const_eval_statement(s, env):
         return s
       case Write(lhs, rhs):
         new_lhs = const_eval_exp(lhs, env)
-        new_rhs = const_eval_init(rhs, env)
+        new_rhs = const_eval_exp(rhs, env)
         return Write(s.location, new_lhs, new_rhs)
       case Transfer(lhs, percent, rhs):
         new_lhs = const_eval_exp(lhs, env)

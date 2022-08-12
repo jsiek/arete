@@ -1,4 +1,4 @@
-fun inc(!p) {
+fun inc(inout p) {
   p = p + 1;
 }
 

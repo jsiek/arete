@@ -76,17 +76,20 @@ def parse_tree_to_type_list(e):
         raise Exception('unrecognized as a type list ' + repr(e))
     
 def parse_tree_to_param(e):
-    e.meta.filename = filename
-    if e.data == 'empty':
-        return []
-    elif e.data == 'single':
-        return [parse_tree_to_param(e.children[0])]
-    elif e.data == 'push':
-        return [parse_tree_to_param(e.children[0])] \
-            + parse_tree_to_param(e.children[1])
-    else:
-        return Param(e.meta, e.data, e.children[0].value,
-                     parse_tree_to_type_annot(e.children[1]))
+  e.meta.filename = filename
+  if e.data == 'empty':
+    return []
+  elif e.data == 'single':
+    return [parse_tree_to_param(e.children[0])]
+  elif e.data == 'push':
+    return [parse_tree_to_param(e.children[0])] \
+      + parse_tree_to_param(e.children[1])
+  elif e.data == 'binding':
+    return Param(e.meta, e.children[0].data, None, e.children[1].value,
+                 parse_tree_to_type_annot(e.children[2]))
+  else:    
+    return Param(e.meta, 'def', e.data, e.children[0].value,
+                 parse_tree_to_type_annot(e.children[1]))
 
 primitive_ops = {'add', 'sub', 'mul', 'div', 'int_div', 'neg',
                  'and', 'or', 'not',
@@ -109,8 +112,6 @@ def parse_tree_to_ast(e):
         return Bool(e.meta, False)
     elif e.data in primitive_ops:
         return Prim(e.meta, e.data, [parse_tree_to_ast(c) for c in e.children])
-    elif e.data == 'new':
-        return New(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'tuple':
         return TupleExp(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'array':
@@ -149,6 +150,12 @@ def parse_tree_to_ast(e):
                       parse_tree_to_param(e.children[0]),
                       parse_tree_to_ast(e.children[1]),
                       parse_tree_to_ast(e.children[2]))
+    elif e.data == 'binding_exp':
+        return BindingExp(e.meta,
+                          Param(e.meta, e.children[0].data,
+                                None, e.children[1].value, AnyType(e.meta)),
+                          parse_tree_to_ast(e.children[2]),
+                          parse_tree_to_ast(e.children[3]))
     elif e.data == 'future':
         return FutureExp(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'wait':
@@ -160,21 +167,12 @@ def parse_tree_to_ast(e):
                        parse_tree_to_param(e.children[0]),
                        parse_tree_to_ast(e.children[1]),
                        parse_tree_to_ast(e.children[2]))
-    elif e.data == 'let_stmt':
-        return BindingStmt(e.meta, 'let',
-                           e.children[0].value,
-                           parse_tree_to_ast(e.children[1]),
-                           parse_tree_to_ast(e.children[2]))
-    elif e.data == 'var_stmt':
-        return BindingStmt(e.meta, 'var',
-                           e.children[0].value,
-                           parse_tree_to_ast(e.children[1]),
-                           parse_tree_to_ast(e.children[2]))
-    elif e.data == 'inout_stmt':
-        return BindingStmt(e.meta, 'inout',
-                           e.children[0].value,
-                           parse_tree_to_ast(e.children[1]),
-                           parse_tree_to_ast(e.children[2]))
+    elif e.data == 'binding_stmt':
+        return BindingStmt(e.meta,
+                           Param(e.meta, e.children[0].data,
+                                 None, e.children[1].value, AnyType(e.meta)),
+                           parse_tree_to_ast(e.children[2]),
+                           parse_tree_to_ast(e.children[3]))
     elif e.data == 'return':
         return Return(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'write':
@@ -252,7 +250,8 @@ def parse_tree_to_ast(e):
     
     # miscelaneous
     elif e.data == 'default_initializer':
-        return Initializer(e.meta, 'default', parse_tree_to_ast(e.children[0]))
+        #return Initializer(e.meta, 'default', parse_tree_to_ast(e.children[0]))
+        return parse_tree_to_ast(e.children[0])
     elif e.data == 'frac_initializer':
         return Initializer(e.meta, parse_tree_to_ast(e.children[0]), parse_tree_to_ast(e.children[1]))
     

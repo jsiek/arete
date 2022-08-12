@@ -1,4 +1,4 @@
 fun main() {
-  def t = ⟨3, 5⟩;
+  let t = ⟨3, 5⟩;
   return t[0] - 1 - 2;
 }

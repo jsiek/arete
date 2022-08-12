@@ -15,7 +15,7 @@
 
 # Machine methods:
 #   schedule(ast, env) returns the runner
-#   finish_expression(value)
+#   finish_expression(result)
 #   finish_statement()
 #   finish_and_return(value)
 
@@ -37,7 +37,7 @@ from graphviz import log_graphviz
 class NodeRunner:
     ast: AST
     state: int
-    results: list[(Value,Context)] # results of subexpressions
+    results: list[Result] # results of subexpressions
     return_value: Value  # result of `return` statement
     return_mode: str     # value or address
     context: Context     # rvalue/lvalue/etc.
@@ -81,8 +81,7 @@ class Machine:
       self.push_frame()
       loc = main.location
       call_main = Call(loc, Var(loc, 'main'), [])
-      self.schedule(call_main, env, ValueCtx(True, True, Fraction(1,2)),
-                    return_mode='-no-return-mode-')
+      self.schedule(call_main, env, return_mode='-no-return-mode-')
       self.loop()
       if tracing_on():
           print('** finished program')
@@ -99,10 +98,10 @@ class Machine:
           if tracing_on():
               print('final memory:')
               print(self.memory)
-          print('program result: ' + str(self.result))
+          print('program result: ' + str(self.result.value))
           error(main.location, 'memory leak, memory size = '
                 + str(self.memory.size()))
-      return self.result
+      return self.result.value
 
   def loop(self):
       while len(self.threads) > 0:
@@ -138,8 +137,7 @@ class Machine:
 
   # Call schedule to start the evaluation of an AST node.
   # Returns the new runner.
-  def schedule(self, ast, env, context=ValueCtx(True, False, Fraction(1,2)),
-               return_mode=None):
+  def schedule(self, ast, env, context=ValueCtx(), return_mode=None):
       return_mode = self.current_runner().return_mode if return_mode is None \
                     else return_mode
       runner = NodeRunner(ast, 0, [], None, return_mode, context, env)
@@ -149,17 +147,16 @@ class Machine:
   # Call finish_expression to signal that the current expression
   # runner is finished and register the value it produced with the
   # previous runner.
-  def finish_expression(self, result, location):
+  def finish_expression(self, result: Result, location):
       if tracing_on():
           print('finish_expression ' + str(result))
           print(self.memory)
-      for (p,ctx) in self.current_runner().results:
-        if ctx.duplicate:
-          p.kill(machine.memory, location)
-      context = self.current_runner().context
+      for res in self.current_runner().results:
+          if res.temporary:
+              res.value.kill(machine.memory, location)
       self.current_frame().todo.pop()
       if len(self.current_frame().todo) > 0:
-          self.current_runner().results.append((result, context))
+          self.current_runner().results.append(result)
       elif len(self.current_thread.stack) > 1:
           self.pop_frame(result)
       else:
@@ -173,9 +170,9 @@ class Machine:
       retval = self.current_runner().return_value
       if tracing_on():
           print('finish_statement ' + str(retval))
-      for (p,ctx) in self.current_runner().results:
-        if ctx.duplicate:
-          p.kill(machine.memory, location)
+      for res in self.current_runner().results:
+          if res.temporary:
+              res.value.kill(machine.memory, location)
       self.current_frame().todo.pop()
       if len(self.current_frame().todo) > 0:
         self.current_runner().return_value = retval
@@ -185,9 +182,8 @@ class Machine:
         self.result = retval
 
   def finish_definition(self, location):
-    for (p,ctx) in self.current_runner().results:
-      if ctx.duplicate:
-        p.kill(machine.memory, location)
+    for res in self.current_runner().results:
+        res.value.kill(machine.memory, location)
     self.current_frame().todo.pop()
         
   def push_frame(self):
@@ -207,7 +203,7 @@ class Machine:
   def spawn(self, exp: Exp, env):
       act = NodeRunner(exp, 0, [], None,
                        self.current_runner().return_mode, # ??
-                       ValueCtx(True, False, Fraction(1,1)), env)
+                       ValueCtx(), env)
       frame = Frame([act])
       self.current_thread.num_children += 1
       thread = Thread([frame], None, self.current_thread, 0)

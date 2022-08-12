@@ -12,6 +12,13 @@ class Value:
     def node_label(self):
         return str(self)
 
+# Result of an expression
+# includes the result value and whether it's a temporary. 
+@dataclass
+class Result:
+    temporary: bool
+    value: Value
+
 @dataclass
 class Void(Value):
   def kill(self, mem, loc, progress=set()):
@@ -128,6 +135,21 @@ class Pointer(Value):
     
     __match_args__ = ("address", "path", "permission")
 
+    def get_address(self):
+        return self.address
+
+    def get_path(self):
+        return self.path
+    
+    def get_pointer(self):
+        return self
+    
+    def get_permission(self):
+        return self.permission
+
+    def set_permission(self, perm):
+        self.permission = perm
+    
     def equals(self, other):
         return self.address == other.address and self.path == other.path
 
@@ -210,7 +232,7 @@ class Pointer(Value):
         if tracing_on():
           print('element address ' + str(self) + ' into ' + str(ptr))
         return ptr
-        
+
     def kill(self, mem, location, progress=set()):
         if self.address is None:
           return
@@ -242,7 +264,39 @@ class Pointer(Value):
           return
         val = mem.memory[self.address]
         val.clear(mem, location)
-      
+
+# This class is needed to avoid prematurely duplicating a Pointer.        
+@dataclass
+class PointerOffset(Value):
+    ptr: Pointer
+    offset: int
+
+    def get_pointer(self):
+        return self.ptr.get_pointer()
+    
+    def get_address(self):
+        return self.ptr.get_address()
+
+    def get_path(self):
+        return self.ptr.get_path() + [self.offset]
+    
+    def get_permission(self):
+        return self.ptr.get_permission()
+
+    def set_permission(self, perm):
+        return self.ptr.set_permission(perm)
+    
+    def duplicate(self, percentage, location):
+        other_priv = self.ptr.get_permission() * percentage
+        self.ptr.set_permission(self.ptr.get_permission() - other_priv)
+        return Pointer(self.ptr.get_address(),
+                       self.ptr.get_path() + [self.offset],
+                       other_priv, self.get_pointer())
+
+    def kill(self, mem, loc):
+        # kill the whole thing
+        ptr.kill(mem, loc)
+        
 @dataclass
 class Closure(Value):
     name: str

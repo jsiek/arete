@@ -14,12 +14,16 @@ verbose = False
 @dataclass(frozen=True)
 class Param:
     location: Meta
-    kind: str # read, write
+    kind: str # let, var, inout, sink, set
+    privilege: str # read, write
     ident: str
     type_annot: Type
-    __match_args__ = ("kind", "ident")
+    __match_args__ = ("privilege", "ident")
     def __str__(self):
-        return self.kind + ' ' + self.ident + ': ' + str(self.type_annot)
+        if self.kind is None:
+          return self.privilege + ' ' + self.ident + ': ' + str(self.type_annot)
+        else:
+          return self.kind + ' ' + self.ident + ': ' + str(self.type_annot)
     def __repr__(self):
         return str(self)
 
@@ -42,23 +46,17 @@ class Initializer:
   def step(self, runner, machine):
     if runner.state == 0:
       if self.percentage == 'default':
-        if isinstance(runner.context, AddressCtx):
-            self.percentage = Frac(self.location, runner.context.percentage)
-        else:
-            self.percentage = Frac(self.location, Fraction(1,2))
+        self.percentage = Frac(self.location, Fraction(1,2))
       machine.schedule(self.percentage, runner.env)
     elif runner.state == 1:
-      percent = runner.results[0][0]
-      amount = to_number(percent, self.location)
-      if isinstance(runner.context, AddressCtx):
-          ctx = AddressCtx(True, False, amount)
-      elif isinstance(runner.context, ValueCtx):
-          ctx = ValueCtx(True, False, amount)
-      machine.schedule(self.arg, runner.env, ctx)
+      percent = runner.results[0].value
+      runner.amount = to_number(percent, self.location)
+      machine.schedule(self.arg, runner.env, runner.context)
     else:
-      val = runner.results[1][0]
-      val_copy = val.duplicate(1, self.location)
-      machine.finish_expression(val_copy, self.location)
+      val = runner.results[1].value
+      val_copy = val.duplicate(runner.amount, self.location)
+      machine.finish_expression(Result(runner.results[1].temporary, val_copy),
+                                self.location)
       
 # Expressions
 
@@ -85,7 +83,7 @@ class Call(Exp):
   
   def set_closure(self, runner, machine):
       if runner.clos is None:
-        runner.clos = runner.results[0][0]
+        runner.clos = runner.results[0].value
         if not isinstance(runner.clos, Closure):
           error(self.location, 'expected function in call, not '
                 + str(runner.clos))
@@ -98,9 +96,7 @@ class Call(Exp):
     elif runner.state <= len(self.args):
       self.set_closure(runner, machine)
       # evaluate the operand subexpressions
-      percent = priv_to_percent(runner.clos.params[runner.state - 1].kind)
-      machine.schedule(self.args[runner.state - 1], runner.env,
-                       AddressCtx(True, False, percent)) # TODO adapt by parameter kind
+      machine.schedule(self.args[runner.state - 1], runner.env, AddressCtx())
     elif runner.state == len(self.args) + 1:
       self.set_closure(runner, machine)
       # call the function
@@ -108,15 +104,13 @@ class Call(Exp):
         case Closure(name, params, ret_mode, body, clos_env):
           runner.params = params
           runner.body_env = clos_env.copy()
-          args = [val for val,ctx in runner.results[1:]]
-          if len(params) != len(args):
+          runner.args = [res for res in runner.results[1:]]
+          if len(params) != len(runner.args):
             error(self.location, 'wrong number of arguments, expected '
-                  + str(len(params)) + ' not ' + str(len(args)))
-          # In the following, duplicate the val? -Jeremy
-          var_priv_vals = [(p.ident, p.kind, arg) \
-                           for p, arg in zip(params, args)]
-          allocate_locals(var_priv_vals, runner.body_env, machine.memory,
-                          self.location)
+                  + str(len(params)) + ' not ' + str(len(runner.args)))
+          for param, arg in zip(params, runner.args):
+            bind_param(param, arg, runner.body_env, machine.memory,
+                       self.location)
           machine.push_frame()
           machine.schedule(body, runner.body_env, return_mode=ret_mode)
         case _:
@@ -124,16 +118,16 @@ class Call(Exp):
                 + str(runner.clos))
     else:
       # return from the function
-      deallocate_locals([p.ident for p in runner.params], runner.body_env,
-                        machine.memory, self.location)
+      for (param, arg) in zip(runner.params, runner.args):
+        dealloc_param(param, arg, runner.body_env, machine.memory,
+                      self.location)
       if runner.return_value is None:
         runner.return_value = Void()
       if isinstance(runner.context, ValueCtx):
         if runner.clos.return_mode == 'value':
           result = runner.return_value
         elif runner.clos.return_mode == 'address':
-          result = machine.memory.read(runner.return_value, self.location,
-                                       AddressCtx(True, False, Fraction(1,1)))
+          result = machine.memory.read(runner.return_value, self.location)
           runner.return_value.kill(machine.memory, self.location)
         else:
           raise Exception('unrecognized return_mode: '
@@ -142,14 +136,14 @@ class Call(Exp):
         if runner.clos.return_mode == 'value':
           result = machine.memory.allocate(runner.return_value)
         elif runner.clos.return_mode == 'address':
-          result = runner.return_value # duplicate?
+          result = runner.return_value
         else:
           raise Exception('unrecognized return_mode: '
                           + runner.clos.return_mode)
       else:
         error(self.location, 'unknown context ' + repr(runner.context))
         
-      machine.finish_expression(result, self.location)
+      machine.finish_expression(Result(True, result), self.location)
 
 @dataclass
 class Prim(Exp):
@@ -165,17 +159,15 @@ class Prim(Exp):
         return set().union(*[arg.free_vars() for arg in self.args])
     def step(self, runner, machine):
       if runner.state < len(self.args):
-        dup = not self.op in set(['permission','upgrade', 'split','join'])
-        context = ValueCtx(dup, False, Fraction(1,2))
-        machine.schedule(self.args[runner.state], runner.env, context)
+        machine.schedule(self.args[runner.state], runner.env, ValueCtx())
       else:
-        result = eval_prim(self.op, [val for val, ctx in runner.results],
+        result = eval_prim(self.op, [res.value for res in runner.results],
                            machine, self.location)
         if isinstance(runner.context, AddressCtx):
           # join produces an address, no need to allocate
           if self.op != 'join':
             result = machine.memory.allocate(result)
-        machine.finish_expression(result, self.location)
+        machine.finish_expression(Result(True, result), self.location)
             
 @dataclass
 class Member(Exp):
@@ -190,56 +182,22 @@ class Member(Exp):
         return self.arg.free_vars()
     def step(self, runner, machine):
       if runner.state == 0:
-        machine.schedule(self.arg, runner.env, AddressCtx(True, False, Fraction(1,2)))
+        machine.schedule(self.arg, runner.env, AddressCtx())
       else:
-        mod_ptr = runner.results[0][0]
-        mod = machine.memory.read(mod_ptr, self.location,
-                                  ValueCtx(False, False, Fraction(1,1)))
+        mod_ptr = runner.results[0].value
+        mod = machine.memory.read(mod_ptr, self.location)
         if not isinstance(mod, Module):
           error(e.location, "expected a module, not " + str(val))
         if self.field in mod.exports.keys():
           ptr = mod.exports[self.field]
           if isinstance(runner.context, ValueCtx):
-            result = machine.memory.read(ptr, self.location, runner.context)
+            result = Result(True, machine.memory.read(ptr, self.location))
           elif isinstance(runner.context, AddressCtx):
-            if runner.context.duplicate:
-              result = ptr.duplicate(runner.context.percentage, self.location)
-              if runner.context.consume:
-                  ptr.kill(machine.memory, self.location)
-            else:
-              result = ptr
-          else:
-            raise Exception('in Member.step, bad context '
-                            + repr(runner.context))
+            result = Result(False, ptr)
           machine.finish_expression(result, self.location)
         else:
           error(self.location, 'no member ' + self.field
                 + ' in module ' + mod.name)
-
-# TODO: do we need `new`? Can it be replaced by taking the address
-#   of a 1-element tuple? -Jeremy
-@dataclass
-class New(Exp):
-    init: Initializer
-    __match_args__ = ("init",)
-    def __str__(self):
-        return 'new ' + str(self.init)
-    def __repr__(self):
-        return str(self)
-    def free_vars(self):
-        return self.init.free_vars()
-    def step(self, runner, machine):
-      if runner.state == 0:
-        machine.schedule(self.init, runner.env, ValueCtx(True, True, Fraction(1,1)))
-      else:
-        ptr = machine.memory.allocate(runner.results[0][0].duplicate(1, self.location))
-        if isinstance(runner.context, ValueCtx):
-            result = ptr
-        elif isinstance(runner.context, AddressCtx):
-            result = machine.memory.allocate(ptr)
-        if not runner.context.duplicate:
-            error(self.location, 'new not allowed in this context')
-        machine.finish_expression(result, self.location)
 
 @dataclass
 class Array(Exp):
@@ -258,8 +216,8 @@ class Array(Exp):
       elif runner.state == 1:
         machine.schedule(self.arg, runner.env)
       else:
-        sz = runner.results[0][0]
-        val = runner.results[1][0]
+        sz = runner.results[0].value
+        val = runner.results[1].value
         size = to_integer(sz, self.location)
         vals = [val.duplicate(Fraction(1,2), self.location) for i in range(0,size-1)]
         vals.append(val)
@@ -268,9 +226,7 @@ class Array(Exp):
             result = array
         elif isinstance(runner.context, AddressCtx):
             result = machine.memory.allocate(array)
-        if not runner.context.duplicate:
-          error(self.location, 'arrays not allowed in this context')
-        machine.finish_expression(result, self.location)
+        machine.finish_expression(Result(True, result), self.location)
 
 @dataclass
 class TupleExp(Exp):
@@ -284,21 +240,17 @@ class TupleExp(Exp):
         return set().union(*[init.free_vars() for init in self.inits])
     def step(self, runner, machine):
       if runner.state < len(self.inits):
-        machine.schedule(self.inits[runner.state], runner.env,
-                         ValueCtx(True, True, Fraction(1,1)))
+        machine.schedule(self.inits[runner.state], runner.env)
       else:
-        vals = [val.duplicate(1, self.location) for (val,ctx) in runner.results]
-        if runner.context.consume:
-            for (val,ctx) in runner.results:
-              val.kill(machine.memory, self.location)
+        vals = [res.value.duplicate(1, self.location) for res in runner.results]
+        for res in runner.results:
+          res.value.kill(machine.memory, self.location)
         tup = TupleValue(vals)
         if isinstance(runner.context, ValueCtx):
           result = tup
         elif isinstance(runner.context, AddressCtx):
           result = machine.memory.allocate(tup)
-        if not runner.context.duplicate:
-          error(self.location, 'tuple not allowed in this context')
-        machine.finish_expression(result, self.location)
+        machine.finish_expression(Result(True, result), self.location)
         
 @dataclass
 class Var(Exp):
@@ -315,14 +267,9 @@ class Var(Exp):
             error(self.location, 'use of undefined variable ' + self.ident)
         ptr = runner.env[self.ident]
         if isinstance(runner.context, ValueCtx):
-          result = machine.memory.read(ptr, self.location, runner.context)
+          result = Result(True, machine.memory.read(ptr, self.location))
         elif isinstance(runner.context, AddressCtx):
-          if runner.context.duplicate:
-            result = ptr.duplicate(runner.context.percentage, self.location)
-            if runner.context.consume:
-                ptr.kill(machine.memory, self.location)
-          else:
-            result = ptr
+          result = Result(False, ptr)
         machine.finish_expression(result, self.location)
 
 @dataclass
@@ -341,9 +288,7 @@ class Int(Exp):
             result = val
         elif isinstance(runner.context, AddressCtx):
             result = machine.memory.allocate(val)
-        if not runner.context.duplicate:
-          error(self.location, 'integer not allowed in this context')
-        machine.finish_expression(result, self.location)
+        machine.finish_expression(Result(True, result), self.location)
 
 @dataclass
 class Frac(Exp):
@@ -361,9 +306,9 @@ class Frac(Exp):
             result = val
         elif isinstance(runner.context, AddressCtx):
             result = machine.memory.allocate(val)
-        if not runner.context.duplicate:
-          error(self.location, 'fraction not allowed in this context')
-        machine.finish_expression(result, self.location)
+        # if not runner.context.duplicate:
+        #   error(self.location, 'fraction not allowed in this context')
+        machine.finish_expression(Result(True, result), self.location)
     
 @dataclass
 class Bool(Exp):
@@ -381,9 +326,9 @@ class Bool(Exp):
             result = val
         elif isinstance(runner.context, AddressCtx):
             result = machine.memory.allocate(val)
-        if not runner.context.duplicate:
-          error(self.location, 'Boolean not allowed in this context')
-        machine.finish_expression(result, self.location)
+        # if not runner.context.duplicate:
+        #   error(self.location, 'Boolean not allowed in this context')
+        machine.finish_expression(Result(True, result), self.location)
     
 @dataclass
 class Index(Exp):
@@ -402,49 +347,50 @@ class Index(Exp):
       elif runner.state == 1:
         machine.schedule(self.index, runner.env)
       else:
-        ind = runner.results[1][0]
+        ind = runner.results[1].value
         i = to_integer(ind, self.location)
         if isinstance(runner.context, ValueCtx):
           if tracing_on():
               print('in Index.step, ValueCtx')
-          tup = runner.results[0][0]
+          tup = runner.results[0].value
           if not isinstance(tup, TupleValue):
             error(self.location, 'expected a tuple, not ' + str(tup))
-          if runner.context.duplicate:
-            result = tup.elts[int(i)].duplicate(1, self.location)
-          else:
-            result = tup.elts[int(i)]
+          result = tup.elts[int(i)]
         elif isinstance(runner.context, AddressCtx):
           if tracing_on():
               print('in Index.step, AddressCtx')
-          ptr = runner.results[0][0]
-          # what if not runner.context.duplicate? -Jeremy
-          result = ptr.element_address(int(i), runner.context.percentage, self.location)
+          res = duplicate_if_temporary(runner.results[0], self.location)
+          ptr = res.value
+          #result = ptr.element_address(int(i), Fraction(1,1), self.location)
+          result = PointerOffset(ptr, int(i))
         else:
           error(self.location, 'unrecognized context ' + repr(runner.context))
         
-        machine.finish_expression(result, self.location)
+        machine.finish_expression(Result(False, result), self.location)
 
 @dataclass
 class Deref(Exp):
     arg: Exp
     __match_args__ = ("arg",)
     def __str__(self):
-        return '*' + str(self.arg)
+        return '(*' + str(self.arg) + ')'
     def __repr__(self):
         return str(self)
     def free_vars(self):
         return self.arg.free_vars()
     def step(self, runner, machine):
       if runner.state == 0:
-        machine.schedule(self.arg, runner.env, runner.context)
+        machine.schedule(self.arg, runner.env)
       else:
         if tracing_on():
             print('in Deref.step')
-        ptr = runner.results[0][0]
+        ptr = runner.results[0].value
         if not isinstance(ptr, Pointer):
           error(self.location, 'deref expected a pointer, not ' + str(ptr))
-        result = machine.memory.read(ptr, self.location, runner.context)
+        if isinstance(runner.context, ValueCtx):
+            result = Result(True, machine.memory.read(ptr, self.location))
+        elif isinstance(runner.context, AddressCtx):
+            result = duplicate_if_temporary(runner.results[0], self.location)
         machine.finish_expression(result, self.location)
 
 @dataclass
@@ -459,19 +405,13 @@ class AddressOf(Exp):
         return self.arg.free_vars()
     def step(self, runner, machine):
       if runner.state == 0:
-        machine.schedule(self.arg, runner.env,
-                         AddressCtx(runner.context.duplicate, False, Fraction(1,1)))
+        machine.schedule(self.arg, runner.env, AddressCtx())
       else:
+        res = duplicate_if_temporary(runner.results[0], self.location)
         if isinstance(runner.context, ValueCtx):
-          ptr = runner.results[0][0]
-          if runner.context.duplicate:
-            result = ptr.duplicate(runner.context.percentage, self.location)
-            if runner.context.consume:
-                ptr.kill(machine.memory, self.location)
-          else:
-            result = ptr
-        else:
-          error(self.location, '& (address of) not allowed in this context')
+          result = Result(runner.results[0].temporary, res.value)
+        elif isinstance(runner.context, AddressCtx):
+          result = Result(True, machine.memory.allocate(res.value))
         machine.finish_expression(result, self.location)
         
 @dataclass
@@ -497,10 +437,6 @@ class Lambda(Exp):
               error(self.location, 'in closure, undefined variable ' + x)
             v = runner.env[x]
             clos_env[x] = v.duplicate(Fraction(1,2), self.location)            
-            # if not (v is None):
-            #     clos_env[x] = v.duplicate(Fraction(1,2))
-            # else:
-            #     clos_env[x] = runner.env[x]
         clos = Closure(self.name, self.params, self.return_mode, self.body,
                        clos_env)
         if isinstance(runner.context, ValueCtx):
@@ -509,7 +445,7 @@ class Lambda(Exp):
             result = machine.memory.allocate(clos)
         else:
             error(self.location, 'function not allowed in this context')
-        machine.finish_expression(result, self.location)
+        machine.finish_expression(Result(True, result), self.location)
     
 @dataclass
 class IfExp(Exp):
@@ -529,15 +465,56 @@ class IfExp(Exp):
       if runner.state == 0:
         machine.schedule(self.cond, runner.env)
       elif runner.state == 1:
-        cond = runner.results[0][0]
+        cond = runner.results[0].value
         if to_boolean(cond, self.location):
           machine.schedule(self.thn, runner.env, runner.context)
         else:
           machine.schedule(self.els, runner.env, runner.context)
       elif runner.state == 2:
-        result = runner.results[1][0].duplicate(1, self.location)
+        result = Result(runner.results[1].temporary,
+                        runner.results[1].value.duplicate(1, self.location))
         machine.finish_expression(result, self.location)
-    
+
+def duplicate_if_temporary(result: Result, loc):
+  if result.temporary:
+    tmp = True
+    val = result.value.duplicate(1, loc)
+  else:
+    tmp = False
+    val = result.value
+  return Result(tmp, val)
+
+@dataclass
+class BindingExp(Exp):
+    param: Param
+    arg: Exp
+    body: Exp
+    __match_args__ = ("param", "arg", "body")
+    def __str__(self):
+      if verbose:
+        return str(self.param) + " = " + str(self.arg) + ";\n" \
+            + str(self.body)
+      else:
+        return str(self.param) + " = " + str(self.arg) + "; ..."
+    def __repr__(self):
+        return str(self)
+    def free_vars(self):
+        return self.arg.free_vars() \
+            | (self.body.free_vars() - set([self.param.ident]))
+    def step(self, runner, machine):
+      if runner.state == 0:
+        machine.schedule(self.arg, runner.env, AddressCtx())
+      elif runner.state == 1:
+        runner.body_env = runner.env.copy()
+        bind_param(self.param, runner.results[0],
+                   runner.body_env, machine.memory, self.arg.location)
+        machine.schedule(self.body, runner.body_env)
+      else:
+        dealloc_param(self.param, runner.results[0],
+                      runner.body_env, machine.memory, self.location)
+        result = duplicate_if_temporary(runner.results[1], self.location)
+        machine.finish_expression(result, self.location)
+
 @dataclass
 class DefExp(Exp):
     var: Param
@@ -554,19 +531,16 @@ class DefExp(Exp):
             (self.body.free_vars() - set([self.var.ident]))
     def step(self, runner, machine):
       if runner.state == 0:
-        context = AddressCtx(True, False, priv_to_percent(self.var.kind))
-        machine.schedule(self.init, runner.env, context)
+        machine.schedule(self.init, runner.env, AddressCtx())
       elif runner.state == 1:
-        val = runner.results[0][0]
+        val = runner.results[0].value
         runner.body_env = runner.env.copy()
-        var_priv_vals = [(self.var.ident, self.var.kind, val)]
-        allocate_locals(var_priv_vals, runner.body_env, machine.memory,
-                        self.location)
+        bind_param(self.var, val, runner.body_env, machine.memory,
+                   self.location)
         machine.schedule(self.body, runner.body_env, runner.context)
       else:
-        deallocate_locals([self.var.ident], runner.body_env, machine.memory,
-                          self.location)
-        result = runner.results[1][0].duplicate(1, self.location)
+        dealloc_param(self.var, runner.body_env, machine.memory, self.location)
+        result = duplicate_if_temporary(runner.results[1], self.location)
         machine.finish_expression(result, self.location)
 
 @dataclass
@@ -586,9 +560,7 @@ class FutureExp(Exp):
     elif isinstance(runner.context, AddressCtx):
       future = Future(thread)
       result = machine.memory.allocate(future)
-    if not runner.context.duplicate:
-        error(self.location, 'future not allowed in this context')
-    machine.finish_expression(result, self.location)
+    machine.finish_expression(Result(True, result), self.location)
 
 @dataclass
 class Wait(Exp):
@@ -602,18 +574,17 @@ class Wait(Exp):
     return self.arg.free_vars()
   def step(self, runner, machine):
     if runner.state == 0:
-      machine.schedule(self.arg, runner.env,
-                       ValueCtx(True, False, Fraction(1,1)))
+      machine.schedule(self.arg, runner.env)
     else:
-      future = runner.results[0][0]
+      future = runner.results[0].value
       if not isinstance(future, Future):
         error(self.location, 'in wait, expected a future, not ' + str(future))
       if not future.thread.result is None \
          and future.thread.num_children == 0:
         if isinstance(runner.context, ValueCtx):
-          result = future.thread.result
+          result = Result(True, future.thread.result)
         elif isinstance(runner.context, AddressCtx):
-          result = machine.memory.allocate(future.thread.result)
+          result = Result(True, machine.memory.allocate(future.thread.result))
         machine.finish_expression(result, self.location)
   
     
@@ -661,12 +632,11 @@ class DefInit(Exp):
             | (self.body.free_vars() - set([self.var.ident]))
     def step(self, runner, machine):
       if runner.state == 0:
-        context = AddressCtx(True, False, priv_to_percent(self.var.kind))
-        machine.schedule(self.init, runner.env, context)
+        machine.schedule(self.init, runner.env, AddressCtx())
       elif runner.state == 1:
-        val = runner.results[0][0]
+        val = runner.results[0].value
         runner.body_env = runner.env.copy()
-        bind_parameter(self.var.ident, self.var.kind, val,
+        bind_parameter(self.var.ident, self.var.privilege, val,
                        runner.body_env, machine.memory,
                        self.init.location)
         machine.schedule(self.body, runner.body_env)
@@ -674,63 +644,37 @@ class DefInit(Exp):
         deallocate_parameter(self.var.ident, runner.body_env,
                              machine.memory, self.location)
         machine.finish_statement(self.location)
-
+        
 # This is meant to have the same semantics as the `let`, `var`, and
 # `inout` statement in Val.
 @dataclass
 class BindingStmt(Exp):
-    kind: str
-    var: str
+    param: Param
     arg: Exp
     body: Stmt
-    __match_args__ = ("kind", "var", "arg", "body")
+    __match_args__ = ("param", "arg", "body")
     def __str__(self):
       if verbose:
-        return self.kind + " " + str(self.var) + " = " + str(self.arg) + ";\n" \
+        return str(self.param) + " = " + str(self.arg) + ";\n" \
             + str(self.body)
       else:
-        return self.kind + " " + str(self.var) + " = " + str(self.arg) + "; ..."
+        return str(self.param) + " = " + str(self.arg) + "; ..."
     def __repr__(self):
         return str(self)
     def free_vars(self):
         return self.arg.free_vars() \
-            | (self.body.free_vars() - set([self.var]))
+            | (self.body.free_vars() - set([self.param.ident]))
     def step(self, runner, machine):
       if runner.state == 0:
-        if self.kind == 'let':
-            frac = Fraction(1,2)
-        elif self.kind == 'var' or self.kind == 'inout':
-            frac = Fraction(1,1)
-        if self.kind == 'let' or self.kind == 'inout':
-            consume = False
-        elif self.kind == 'var':
-            consume = True
-        context = AddressCtx(True, consume, frac)
-        machine.schedule(self.arg, runner.env, context)
+        machine.schedule(self.arg, runner.env, AddressCtx())
       elif runner.state == 1:
-        val = runner.results[0][0]
-        if self.kind == 'let':
-            val.kill_zero = True
         runner.body_env = runner.env.copy()
-        if self.kind == 'let':
-            privilege = 'read'
-        elif self.kind == 'var' or self.kind == 'inout':
-            privilege = 'write'
-        bind_parameter(self.var, privilege, val,
-                       runner.body_env, machine.memory,
-                       self.arg.location)
+        bind_param(self.param, runner.results[0],
+                   runner.body_env, machine.memory, self.arg.location)
         machine.schedule(self.body, runner.body_env)
       else:
-        if self.kind == 'inout':
-            if runner.body_env[self.var].permission != Fraction(1,1):
-                error(self.location, 'failed to restore inout variable '
-                      + 'to full\npermission by the end of its scope')
-            if runner.body_env[self.var].lender.address is None:
-                error(self.location, "inout can't return ownership because"
-                      + " previous owner died")
-                
-        deallocate_parameter(self.var, runner.body_env,
-                             machine.memory, self.location)
+        dealloc_param(self.param, runner.results[0],
+                      runner.body_env, machine.memory, self.location)
         machine.finish_statement(self.location)
         
 # Dimitri:
@@ -749,12 +693,13 @@ class Return(Stmt):
     def step(self, runner, machine):
       if runner.state == 0:
         if runner.return_mode == 'value':
-          context = ValueCtx(True, True, Fraction(1,1))
+          context = ValueCtx()
         elif runner.return_mode == 'address':
-          context = AddressCtx(True, True, Fraction(1,1))
+          context = AddressCtx()
         machine.schedule(self.arg, runner.env, context)
       else:
-        runner.return_value = runner.results[0][0].duplicate(1, self.location)
+        runner.return_value = \
+          runner.results[0].value.duplicate(1, self.location)
         machine.finish_statement(self.location)
     
 @dataclass
@@ -773,11 +718,10 @@ class Write(Stmt):
       if runner.state == 0:
         machine.schedule(self.rhs, runner.env)
       elif runner.state == 1:
-        machine.schedule(self.lhs, runner.env,
-                         AddressCtx(True, False, Fraction(1,1))) # TODO: Change consume to True?
+        machine.schedule(self.lhs, runner.env, AddressCtx())
       else:
-        val_ptr = runner.results[0][0]
-        ptr = runner.results[1][0]
+        val_ptr = runner.results[0].value
+        ptr = runner.results[1].value
         machine.memory.write(ptr, val_ptr, self.location)
         machine.finish_statement(self.location)
 
@@ -797,15 +741,15 @@ class Transfer(Stmt):
             | self.rhs.free_vars()
     def step(self, runner, machine):
       if runner.state == 0:
-        machine.schedule(self.lhs, runner.env, ValueCtx(False, False, Fraction(1,1)))
+        machine.schedule(self.lhs, runner.env)
       elif runner.state == 1:
         machine.schedule(self.percent, runner.env)
       elif runner.state == 2:
-        machine.schedule(self.rhs, runner.env, ValueCtx(False, False, Fraction(1,1)))
+        machine.schedule(self.rhs, runner.env)
       else:
-        dest_ptr = runner.results[0][0]
-        amount = runner.results[1][0]
-        src_ptr = runner.results[2][0]
+        dest_ptr = runner.results[0].value
+        amount = runner.results[1].value
+        src_ptr = runner.results[2].value
         percent = to_number(amount, self.location)
         dest_ptr.transfer(percent, src_ptr, self.location)
         machine.finish_statement(self.location)
@@ -822,9 +766,9 @@ class Delete(Stmt):
         return self.arg.free_vars()
     def step(self, runner, machine):
       if runner.state == 0:
-        machine.schedule(self.arg, runner.env, ValueCtx(True, False, Fraction(1,1)))
+        machine.schedule(self.arg, runner.env)
       else:
-        ptr = runner.results[0][0]
+        ptr = runner.results[0].value
         if not isinstance(ptr, Pointer):
           error(self.location, 'in delete, expected a pointer, not ' + str(ptr))
         delete(ptr, machine.memory, self.location)
@@ -862,7 +806,7 @@ class Assert(Stmt):
       if runner.state == 0:
         machine.schedule(self.exp, runner.env)
       else:
-        val = to_boolean(runner.results[0][0], self.location)
+        val = to_boolean(runner.results[0].value, self.location)
         if not val:
           error(self.location, "assertion failed: " + str(self.exp))
         machine.finish_statement(self.location)
@@ -888,7 +832,7 @@ class IfStmt(Stmt):
       if runner.state == 0:
         machine.schedule(self.cond, runner.env)
       elif runner.state == 1:
-        if to_boolean(runner.results[0][0], self.location):
+        if to_boolean(runner.results[0].value, self.location):
           machine.schedule(self.thn, runner.env)
         else:
           machine.schedule(self.els, runner.env)
@@ -910,7 +854,7 @@ class While(Stmt):
       if runner.state == 0:
         machine.schedule(self.cond, runner.env)
       elif runner.state == 1:
-        if to_boolean(runner.results[0][0], self.cond.location):
+        if to_boolean(runner.results[0].value, self.cond.location):
           machine.schedule(self, runner.env)
           machine.schedule(self.body, runner.env)
         else:
@@ -966,7 +910,7 @@ class Global(Exp):
     if runner.state == 0:
       machine.schedule(self.rhs, runner.env)
     else:
-      machine.memory.write(runner.env[self.name], runner.results[0][0],
+      machine.memory.write(runner.env[self.name], runner.results[0].value,
                            self.location)
       machine.finish_definition(self.location)
 
@@ -1020,10 +964,10 @@ class Function(Decl):
       if runner.state == 0:
         lam = Lambda(self.location, self.params, self.return_mode, self.body,
                      self.name)
-        machine.schedule(lam, runner.env, ValueCtx(True, False, Fraction(1,1)))
+        machine.schedule(lam, runner.env)
       else:
         machine.memory.unchecked_write(runner.env[self.name],
-                                       runner.results[0][0],
+                                       runner.results[0].value,
                                        self.location)
         machine.finish_definition(self.location)
 
@@ -1068,15 +1012,13 @@ class Import(Decl):
     return str(self)
   def step(self, runner, machine):
     if runner.state == 0:
-      machine.schedule(self.module, runner.env, AddressCtx(True, False, Fraction(1,2)))
+      machine.schedule(self.module, runner.env, AddressCtx())
     else:
-      mod_ptr = runner.results[0][0]
-      mod = machine.memory.read(mod_ptr, self.location,
-                                ValueCtx(False, False, Fraction(1,1)))
+      mod_ptr = runner.results[0].value
+      mod = machine.memory.read(mod_ptr, self.location)
       for x in self.imports:
         if x in mod.exports.keys():
-          val = machine.memory.read(mod.exports[x], self.location,
-                                    ValueCtx(False, False, Fraction(1,1)))
+          val = machine.memory.read(mod.exports[x], self.location)
           machine.memory.write(runner.env[x], val, self.location)
         else:
           error(self.location, 'module does not export ' + x)
