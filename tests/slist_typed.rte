@@ -1,22 +1,22 @@
 type list_t = rec X in ⟨int, X⟩*;
 
-fun listof(data: int) -> list_t {
-  return new ⟨data, null⟩;
+fun listof(let data: int) -> list_t {
+  return &⟨data, null⟩;
 }
 
-fun push(data: int, !lst: list_t) -> list_t {
-  return new ⟨data, 1 of lst⟩;
+fun push(let data: int, var lst: list_t) -> list_t {
+  return &⟨data, lst⟩;
 }
 
-fun data(node: list_t) -> int & {
+fun data(let node: list_t) -> int & {
   return (*node)[0];
 }
 
-fun next(node: list_t) -> list_t & {
+fun next(let node: list_t) -> list_t & {
   return (*node)[1];
 }
 
-fun is_last(node: list_t) -> bool {
+fun is_last(let node: list_t) -> bool {
   if (is_null(node)) {
     return false;
   } else {
@@ -26,16 +26,16 @@ fun is_last(node: list_t) -> bool {
 
 // Split the list into two parts, with the second
 // part just containing the last element.
-fun remove_last(!n : list_t) -> list_t {
+fun remove_last(inout n : list_t) -> list_t {
   if (is_null(n)) {
     return null;
   } else {
     if (is_last(next(n))) {
-      var q = copy(next(1 of n)); // want all permissions to next(n)
-      next(1 of n) = null;
+      var q = copy((*n)[1]); // want all permissions to next(n)
+      (*n)[1] = null;
       return q;
     } else {
-      return remove_last(next(1 of n));
+      return remove_last((*n)[1]);
     }
   }
 }

@@ -52,7 +52,11 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 ?expression_med: expression_med "%" expression_hi              -> int_div
     | expression_med "/" expression_hi                         -> div
     | expression_med "*" expression_hi                         -> mul
-    | expression_hi
+    | expression_med_hi
+
+?expression_med_hi: expression_hi
+    | "*" expression_hi                                 -> deref
+    | "&" expression_hi                                 -> addrof
 
 ?expression_hi: INT                                     -> int
     | "copy" "(" expression ")"                         -> copy
@@ -65,8 +69,6 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "upgrade" "(" expression ")"                      -> upgrade
     | IDENT                                             -> var
     | expression_hi "[" expression "]"                  -> index
-    | "*" expression_hi                                 -> deref
-    | "&" expression_hi                                 -> addrof
     | expression_hi "." IDENT                           -> member
     | "-" expression_hi                                 -> neg
     | "not" expression_hi                               -> not

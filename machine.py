@@ -153,6 +153,9 @@ class Machine:
           print(self.memory)
       for res in self.current_runner().results:
           if res.temporary:
+              # Catch a common mistake in the interpreter!
+              if res.value is result.value:
+                  error(location, "*** result is a temporary that's being deleted!")
               res.value.kill(machine.memory, location)
       self.current_frame().todo.pop()
       if len(self.current_frame().todo) > 0:

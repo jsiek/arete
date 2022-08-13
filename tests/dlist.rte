@@ -4,8 +4,8 @@ const half = 1/2;
 const all = 1;
 
 const data = 0;
-const pred = 1;
-const succ = 2;
+const prev = 1;
+const next = 2;
 
 const head = 0;
 const tail = 1;
@@ -18,19 +18,19 @@ fun listof(let dat) {
 fun push(let dat, var lst) {
   var first = &⟨dat, null, null⟩;
   if (lst[head] == lst[tail]) { // lst is a 1 element list
-    var n = copy(join(lst[0], lst[1]));
-    (*n)[pred] = none of first;
-    (*first)[succ] = half of n;
+    var n = copy(join(lst[head], lst[tail]));
+    (*n)[prev] = none of first;
+    (*first)[next] = half of n;
     (*n)[1] <- half of first;
     lst[head] = first;
     lst[tail] = n;
     return lst;
   } else { // lst has at least 2 elements
-    lst[head] <- all of (*((*(lst[0]))[2]))[1];
-    (*lst[head])[1] = none of first;
-    (*((*(lst[0]))[2]))[1] <- half of lst[0];
-    (*first)[succ] = lst[head];
-    (*((*first)[2]))[1] <- half of first;
+    lst[head] <- all of (* (* lst[head])[next])[prev]; // bug
+    (*lst[head])[prev] = none of first;
+    (* (* lst[head])[next])[prev] <- half of lst[head];
+    (*first)[next] = lst[head];
+    (* (*first)[next])[prev] <- half of first;
     lst[head] = first;
     return lst;
   }
@@ -42,7 +42,7 @@ fun delete_nodes(var node, last) {
       delete join(node, last);
     } else {
       node <- all of (*((*node)[2]))[1];
-      ! delete_nodes(copy((*node)[succ]), all of last);
+      ! delete_nodes(copy((*node)[next]), all of last);
       delete node;
     }
   }
