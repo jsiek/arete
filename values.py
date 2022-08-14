@@ -237,6 +237,7 @@ class Pointer(Value):
           print('element address ' + str(self) + ' into ' + str(ptr))
         return ptr
 
+    # TODO: change to just kill the part specified by the path?
     def kill(self, mem, location, progress=set()):
         if self.address is None:
           return
@@ -302,7 +303,7 @@ class PointerOffset(Value):
         return ptr
 
     def kill(self, mem, loc):
-        # TODO: change to just killing the part
+        # TODO: change to just kill the part
         # kill the whole thing
         self.ptr.kill(mem, loc)
         
