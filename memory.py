@@ -144,7 +144,16 @@ def bind_param(param, res : Result, env, mem, loc):
       env[param.ident] = val.duplicate(Fraction(1,1), loc)
       if param.kind == 'var':
         val.kill(mem, loc)
-    
+
+  # The ref kind is not in Val. It doesn't guarantee any
+  # read/write ability and it does not guarantee others
+  # won't mutate. Unline `var`, it does not consume the
+  # initializing value.
+  elif param.kind == 'ref':
+    if not res.temporary:
+      env[param.ident] = val.duplicate(Fraction(1,1), loc)
+        
+  # the def form is OBSOLETE
   elif param.kind == 'def':  
     if param.privilege == 'write':
       if val.get_permission() != Fraction(1,1):
@@ -157,7 +166,7 @@ def bind_param(param, res : Result, env, mem, loc):
       if not res.temporary:
         env[param.ident] = val.duplicate(Fraction(1,2), loc)
   else:
-    error(loc, 'unrecognsized kind of parameter: ' + param.kind)
+    error(loc, 'unrecognized kind of parameter: ' + param.kind)
     
 def inout_end_of_life(ptr, source, loc):
     if ptr.permission != Fraction(1,1):

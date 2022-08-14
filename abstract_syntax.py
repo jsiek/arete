@@ -343,7 +343,8 @@ class Index(Exp):
         return self.arg.free_vars() | self.index.free_vars()
     def step(self, runner, machine):
       if runner.state == 0:
-        machine.schedule(self.arg, runner.env, runner.context)
+        # machine.schedule(self.arg, runner.env, runner.context)
+        machine.schedule(self.arg, runner.env, AddressCtx())
       elif runner.state == 1:
         machine.schedule(self.index, runner.env)
       else:
@@ -352,12 +353,15 @@ class Index(Exp):
         if isinstance(runner.context, ValueCtx):
           if tracing_on():
               print('in Index.step, ValueCtx')
-          tup = runner.results[0].value
+          #tup = runner.results[0].value
+          tup_ptr = runner.results[0].value
+          tup = machine.memory.raw_read(tup_ptr.get_address(), tup_ptr.get_path(),
+                                        self.location)
           if not isinstance(tup, TupleValue):
             error(self.location, 'expected a tuple, not ' + str(tup))
           val = tup.elts[int(i)]
           if runner.results[0].temporary:
-              val = val.duplicate(1, self.location)
+              val = val.duplicate(tup_ptr.permission, self.location)
           result = Result(runner.results[0].temporary, val)
         elif isinstance(runner.context, AddressCtx):
           if tracing_on():

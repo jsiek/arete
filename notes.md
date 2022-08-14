@@ -153,6 +153,16 @@ again.)
 
 ================
 
-9: ⟨2, null⟩, 11: ⟨1, ptr(9.@1/1(9216))⟩, 12: ptr(11.@1/1(2928))}
+duplicated ptr(10.@0/1(0896))
+	into ptr(10.@1/2(1712)->0896)
+kill: ptr(10.@0/1(1712)->0896) ignoring set()
 
-'q': ptr(13.@1/1(0080))
+duplicated ptr(10.@0/1(1712)->0896)
+	into ptr(10.@1/2(1040)->1712)
+kill: ptr(10.@1/2(1040)->0896) ignoring set()
+
+duplicated ptr(10.@0/1(0896))
+	into ptr(10.@0/1(8976)->0896)
+kill: ptr(10.@0/1(8976)->0896) ignoring set()
+
+

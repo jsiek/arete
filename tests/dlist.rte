@@ -26,7 +26,7 @@ fun push(let dat, var lst) {
     lst[tail] = n;
     return lst;
   } else { // lst has at least 2 elements
-    lst[head] <- all of (* (* lst[head])[next])[prev]; // bug
+    lst[head] <- all of (* (* lst[head])[next])[prev];
     (*lst[head])[prev] = none of first;
     (* (* lst[head])[next])[prev] <- half of lst[head];
     (*first)[next] = lst[head];
@@ -36,27 +36,29 @@ fun push(let dat, var lst) {
   }
 }
 
-fun delete_nodes(var node, last) {
-  if (not is_null(node)) {
-    if (node == last) {
-      delete join(node, last);
-    } else {
-      node <- all of (*((*node)[2]))[1];
-      ! delete_nodes(copy((*node)[next]), all of last);
-      delete node;
-    }
-  }
-}
 
-fun delete_list(var list) {
-  ! delete_nodes(copy(list[head]), copy(list[tail]));
+fun delete_list(var lst) {
+  if (lst[head] == lst[tail]) { // lst is a 1 element list
+    var n = copy(join(lst[head], lst[tail]));
+    delete n;
+  } else {
+    lst[head] <- all of (*(*lst[head])[next])[prev];
+    // The `ref` variable is to allow for variables that have less
+    // than 1 permission (like `let`) but that do not guarantee
+    // immutability. Like `var` they take all the permission from
+    // their initializer, but they do not consume the initializer.
+    ref nxt = copy((*lst[head])[next]);
+    delete lst[head];
+    lst[head] = nxt;
+    ! delete_list(lst);
+  }
 }
 
 fun main() {
   var three = listof(3);
   var two_three = push(2, three);
   var one_two_three = push(1, two_three);
-  let one = copy(one_two_three[head][data]);
+  let one = copy((*one_two_three[head])[data]);
   ! delete_list(one_two_three);
   return one - 1;
 }

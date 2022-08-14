@@ -153,9 +153,10 @@ def parse_tree_to_ast(e):
     elif e.data == 'binding_exp':
         return BindingExp(e.meta,
                           Param(e.meta, e.children[0].data,
-                                None, e.children[1].value, AnyType(e.meta)),
-                          parse_tree_to_ast(e.children[2]),
-                          parse_tree_to_ast(e.children[3]))
+                                None, e.children[1].value,
+                                parse_tree_to_type_annot(e.children[2])),
+                          parse_tree_to_ast(e.children[3]),
+                          parse_tree_to_ast(e.children[4]))
     elif e.data == 'future':
         return FutureExp(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'wait':
@@ -170,9 +171,10 @@ def parse_tree_to_ast(e):
     elif e.data == 'binding_stmt':
         return BindingStmt(e.meta,
                            Param(e.meta, e.children[0].data,
-                                 None, e.children[1].value, AnyType(e.meta)),
-                           parse_tree_to_ast(e.children[2]),
-                           parse_tree_to_ast(e.children[3]))
+                                 None, e.children[1].value,
+                                 parse_tree_to_type_annot(e.children[2])),
+                           parse_tree_to_ast(e.children[3]),
+                           parse_tree_to_ast(e.children[4]))
     elif e.data == 'return':
         return Return(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'write':
