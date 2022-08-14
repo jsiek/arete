@@ -3,6 +3,10 @@ from utilities import *
 
 # TODO: need different type checking rules for ObserveCtx
 
+def require_consistent(ty1, ty2, msg, location):
+  if not consistent(ty1, ty2):
+    error(location, msg + ', ' + str(ty1) + ' inconsistent with ' + str(ty2))
+
 def simplify(type: Type, env) -> Type:
   match type:
     case TypeVar(name):
@@ -139,50 +143,50 @@ def type_check_prim(location, op, arg_types):
         return BoolType(location)
       case 'not_equal':
         assert len(arg_types) == 2
-        assert consistent(arg_types[0], arg_types[1])
+        require_consistent(arg_types[0], arg_types[1], 'in !=', location)
         return BoolType(location)
       case 'add':
         assert len(arg_types) == 2
-        assert consistent(arg_types[0], IntType(location))
-        assert consistent(arg_types[1], IntType(location))
+        require_consistent(arg_types[0], IntType(location), 'in +', location)
+        require_consistent(arg_types[1], IntType(location), 'in +', location)
         return IntType(location)
       case 'sub':
         assert len(arg_types) == 2
-        assert consistent(arg_types[0], IntType(location))
-        assert consistent(arg_types[1], IntType(location))
+        require_consistent(arg_types[0], IntType(location), 'in -', location)
+        require_consistent(arg_types[1], IntType(location), 'in -', location)
         return IntType(location)
       case 'mul':
         assert len(arg_types) == 2
-        assert consistent(arg_types[0], IntType(location))
-        assert consistent(arg_types[1], IntType(location))
+        require_consistent(arg_types[0], IntType(location), 'in *', location)
+        require_consistent(arg_types[1], IntType(location), 'in *', location)
         return IntType(location)
       case 'div':
         assert len(arg_types) == 2
-        assert consistent(arg_types[0], IntType(location))
-        assert consistent(arg_types[1], IntType(location))
+        require_consistent(arg_types[0], IntType(location), 'in /', location)
+        require_consistent(arg_types[1], IntType(location), 'in /', location)
         return RationalType(location)
       case 'int_div':
         assert len(arg_types) == 2
-        assert consistent(arg_types[0], IntType(location))
-        assert consistent(arg_types[1], IntType(location))
+        require_consistent(arg_types[0], IntType(location), 'in //', location)
+        require_consistent(arg_types[1], IntType(location), 'in //', location)
         return IntType(location)
       case 'neg':
         assert len(arg_types) == 1
-        assert consistent(arg_types[0], IntType(location))
+        require_consistent(arg_types[0], IntType(location), 'in -', location)
         return IntType(location)
       case 'and':
         assert len(arg_types) == 2
-        assert consistent(arg_types[0], BoolType(location))
-        assert consistent(arg_types[1], BoolType(location))
+        require_consistent(arg_types[0], BoolType(location), 'in and', location)
+        require_consistent(arg_types[1], BoolType(location), 'in and', location)
         return BoolType(location)
       case 'or':
         assert len(arg_types) == 2
-        assert consistent(arg_types[0], BoolType(location))
-        assert consistent(arg_types[1], BoolType(location))
+        require_consistent(arg_types[0], BoolType(location), 'in or', location)
+        require_consistent(arg_types[1], BoolType(location), 'in or', location)
         return BoolType(location)
       case 'not':
         assert len(arg_types) == 1
-        assert consistent(arg_types[0], BoolType(location))
+        require_consistent(arg_types[0], BoolType(location), 'in not', location)
         return BoolType(location)
       case 'null':
         assert len(arg_types) == 0
@@ -205,7 +209,7 @@ def type_check_prim(location, op, arg_types):
         # assert isinstance(arg_types[1], PointerType) \
         #   or isinstance(arg_types[1], ArrayType) \
         #   or isinstance(arg_types[1], AnyType)
-        assert consistent(arg_types[0], arg_types[1])
+        require_consistent(arg_types[0], arg_types[1], 'in join', location)
         return join(arg_types[0], arg_types[1])
       case 'permission':
         assert len(arg_types) == 1
@@ -221,8 +225,8 @@ def type_check_prim(location, op, arg_types):
         return BoolType(location)
       case cmp if cmp in compare_ops.keys():
         assert len(arg_types) == 2
-        assert consistent(arg_types[0], IntType(location))
-        assert consistent(arg_types[1], IntType(location))
+        require_consistent(arg_types[0], IntType(location), 'in ' + cmp, location)
+        require_consistent(arg_types[1], IntType(location), 'in ' + cmp, location)
         return BoolType(location)
       case _:
         error(location, 'in type_check_prim, unknown primitive operator ' + op)
@@ -399,7 +403,7 @@ def type_check_statement(s, env):
           error(s.location, 'type of initializer ' + str(rhs_type) + '\n'
                 + ' is inconsistent with declared type ' + str(type_annot))
         body_env = env.copy()
-        body_env[param.ident] = rhs_type
+        body_env[param.ident] = type_annot
         body_type = type_check_statement(body, body_env)
         return body_type
       case Seq(first, rest):

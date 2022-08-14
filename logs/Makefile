@@ -1,0 +1,4 @@
+%.pdf : %.dot
+	dot -Tpdf $< > $@
+
+

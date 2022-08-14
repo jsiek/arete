@@ -16,20 +16,20 @@ const none = 0/1;
 const half = 1/2;
 const all = 1/1;
 
-fun find(key: int, node: node_t, p: node_t) -> node_t {
+fun find(let key: int, ref node: node_t, ref p: node_t) -> node_t {
   if (is_null(node)) {
     return p;
   }
   if (key < (*node)[data]) {
-    return find(key, all of copy((*node)[left]), all of node);
+    return find(key, copy((*node)[left]), node);
   }
   if ((*node)[data] < key) {
-    return find(key, all of copy((*node)[right]), all of node);
+    return find(key, copy((*node)[right]), node);
   }
   return node;
 }
 
-fun gather_permission(node: node_t) {
+fun gather_permission(ref node: node_t) {
   if (not is_null((*node)[left])) {
     node <- all of (*((*node)[left]))[parent];
   }
@@ -39,7 +39,7 @@ fun gather_permission(node: node_t) {
   assert permission(node) == 1/1;
 }
 
-fun scatter_permission(node: node_t) {
+fun scatter_permission(ref node: node_t) {
   if (not is_null((*node)[left])) {
     (*((*node)[left]))[parent] <- half of node;
   }
@@ -48,9 +48,7 @@ fun scatter_permission(node: node_t) {
   }
 }
 
-fun set_left(!node: node_t, !new_left: node_t) {
-  assert permission(node) == 1/1;
-  assert permission(new_left) == 1/1;
+fun set_left(inout node: node_t, var new_left: node_t) {
   if (not is_null(new_left)) {
     (*new_left)[parent] = none of node;
   }
@@ -59,9 +57,7 @@ fun set_left(!node: node_t, !new_left: node_t) {
   (*node)[left] <- all of new_left;  
 }
 
-fun set_right(!node: node_t, !new_right: node_t) {
-  assert permission(node) == 1/1;
-  assert permission(new_right) == 1/1;
+fun set_right(inout node: node_t, var new_right: node_t) {
   if (not is_null(new_right)) {
     (*new_right)[parent] = none of node;
   }
@@ -70,28 +66,27 @@ fun set_right(!node: node_t, !new_right: node_t) {
   (*node)[right] <- all of new_right;
 }
 
-fun insert(key: int, !tree: tree_t) {
+fun insert(let key: int, inout tree: tree_t) {
   if (is_null(*tree)) {
-    *tree = new ⟨key, null, null, null, 0⟩;
+    *tree = &⟨key, null, null, null, 0⟩;
   } else {
-    // TODO: issue, can't turn the following into a `let`
-    def node: node_t = all of find(key, all of *tree, null);
+    ref node: node_t = find(key, *tree, null);
     if (key < (*node)[data]) {
-      var new_node = new ⟨key, null, null, null, 0⟩;
-      ! gather_permission(all of node);
+      var new_node = &⟨key, null, null, null, 0⟩;
+      ! gather_permission(node);
       ! set_left(node, new_node);
-      ! scatter_permission(all of node);
+      ! scatter_permission(node);
     }
     if ((*node)[data] < key) {
-      var new_node = new ⟨key, null, null, null, 0⟩;
-      ! gather_permission(all of node);
+      var new_node = &⟨key, null, null, null, 0⟩;
+      ! gather_permission(node);
       ! set_right(node, new_node);
-      ! scatter_permission(all of node);
+      ! scatter_permission(node);
     }
   }
 }
 
-fun delete_node(node: node_t) {
+fun delete_node(var node: node_t) {
   if (not is_null(node)) {
     ! gather_permission(all of node);
     ! delete_node(all of (*node)[left]);
@@ -105,11 +100,11 @@ fun delete_tree(!tree: tree_t) {
 }
 
 fun main() {
-  var tree = new null;
+  var tree = &null;
   ! insert(5, tree);
   ! insert(10, tree);
   ! insert(1, tree);
-  let ten = (def n: node_t = find(10, *tree, null)
+  let ten = (ref n: node_t = find(10, *tree, null)
              in copy((*n)[data]));
   ! delete_tree(tree);
   return ten - 10;
