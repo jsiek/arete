@@ -57,8 +57,6 @@ error and returns `0`.
 	  return x - 2;
 	}
 
-TODO: inout variables
-
 Both `var` and `let` variables are by-reference (C++ lingo); they are
 aliases for the value produced by their initializing expression (like
 all variables in Java).  In the following, we initialize `y` with `x` and
@@ -67,14 +65,14 @@ and `1` to `x`.
 
 	fun main() {
 	  var x = 42;
-	  inout y = x;
-	  x = 1;
+	  var y = x;
 	  y = 0;
-	  return x;
+	  return x + y;
 	}
 
-This program halts with an error at `x = 1`, saying that
-the pointer (associated with `x`) does not have write permission. 
+This program halts with an error when we try to read `x` in `return
+x + y`, saying that the pointer (associated with `x`) does not have
+read permission.
 
 In Arete, each pointer has a fraction to control whether it is allowed
 to read or write. A positive fraction allows it to read and a fraction
@@ -83,10 +81,10 @@ of `1` allows it to write.
 The pointer associated with variable `x` starts out with a permission
 of `1`, but when we initialize `y` with `x`, all of its permission is
 transfered to the new pointer for `y`. So the write to `y` executes
-successfully, but the later write to `x` is an error because by that
+successfully, but the later read of `x` is an error because by that
 time, `x` has `0` permission.
 
-Getting back to the first example, let us discuss memory allocation
+Getting back to the first example, we discuss memory allocation
 and deallocation.
 
 	fun main() {
@@ -103,6 +101,20 @@ the resulting pointer is associated with `x` (with permission
 `return`. When they go out of scope, the associated pointers are
 *killed*, and because those pointers have permission `1`, the memory
 at their address is deallocated.
+
+In this way, memory deallocation is often handled automatically in Arete.
+However, when dealing with data structures that contain cycles, some
+manual effort is needed. The following example creates a tuple
+that contains a pointer to itself.
+
+	fun main() {
+	  var x = ⟨0, 1⟩;
+	  x[1] = &x;
+	  return x[0];
+	}
+
+The `x` goes to 0 permission on the assignment `x[1] = &x`, so when
+`x` goes out of scope, the tuple does not get deallocated.
 
 
 # Specification 
@@ -127,7 +139,11 @@ This is the current specification of the Arete language.
 	
 	* [Expressions](#expressions)
 
-# <a name="values"></a>Values
+# <a name="values"></a>Results and Values 
+
+The *result* of an expression consists of a value (see below) and a
+Boolean flag that says whether the value was newly created by the
+expression (a temporary) or not.
 
 A *value* is the runtime object produced by an expression during
 program execution. The kinds of values in Arete are listed below.
