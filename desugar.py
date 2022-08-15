@@ -84,12 +84,6 @@ def desugar_exp(e, env):
     
 def desugar_statement(s, env):
     match s:
-      case DefInit(var, init, body):
-        new_init = desugar_exp(init, env)
-        body_env = env.copy()
-        body_env[var.ident] = False
-        new_body = desugar_statement(body, body_env)
-        return DefInit(s.location, var, new_init, new_body)
       case BindingStmt(param, rhs, body):
         loc = s.location
         new_rhs = desugar_exp(rhs, env)

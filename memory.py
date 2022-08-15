@@ -68,21 +68,24 @@ class Memory:
     return self.get_tuple_element(self.memory[address], path, loc)
 
   # TODO: move duplicate logic to callers?
-  def read(self, ptr, location):
-      if not isinstance(ptr, Pointer):
+  def read(self, ptr, location, duplicate=True):
+      if not (isinstance(ptr, Pointer) or isinstance(ptr, PointerOffset)):
           error(location, 'in read expected a pointer, not ' + str(ptr))
-      if none(ptr.permission):
+      if duplicate and none(ptr.get_permission()):
           error(location, 'pointer does not have read permission: ' + str(ptr))
-      if not self.valid_address(ptr.address):
+      if not self.valid_address(ptr.get_address()):
           error(location, 'in read, bad address: ' + str(ptr.address))
 
-      val = self.raw_read(ptr.address, ptr.path, location)
-      percent = Fraction(1,1)
-      #percent = ptr.permission
-      retval = val.duplicate(percent, location)
+      val = self.raw_read(ptr.get_address(), ptr.get_path(), location)
+      #percent = Fraction(1,1)
+      percent = ptr.get_permission()
+      if duplicate:
+        retval = val.duplicate(percent, location)
+      else:
+        retval = val
       if tracing_on():
           print('read from ' + str(ptr))
-          print('    value: ' + str(self.memory[ptr.address]))
+          print('    value: ' + str(self.memory[ptr.get_address()]))
           print('    producing: ' + str(retval))
       return retval
 
@@ -127,6 +130,7 @@ def bind_param(param, res : Result, env, mem, loc):
   if not (isinstance(val, Pointer) or isinstance(val, PointerOffset)):
     error(loc, 'for binding, expected a pointer, not ' + str(val))
   if res.temporary:
+    # what if val is a PointerOffset??
     env[param.ident] = val
     
   if param.kind == 'let':

@@ -1,15 +1,15 @@
 module M
   exports empty, push, front, rest, map
 {
-  def all = 1;
-  def empty = null;
-  fun push(data, rest) {
-    return ⟨data, all of rest⟩;
+  const all = 1;
+  let empty = null;
+  fun push(let data, let rest) {
+    return ⟨data, rest⟩;
   }
-  fun front(ls) { return ls[0]; }
-  fun rest(ls) { return ls[1]; }
+  fun front(let ls) { return ls[0]; }
+  fun rest(let ls) { return ls[1]; }
   
-  fun map(f, ls) {
+  fun map(let f, let ls) {
     if (is_null(ls)) {
       return null;
     } else {
@@ -21,9 +21,9 @@ module M
 from M import empty, push, front, rest;
 
 fun main() {
-  def !ls1 = push(0, push(1, push(2, empty)));
-  def inc = fun (x) { return x + 1; };
-  def !ls2 = M.map(inc, ls1); // test . operator
-  def three = front(rest(rest(ls2)));
+  let ls1 = push(0, push(1, push(2, empty)));
+  let inc = fun (x) { return x + 1; };
+  let ls2 = M.map(inc, ls1); // test . operator
+  let three = front(rest(rest(ls2)));
   return three - 3;
 }

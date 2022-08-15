@@ -1,9 +1,9 @@
 fun main() {
-  def !p = new 0;
-  def write1 = fun (v) { *p = v; };
-  def write2 = write1;
+  var p = 0;
+  let write1 = fun (v) { p = v; };
+  let write2 = write1;
   ! write1(42);
   ! write2(7);
-  def x = *p;
+  let x = p;
   return x;
 }

@@ -1,12 +1,12 @@
-fun write(!p, v) {
-  *p = v;
+fun write(inout p, let v) {
+  p = v;
 }
 
 fun main() {
-  def !a = new 0;
-  def f1 = spawn write(a, 42);
+  var a = 0;
+  let f1 = spawn write(a, 42);
   ! wait f1;
-  def f2 = spawn write(a, -42);
+  let f2 = spawn write(a, -42);
   ! wait f2;
-  return *a + 42;
+  return a + 42;
 }

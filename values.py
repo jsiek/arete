@@ -369,11 +369,13 @@ class Module(Value):
     members: dict[str, Pointer] # all the members
     __match_args__ = ("name", "exports")
     def duplicate(self, percentage, loc):
-        exports_copy = {x: val.duplicate(percentage, loc) \
-                        for x,val in self.exports.items()}
-        return Module(self.name, exports_copy)
+        error(loc, 'modules may not be copied')
+        # members_copy = {x: val.duplicate(percentage, loc) \
+        #                 for x,val in self.members.items()}
+        # exports_copy = {x: members_copy[x] for x in self.exports.keys()}
+        # return Module(self.name, exports_copy, self.members)
     def __str__(self):
-      return self.name + '{' + ','.join([x + '=' + str(v) for x,v in self.exports.items()]) + '}'
+      return self.name + '(' + str(id(self)) + ')' + '{' + ','.join([x + '=' + str(v) for x,v in self.exports.items()]) + '}'
     def __repr__(self):
         return str(self)
     def kill(self, mem, location, progress=set()):

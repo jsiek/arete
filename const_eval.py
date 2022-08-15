@@ -127,13 +127,6 @@ def const_eval_exp(e, env):
 
 def const_eval_statement(s, env):
     match s:
-      case DefInit(var, init, body):
-        new_init = const_eval_exp(init, env)
-        body_env = env.copy()
-        if var.ident in body_env.keys():
-          del body_env[var]
-        new_body = const_eval_statement(body, body_env)
-        return DefInit(s.location, var, new_init, new_body)
       case BindingStmt(param, rhs, body):
         new_rhs = const_eval_exp(rhs, env)
         body_env = env.copy()

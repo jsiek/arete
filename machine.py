@@ -161,7 +161,7 @@ class Machine:
       if len(self.current_frame().todo) > 0:
           self.current_runner().results.append(result)
       elif len(self.current_thread.stack) > 1:
-          self.pop_frame(result)
+          self.pop_frame(result.value)
       else:
           if tracing_on():
               print('finished thread ' + str(result))
@@ -186,14 +186,15 @@ class Machine:
 
   def finish_definition(self, location):
     for res in self.current_runner().results:
-        res.value.kill(machine.memory, location)
+        if res.temporary:
+            res.value.kill(machine.memory, location)
     self.current_frame().todo.pop()
         
   def push_frame(self):
       frame = Frame([])
       self.current_thread.stack.append(frame)
 
-  def pop_frame(self, val):
+  def pop_frame(self, val : Value):
       self.current_thread.stack.pop()
       self.current_runner().return_value = val
 

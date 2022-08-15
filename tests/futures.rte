@@ -1,9 +1,9 @@
 fun main() {
-  def a = spawn 1 + 2; // 3
-  def b = spawn 3 + 4; // 7
-  def c = spawn wait a + wait b; // 10
-  def d = spawn 5 + 6; // 11
-  def e = spawn 7 + 8; // 15
-  def f = spawn wait d + wait e; // 26
+  let a = spawn 1 + 2; // 3
+  let b = spawn 3 + 4; // 7
+  let c = spawn wait a + wait b; // 10
+  let d = spawn 5 + 6; // 11
+  let e = spawn 7 + 8; // 15
+  let f = spawn wait d + wait e; // 26
   return wait c + wait f - 36;
 }

@@ -5,16 +5,16 @@ among two threads.
 
 */
 
-fun inc(@q) {
+fun inc(ref q) {
   while (not (upgrade(&q))) { }
-  *q = *q + 1;
+  q = q + 1;
 }
 
 fun main() {
-  def !p = new 0;
-  def t1 = spawn inc(p);
-  def t2 = spawn inc(p);
+  var p = 0;
+  let t1 = spawn inc(p);
+  let t2 = spawn inc(p);
   ! wait t1;
   ! wait t2;
-  return *p - 2;
+  return p - 2;
 }

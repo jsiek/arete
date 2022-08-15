@@ -31,12 +31,10 @@ fun find(let key: int, ref node: node_t, ref p: node_t) -> node_t {
 
 fun gather_permission(ref node: node_t) {
   if (not is_null((*node)[left])) {
-    var l = copy((*node)[left]);
-    node <- all of (*l)[parent];
+    node <- all of (*((*node)[left]))[parent];
   }
   if (not is_null((*node)[right])) {
-    var r = copy((*node)[right]);
-    node <- all of (*r)[parent];
+    node <- all of (*((*node)[right]))[parent];
   }
   assert permission(node) == 1/1;
 }
@@ -90,15 +88,15 @@ fun insert(let key: int, inout tree: tree_t) {
 
 fun delete_node(var node: node_t) {
   if (not is_null(node)) {
-    ! gather_permission(all of node);
-    ! delete_node(all of (*node)[left]);
-    ! delete_node(all of (*node)[right]);
+    ! gather_permission(node);
+    ! delete_node((*node)[left]);
+    ! delete_node((*node)[right]);
     delete node;
   }
 }
 
 fun delete_tree(!tree: tree_t) {
-  ! delete_node(all of *tree);
+  ! delete_node(*tree);
 }
 
 fun main() {
@@ -106,7 +104,7 @@ fun main() {
   ! insert(5, tree);
   ! insert(10, tree);
   ! insert(1, tree);
-  let ten = (ref n: node_t = find(10, *tree, null)
+  let ten = (let n: node_t = find(10, *tree, null)
              in copy((*n)[data]));
   ! delete_tree(tree);
   return ten - 10;

@@ -93,6 +93,10 @@ def consistent(ty1, ty2, assumed_consistent=set()):
       result = True
     case (RationalType(), RationalType()):
       result = True
+    case (IntType(), RationalType()):
+      result = True
+    case (RationalType(), IntType()):
+      result = True
     case (BoolType(), BoolType()):
       result = True
     case _:
@@ -386,16 +390,6 @@ def type_check_exp(e, env):
     
 def type_check_statement(s, env):
     match s:
-      case DefInit(var, init, body):
-        init_type = type_check_exp(init, env)
-        type_annot = simplify(var.type_annot, env)
-        if not consistent(init_type, type_annot):
-          error(s.location, 'initializing type ' + str(init_type) + '\n'
-                + ' is inconsistent with declared type ' + str(type_annot))
-        body_env = env.copy()
-        body_env[var.ident] = type_annot
-        body_type = type_check_statement(body, body_env)
-        return body_type
       case BindingStmt(param, rhs, body):
         rhs_type = type_check_exp(rhs, env)
         type_annot = simplify(param.type_annot, env)

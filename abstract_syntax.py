@@ -47,7 +47,8 @@ class Initializer:
     if runner.state == 0:
       if self.percentage == 'default':
         self.percentage = Frac(self.location, Fraction(1,2))
-      machine.schedule(self.percentage, runner.env)
+      machine.schedule(self.percentage, runner.env,
+                       ValueCtx(runner.context.duplicate))
     elif runner.state == 1:
       percent = runner.results[0].value
       runner.amount = to_number(percent, self.location)
@@ -91,7 +92,8 @@ class Call(Exp):
   def step(self, runner, machine):
     if runner.state == 0:
       # evaluate the operator subexpression
-      machine.schedule(self.fun, runner.env)
+      machine.schedule(self.fun, runner.env,
+                       ValueCtx(runner.context.duplicate))
       runner.clos = None
     elif runner.state <= len(self.args):
       self.set_closure(runner, machine)
@@ -159,7 +161,12 @@ class Prim(Exp):
         return set().union(*[arg.free_vars() for arg in self.args])
     def step(self, runner, machine):
       if runner.state < len(self.args):
-        machine.schedule(self.args[runner.state], runner.env, ValueCtx())
+        if self.op in set(['upgrade', 'permission']):
+          dup = False
+        else:
+          dup = True
+        machine.schedule(self.args[runner.state], runner.env,
+                         ValueCtx(dup))
       else:
         result = eval_prim(self.op, [res.value for res in runner.results],
                            machine, self.location)
@@ -185,7 +192,8 @@ class Member(Exp):
         machine.schedule(self.arg, runner.env, AddressCtx())
       else:
         mod_ptr = runner.results[0].value
-        mod = machine.memory.read(mod_ptr, self.location)
+        mod = machine.memory.raw_read(mod_ptr.get_address(),
+                                      mod_ptr.get_path(), self.location)
         if not isinstance(mod, Module):
           error(e.location, "expected a module, not " + str(val))
         if self.field in mod.exports.keys():
@@ -267,7 +275,9 @@ class Var(Exp):
             error(self.location, 'use of undefined variable ' + self.ident)
         ptr = runner.env[self.ident]
         if isinstance(runner.context, ValueCtx):
-          result = Result(True, machine.memory.read(ptr, self.location))
+          val = machine.memory.read(ptr, self.location,
+                                    runner.context.duplicate)
+          result = Result(runner.context.duplicate, val)
         elif isinstance(runner.context, AddressCtx):
           result = Result(False, ptr)
         machine.finish_expression(result, self.location)
@@ -344,7 +354,8 @@ class Index(Exp):
     def step(self, runner, machine):
       if runner.state == 0:
         # machine.schedule(self.arg, runner.env, runner.context)
-        machine.schedule(self.arg, runner.env, AddressCtx())
+        machine.schedule(self.arg, runner.env,
+                         AddressCtx(runner.context.duplicate))
       elif runner.state == 1:
         machine.schedule(self.index, runner.env)
       else:
@@ -362,8 +373,8 @@ class Index(Exp):
             error(self.location, 'expected a tuple, not ' + str(tup))
           val = tup.elts[int(i)]
           if runner.results[0].temporary:
-              #percent = tup_ptr.permission
-              percent = Fraction(1,1)
+              percent = tup_ptr.permission
+              #percent = Fraction(1,1)
               val = val.duplicate(percent, self.location)
           result = Result(runner.results[0].temporary, val)
         elif isinstance(runner.context, AddressCtx):
@@ -388,7 +399,8 @@ class Deref(Exp):
         return self.arg.free_vars()
     def step(self, runner, machine):
       if runner.state == 0:
-        machine.schedule(self.arg, runner.env)
+        machine.schedule(self.arg, runner.env,
+                         ValueCtx(runner.context.duplicate))
       else:
         if tracing_on():
             print('in Deref.step')
@@ -516,7 +528,7 @@ class BindingExp(Exp):
         runner.body_env = runner.env.copy()
         bind_param(self.param, runner.results[0],
                    runner.body_env, machine.memory, self.arg.location)
-        machine.schedule(self.body, runner.body_env)
+        machine.schedule(self.body, runner.body_env, runner.context)
       else:
         dealloc_param(self.param, runner.results[0],
                       runner.body_env, machine.memory, self.location)
@@ -589,10 +601,11 @@ class Wait(Exp):
         error(self.location, 'in wait, expected a future, not ' + str(future))
       if not future.thread.result is None \
          and future.thread.num_children == 0:
+        val = future.thread.result.value
         if isinstance(runner.context, ValueCtx):
-          result = Result(True, future.thread.result)
+          result = Result(True, val)
         elif isinstance(runner.context, AddressCtx):
-          result = Result(True, machine.memory.allocate(future.thread.result))
+          result = Result(True, machine.memory.allocate(val))
         machine.finish_expression(result, self.location)
   
     
@@ -621,38 +634,6 @@ class Seq(Stmt):
       machine.finish_statement(self.location)
       machine.schedule(self.rest, runner.env)
     
-@dataclass
-class DefInit(Exp):
-    var: Param
-    init: Initializer
-    body: Stmt
-    __match_args__ = ("var", "init", "body")
-    def __str__(self):
-      if verbose:
-        return "def " + str(self.var) + " = " + str(self.init) + ";\n" \
-            + str(self.body)
-      else:
-        return "def " + str(self.var) + " = " + str(self.init) + "; ..."
-    def __repr__(self):
-        return str(self)
-    def free_vars(self):
-        return self.init.free_vars() \
-            | (self.body.free_vars() - set([self.var.ident]))
-    def step(self, runner, machine):
-      if runner.state == 0:
-        machine.schedule(self.init, runner.env, AddressCtx())
-      elif runner.state == 1:
-        val = runner.results[0].value
-        runner.body_env = runner.env.copy()
-        bind_parameter(self.var.ident, self.var.privilege, val,
-                       runner.body_env, machine.memory,
-                       self.init.location)
-        machine.schedule(self.body, runner.body_env)
-      else:
-        deallocate_parameter(self.var.ident, runner.body_env,
-                             machine.memory, self.location)
-        machine.finish_statement(self.location)
-        
 # This is meant to have the same semantics as the `let`, `var`, and
 # `inout` statement in Val.
 @dataclass
@@ -749,11 +730,11 @@ class Transfer(Stmt):
             | self.rhs.free_vars()
     def step(self, runner, machine):
       if runner.state == 0:
-        machine.schedule(self.lhs, runner.env)
+        machine.schedule(self.lhs, runner.env, ValueCtx(duplicate=False))
       elif runner.state == 1:
         machine.schedule(self.percent, runner.env)
       elif runner.state == 2:
-        machine.schedule(self.rhs, runner.env)
+        machine.schedule(self.rhs, runner.env, ValueCtx(duplicate=False))
       else:
         dest_ptr = runner.results[0].value
         amount = runner.results[1].value
@@ -1023,14 +1004,22 @@ class Import(Decl):
       machine.schedule(self.module, runner.env, AddressCtx())
     else:
       mod_ptr = runner.results[0].value
-      mod = machine.memory.read(mod_ptr, self.location)
+      # we don't duplicate modules, so we shouldn't kill them on finish
+      runner.results[0].temporary = False
+      mod = machine.memory.raw_read(mod_ptr.get_address(),
+                                    mod_ptr.get_path(), self.location)
+      # mod = machine.memory.read(mod_ptr, self.location)      
       for x in self.imports:
         if x in mod.exports.keys():
           val = machine.memory.read(mod.exports[x], self.location)
           machine.memory.write(runner.env[x], val, self.location)
         else:
           error(self.location, 'module does not export ' + x)
+      if tracing_on():
+          print('** about to finish import')
       machine.finish_definition(self.location)
+      if tracing_on():
+          print('** finish import is complete')
       
 # TODO: instead do allocation and then fill in the result -Jeremy
 def declare_decl(decl, env, mem):

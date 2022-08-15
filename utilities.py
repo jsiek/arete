@@ -19,7 +19,7 @@ def tracing_on():
 
 @dataclass
 class Context:
-  pass
+  duplicate: bool = True # false for arguments of Transfer
 
 # Want the value of the expression (not its address).
 # (rvalue)

@@ -1,11 +1,13 @@
-fun write(!p, v) {
+fun write(inout p, v) {
   *p = v;
+  var i = 0;
+  while (i < 100) { i = i + 1; }
 }
 
 fun main() {
-  def !a = new 0;
-  def f1 = spawn write(a, 42);
-  def f2 = spawn write(a, -42); // need writable pointer
+  var a = &0;
+  let f1 = spawn write(a, 42);
+  let f2 = spawn write(a, -42); // inout binding requires permission 1/1
   ! wait f1;
   ! wait f2;
   return *a;
