@@ -77,7 +77,9 @@ class Memory:
           error(location, 'in read, bad address: ' + str(ptr.address))
 
       val = self.raw_read(ptr.address, ptr.path, location)
-      retval = val.duplicate(ptr.permission, location)
+      percent = Fraction(1,1)
+      #percent = ptr.permission
+      retval = val.duplicate(percent, location)
       if tracing_on():
           print('read from ' + str(ptr))
           print('    value: ' + str(self.memory[ptr.address]))

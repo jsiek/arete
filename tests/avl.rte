@@ -31,10 +31,12 @@ fun find(let key: int, ref node: node_t, ref p: node_t) -> node_t {
 
 fun gather_permission(ref node: node_t) {
   if (not is_null((*node)[left])) {
-    node <- all of (*((*node)[left]))[parent];
+    var l = copy((*node)[left]);
+    node <- all of (*l)[parent];
   }
   if (not is_null((*node)[right])) {
-    node <- all of (*((*node)[right]))[parent];
+    var r = copy((*node)[right]);
+    node <- all of (*r)[parent];
   }
   assert permission(node) == 1/1;
 }

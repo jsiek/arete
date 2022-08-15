@@ -292,7 +292,8 @@ class PointerOffset(Value):
         return self.ptr.set_permission(perm)
     
     def duplicate(self, percentage, location):
-        other_priv = self.ptr.get_permission() * percentage
+        #other_priv = self.ptr.get_permission() * percentage
+        other_priv = percentage
         self.ptr.set_permission(self.ptr.get_permission() - other_priv)
         ptr = Pointer(self.ptr.get_address(),
                        self.ptr.get_path() + [self.offset],

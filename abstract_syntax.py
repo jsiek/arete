@@ -355,13 +355,16 @@ class Index(Exp):
               print('in Index.step, ValueCtx')
           #tup = runner.results[0].value
           tup_ptr = runner.results[0].value
-          tup = machine.memory.raw_read(tup_ptr.get_address(), tup_ptr.get_path(),
+          tup = machine.memory.raw_read(tup_ptr.get_address(),
+                                        tup_ptr.get_path(),
                                         self.location)
           if not isinstance(tup, TupleValue):
             error(self.location, 'expected a tuple, not ' + str(tup))
           val = tup.elts[int(i)]
           if runner.results[0].temporary:
-              val = val.duplicate(tup_ptr.permission, self.location)
+              #percent = tup_ptr.permission
+              percent = Fraction(1,1)
+              val = val.duplicate(percent, self.location)
           result = Result(runner.results[0].temporary, val)
         elif isinstance(runner.context, AddressCtx):
           if tracing_on():
