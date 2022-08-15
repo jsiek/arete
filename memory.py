@@ -187,5 +187,8 @@ def dealloc_param(param, arg, env, mem, loc):
   ptr = env[param.ident]
   if param.kind == 'inout':
     inout_end_of_life(ptr, arg.value, loc)
+  # TODO: get the following working
+  # if param.kind == 'let' or param.kind == 'ref':
+  #   ptr.transfer(Fraction(1,1), arg.value, loc)
   ptr.kill(mem, loc)
 

@@ -98,7 +98,6 @@ class Machine:
           if tracing_on():
               print('final memory:')
               print(self.memory)
-          print('program result: ' + str(self.result.value))
           error(main.location, 'memory leak, memory size = '
                 + str(self.memory.size()))
       return self.result.value
