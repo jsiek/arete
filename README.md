@@ -2,20 +2,24 @@
 
 Arete is an experimental programming language.
 
-Some of the features that it will explore are:
+It currently includes
 
 * parallelism (currently via futures)
 
 * controlled mutability for data-race freedom, memory safety, etc.
-  using both static and dynamic uses of fractional permissions
+  via dynamic tracking of fractional permissions.
   
 * semi-automatic memory management via fractional permissions
   
-* gradual typing
-
-* generics with contraints
+* gradual typing (but not yet sound gradual typing)
 
 * modules
+
+and there are plans to add:
+
+* static tracking of fractional permissions
+
+* generics with contraints
 
 The design of Arete is currently captured in a prototype
 implementation written in Python 3.10 that includes:
@@ -25,7 +29,7 @@ implementation written in Python 3.10 that includes:
 
 * constant evaluation ([const_eval.py](const_eval.py))
 
-* type checking ([type_check.py](type_check.py)) (in progress!)
+* type checking ([type_check.py](type_check.py))
 
 * desugaring ([desugar.py](desugar.py))
 
