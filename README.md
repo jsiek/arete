@@ -527,11 +527,35 @@ Inputs: pointer
 	
     * If the `path` is non-empty, check that `val` is a tuple
       and halt with an error if not. Recusively process the
-      `path[0]`th element of `val` with `path[1:]`.
+      `i`th element of `val` (where `i` is `path[0]`) with `path[1:]`.
 
 ### Write
 
-UNDER CONSTRUCTION
+Inputs: pointer, value
+
+1. If the pointer does not have `1` permission, halt with an error.
+
+2. Let `old_val` be the value obtained by reading from memory with
+   the given pointer (see the above Read operation).
+   
+3. Let `val_copy` be a duplicate of the input value.
+
+4. Update the location in memory for the pointer's address with a new
+   whole value obtained by splicing `val_copy` into the place where
+   `old_val` was in the old whole value at the pointer's `address`.
+   To be precise, recursively process the value at the pointer's
+   `address` (call it `val`) and the pointer's `path` as follows to
+   produce a new value as follows.
+   
+   * If the `path` is an empty list, then `val_copy` is the new value.
+	 
+   * If the `path` is non-empty, check that `val` is a tuple and halt
+     with an error if not. Recursively process the `i`th element of
+     `val` (where `i` is `path[0]`) with `path[1:]` to obtain
+     `new_val`. The new value is then constructed by creating a tuple
+     whose elements are obtained by concatenating `val.elts[:i]`, the
+     `new_val`, and `val.elts[i+1:]`.
+
 
 ### Deallocate
 
