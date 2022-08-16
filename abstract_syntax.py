@@ -111,8 +111,7 @@ class Call(Exp):
             error(self.location, 'wrong number of arguments, expected '
                   + str(len(params)) + ' not ' + str(len(runner.args)))
           for param, arg in zip(params, runner.args):
-            bind_param(param, arg, runner.body_env, machine.memory,
-                       self.location)
+            machine.bind_param(param, arg, runner.body_env, self.location)
           machine.push_frame()
           machine.schedule(body, runner.body_env, return_mode=ret_mode)
         case _:
@@ -121,8 +120,7 @@ class Call(Exp):
     else:
       # return from the function
       for (param, arg) in zip(runner.params, runner.args):
-        dealloc_param(param, arg, runner.body_env, machine.memory,
-                      self.location)
+        machine.dealloc_param(param, arg, runner.body_env, self.location)
       if runner.return_value is None:
         runner.return_value = Void()
       if isinstance(runner.context, ValueCtx):
@@ -529,12 +527,12 @@ class BindingExp(Exp):
         machine.schedule(self.arg, runner.env, AddressCtx())
       elif runner.state == 1:
         runner.body_env = runner.env.copy()
-        bind_param(self.param, runner.results[0],
-                   runner.body_env, machine.memory, self.arg.location)
+        machine.bind_param(self.param, runner.results[0],
+                           runner.body_env, self.arg.location)
         machine.schedule(self.body, runner.body_env, runner.context)
       else:
-        dealloc_param(self.param, runner.results[0],
-                      runner.body_env, machine.memory, self.location)
+        machine.dealloc_param(self.param, runner.results[0],
+                              runner.body_env, self.location)
         result = duplicate_if_temporary(runner.results[1], self.location)
         machine.finish_expression(result, self.location)
 
@@ -633,12 +631,12 @@ class BindingStmt(Exp):
         machine.schedule(self.arg, runner.env, AddressCtx())
       elif runner.state == 1:
         runner.body_env = runner.env.copy()
-        bind_param(self.param, runner.results[0],
-                   runner.body_env, machine.memory, self.arg.location)
+        machine.bind_param(self.param, runner.results[0],
+                           runner.body_env, self.arg.location)
         machine.schedule(self.body, runner.body_env)
       else:
-        dealloc_param(self.param, runner.results[0],
-                      runner.body_env, machine.memory, self.location)
+        machine.dealloc_param(self.param, runner.results[0],
+                              runner.body_env, self.location)
         machine.finish_statement(self.location)
         
 # Dimitri:

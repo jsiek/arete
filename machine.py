@@ -213,6 +213,62 @@ class Machine:
       thread = Thread([frame], None, self.current_thread, 0)
       self.threads.append(thread)
       return thread
+
+  def bind_param(self, param, res : Result, env, loc):
+    val = res.value
+    if not (isinstance(val, Pointer) or isinstance(val, PointerOffset)):
+      error(loc, 'for binding, expected a pointer, not ' + str(val))
+    if res.temporary:
+      # what if val is a PointerOffset??
+      env[param.ident] = val
+
+    if param.kind == 'let':
+      if (not val.get_address() is None) \
+           and val.get_permission() == Fraction(0,1):
+        error(loc, 'let binding requires non-zero permission, not '
+              + str(val))
+      if not res.temporary:      
+        env[param.ident] = val.duplicate(Fraction(1,2), loc)
+      env[param.ident].kill_when_zero = True
+
+    elif param.kind == 'var' or param.kind == 'inout':
+      if val.get_permission() != Fraction(1,1):
+        error(loc, param.kind + ' binding requires permission 1/1, not '
+              + str(val))
+      if not res.temporary:
+        env[param.ident] = val.duplicate(Fraction(1,1), loc)
+        if param.kind == 'var':
+          val.kill(self.memory, loc)
+
+    # The ref kind is not in Val. It doesn't guarantee any
+    # read/write ability and it does not guarantee others
+    # won't mutate. Unline `var`, it does not consume the
+    # initializing value.
+    elif param.kind == 'ref':
+      if not res.temporary:
+        env[param.ident] = val.duplicate(Fraction(1,1), loc)
+
+    else:
+      error(loc, 'unrecognized kind of parameter: ' + param.kind)
+
+  def inout_end_of_life(self, ptr, source, loc):
+      if ptr.permission != Fraction(1,1):
+          error(loc, 'failed to restore inout variable '
+                + 'to full\npermission by the end of its scope')
+      if source.address is None:
+          error(loc, "inout can't return ownership because"
+                + " previous owner died")
+      ptr.transfer(Fraction(1,1), source, loc)
+
+  def dealloc_param(self, param, arg, env, loc):
+    ptr = env[param.ident]
+    if param.kind == 'inout':
+      self.inout_end_of_life(ptr, arg.value, loc)
+    # TODO: get the following working
+    # if param.kind == 'let' or param.kind == 'ref':
+    #   ptr.transfer(Fraction(1,1), arg.value, loc)
+    ptr.kill(self.memory, loc)
+
   
 flags = set(['trace', 'fail'])
 

@@ -163,7 +163,7 @@ names to pointers. (Pointers are a kind of value defined below.)
 
 ## Numbers
 
-The numbers currently include integers and fractions.
+The numbers currently include integers and rationals.
 
 ## Booleans
 
@@ -511,10 +511,61 @@ Inputs: an expression and environment
 
 6. Return the new thread.
 
+### <a name="bind_param"></a>Bind a Parameter
+
+Inputs: `parameter`, `result`, `environment`
+
+1. If the value of the `result` is not a pointer or pointer offset,
+   halt with an error.
+   
+2. If the `result` is a temporary, update the `environment` to
+   associate the parameter's identifier with the value of the
+   `result`.
+
+3. If the `parameter` is a `let` do the following:
+
+    a. If the `address` of the pointer is `None` or its permission is
+	   `0`, halt with an error.
+	   
+    b. If the `result` is not a temporary, update the `environment` to
+	   associate the parameter's identifier with a duplicate of the
+	   value of the result, taking 50% of its permission.
+	   
+4. Otherwise, if the `parameter` is a `var` or `inout`, do the following:
+
+    a. If the `address` of the pointer is `None` or its permission is
+	   not `1`, halt with an error.
+	   
+    b. If the `result` is not a temporary, update the `environment` to
+	   associate the parameter's identifier with a duplicate of the
+	   value of the result, taking 100% of its permission.
+
+5. Otherwise, if the `parameter` is a `ref` and `result` is not a
+   temporary, update the `environment` to associate the parameter's
+   identifier with a duplicate of the value of the result, taking 100%
+   of its permission.
+
+### <a name="dealloc_param"></a>Deallocate a Parameter
+
+Inputs: parameter, argument value, environment
+
+1. Let `ptr` be the value associated with the parameter's
+   identifier in the given environment.
+
+2. If the `parameter` is `inout`, do the following:
+
+    a. If the permission of `ptr` is not `1`, halt with an error.n
+	
+	b. If the argument value is not live, halt with an error.
+	
+	c. Transfer all of the permission from `ptr` to the argument value.
+
+3. Kill the `ptr`.
+
 
 ## Memory Operations
 
-### Read
+### <a name="read_op"></a>Read
 
 Inputs: pointer
 
@@ -529,7 +580,7 @@ Inputs: pointer
       and halt with an error if not. Recusively process the
       `i`th element of `val` (where `i` is `path[0]`) with `path[1:]`.
 
-### Write
+### <a name="write_op"></a>Write
 
 Inputs: pointer, value
 
@@ -674,11 +725,16 @@ percentage. Otherwise use 50%.
 **Table of Contents**
 
 * [Assert](#assert)
+* [Binding](#local) (Let, Var, etc.)
 * [Block](#block)
 * [Delete](#delete)
 * [Expression](#expr) Statement
 * [If](#ifstmt) Statement
-* [Local Variable](#local) Definition
+* [Pass](#pass) (Do Nothing)
+* [Return](#return) Return
+* [Transfer](#transfer) Permission
+* [While](#while) Loop
+* [Write](#write) (aka Assignment)
 
 ### <a name="assert"></a>Assert
 
@@ -686,7 +742,36 @@ percentage. Otherwise use 50%.
 <statement> ::= assert <expression>;
 ```
 
-Evaluate the `expression` and halt the program if the result is `false`.
+1. Schedule the `expression` in the current environment with value
+   context with duplication.
+
+2. If the result is `false`, halt with an error.
+
+3. Otherwise, finish this statement.
+
+
+### Binding (Let, Var, etc.)
+
+```
+<statement> ::= <parameter> = <expression>; <statement_list>
+```
+
+1. Schedule the `expression` in the current environment with address
+   context and duplication.
+
+2. Copy the current environment and name it `body_env`.
+   
+3. [Bind](#bind_param) the result from `expression` to the parameter
+   in the `body_env`.
+   
+4. Schedule the following statements in the environment `body_env`.
+
+6. Once the following statements are complete, 
+   [deallocate the parameter](#dealloc_param) with the result
+   from the `expression` and the `body_env`.
+   
+7. Finish this statement.
+   
 
 ### <a name="block"></a>Block
 
@@ -694,16 +779,24 @@ Evaluate the `expression` and halt the program if the result is `false`.
 <statement> ::= { <statement_list> }
 ```
 
+1. Schedule the body in the current environment.
+
+2. Finish this statement.
+
+
 ### <a name="delete"></a>Delete
 
 ```
 <statement> ::= delete <expression>;
 ```
 
-1. Schedule the `expression` in value context with duplication
-   requesting 100%. The result must be a pointer.
+1. Schedule the `expression` in the current environment with value
+   context and duplication.  The result must be a pointer.
 
-2. Deallocate the memory associated with the pointer.
+2. Deallocate the memory associated with the pointer,
+   set its `address` to `None` and its permission to `0`.
+
+3. Finish this statement.
 
 
 ### <a name="expr"></a>Expression Statement
@@ -712,7 +805,10 @@ Evaluate the `expression` and halt the program if the result is `false`.
 <statement> ::= ! <expression>;
 ```
 
-Evaluate the `expression` for its effects and discard the result.
+1. Schedule the `expression` in the current environment with value
+   context and duplication.
+
+2. Finish this statement.
 
 (Note: the `!` is there to make the grammar unambiguous, which sucks.
 This needs work.)
@@ -724,92 +820,96 @@ This needs work.)
 <statement> ::= if (<expression>) <block> else <block>
 ```
 
-### Local Variable (Let)
+The one-armed `if` is parsed into a two-armed `if` whose
+else branch is a [Pass](#pass) statement.
 
-```
-<statement> ::= <parameter> = <expression>; <statement_list>
-```
+To interpret a two-armed `if`: 
 
-1. Schedule the `expression` in the current environment, with context
-   `AddressCtx` with duplication.
+1. Schedule the condition `expression` in the current environment with
+   value context and duplication.
 
-2. Copy the current environment and name it `body_env`.
-   
-3. Check that the initializer's result is a pointer and has the
-   permission required by the privilege level of the `parameter`.
-   
-4. Update `body_env` to map the identifier of the `parameter` to the
-   initializer's result.
+2. If the result is true, schedule the then branch.
 
-5. Schedule the following statements in the environment `body_env`.
+3. Otherwise, if the result is false, schedule the else branch.
 
-6. Once the following statements are complete, 
-   kill the initializer's result. 
-   
-```
-<statement> ::= var <identifier> = <expression>;
-```
-
-The `var` statement desugars into a `let` statement as follows.
-
-```
-var x = e;
-```
-turns into
-```
-let !x = 1/1 of e;
-```
-
-That is, the permission level of `x` is writable and the
-requested percentage is 100%.
+4. Finish this statement.
 
 
-### Return
+
+### <a name="pass"></a>Pass (Do Nothing)
+
+1. Finish this statement.
+
+### <a name="return"></a>Return
 
 ```
 <statement> ::= return <expression>;
 ```
 
-1. Schedule the `expression`. If the `return_mode` of the current node
-   runner is `value`, using `ValueCtx` with duplication and 100%. If
-   the `return_mode` is `address`, use `AddressCtx` with duplication
-   and 100%.
+1. Schedule the `expression` in the current environment with
+   duplication using value or address context as specified by the
+   `return_mode` of the current node runner.
 
-2. Set the `return_value` of the current node runner to
-   a duplicate (at 100%) of the expression's result.
+2. Set the `return_value` of the current node runner to a duplicate
+   (at 100%) of the expression's result.
 
 3. Finish this statement.
 
 
-### Transfer Permission
+### <a name="transfer"></a>Transfer Permission
 
 ```
 <statement> ::= <expression> <- <expression> of <expression>
 ```
 
+1. Schedule the target `expression` in the current environment with
+   value context and without duplication. The result value must be a
+   pointer.
+   
+2. Schedule the percentage `expression` in the current environment
+   with value context and duplication. The result value must be a
+   rational number.
+   
+3. Schedule the source `expression` in the current environment with
+   value context and without duplication. The result value must be a
+   pointer.
 
-### While
+4. Transfer the given percent from the source pointer to the target
+   pointer.
+   
+5. Finish this statement.
+
+
+### <a name="while"></a>While
 
 ```
 <statement> ::= while (<expression>) <block>
 ```
 
-Repeatedly execute the `block` so long as the `expression` evaluates to `true`.
+1. Schedule the condition `expression` in the current environment
+   with value context and duplication.
+   
+2. If the result of the condition is true, schedule this `while`
+   statement again and then schedule the `block`. (We schedule the
+   `block` after this `while` statement because the machine treats the
+   `todo` list as a stack, that is, in last-in-first-out order.)
+
+3. Finish this statement.
 
 
-### Write (Assignment)
+### <a name="write"></a>Write (Assignment)
 
 ```
 <statement> ::= <expression> = <initializer>;
 ```
 
-1. Schedule the `initializer` in a value context with duplication
-  requesting 50%.
+1. Schedule the `initializer` in the current environment with value
+  context and duplication.
   
-2. Schedule the `expression` in an address context with duplication
-  requesting 100%. The result must be a pointer.
+2. Schedule the `expression` in the current environment with address
+  context and duplication. The result must be a pointer.
 
-3. Write the result of the initializer to the pointer.
+3. [Write](#write_op) the result of the initializer to the pointer.
 
 4. Finish this statement.
 
