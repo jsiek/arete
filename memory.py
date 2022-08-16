@@ -133,7 +133,7 @@ def bind_param(param, res : Result, env, mem, loc):
             + str(val))
     if not res.temporary:      
       env[param.ident] = val.duplicate(Fraction(1,2), loc)
-    env[param.ident].kill_zero = True
+    env[param.ident].kill_when_zero = True
 
   elif param.kind == 'var' or param.kind == 'inout':
     if val.get_permission() != Fraction(1,1):

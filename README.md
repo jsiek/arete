@@ -31,15 +31,15 @@ implementation written in Python 3.10 that includes:
 
 * interpreting (an abstract machine) ([machine.py](machine.py))
 
-The design of Arete is heavily based on discussions with Dave Abrahams
-and Dimitri Racordon about their Val language and it is influenced by
-the design of the Carbon language.
+The design of Arete is based on discussions with Dave Abrahams and
+Dimitri Racordon about their Val language and it is influenced by the
+design of the Carbon language.
 
 
 # Examples
 
-There are lots of example programs in the [tests](tests) directory,
-including [double-linked lists](tests/dlist.rte), [binary
+There are lots of small example programs in the [tests](tests)
+directory, including [double-linked lists](tests/dlist.rte), [binary
 trees](tests/avl.rte), and [parallel merge
 sort](tests/par_merge_sort.rte).
 
@@ -57,11 +57,11 @@ error and returns `0`.
 	  return x - 2;
 	}
 
-Both `var` and `let` variables are by-reference (C++ lingo); they are
-aliases for the value produced by their initializing expression (like
-all variables in Java).  In the following, we initialize `y` with `x` and
-declare `y` to also be a mutable variable. We then write `0` to `y`
-and `1` to `x`.
+Both `var` and `let` variables are by-reference (in C++ lingo); they
+are aliases for the value produced by their initializing expression
+(like all variables in Java).  In the following, we initialize `y`
+with `x` and declare `y` to also be a mutable variable. We then write
+`0` to `y` and try to return `x + y`.
 
 	fun main() {
 	  var x = 42;
@@ -70,13 +70,13 @@ and `1` to `x`.
 	  return x + y;
 	}
 
-This program halts with an error when we try to read `x` in `return
-x + y`, saying that the pointer (associated with `x`) does not have
+This program halts with an error when we try to read `x` in `x + y`, 
+saying that the pointer (associated with `x`) does not have
 read permission.
 
 In Arete, each pointer has a fraction to control whether it is allowed
-to read or write. A positive fraction allows it to read and a fraction
-of `1` allows it to write.
+to read or write. A pointer with positive fraction may read and a
+pointer with a fraction of `1` may write.
 
 The pointer associated with variable `x` starts out with a permission
 of `1`, but when we initialize `y` with `x`, all of its permission is
@@ -115,6 +115,7 @@ that contains a pointer to itself.
 
 The `x` goes to 0 permission on the assignment `x[1] = &x`, so when
 `x` goes out of scope, the tuple does not get deallocated.
+So this program halts with an error.
 
 
 # Specification 
@@ -141,16 +142,17 @@ This is the current specification of the Arete language.
 
 # <a name="values"></a>Results and Values 
 
-The *result* of an expression consists of a value (see below) and a
-Boolean flag that says whether the value was newly created by the
-expression (a temporary) or not.
+The *result* of an expression consists of a value (described next) and
+a Boolean flag that says whether the value was newly created by the
+expression (it's a temporary) or not.
 
 A *value* is the runtime object produced by an expression during
 program execution. The kinds of values in Arete are listed below.
 
-The values are defined in [values.py](values.py).
+The Python classes that representation values are defined in
+[values.py](values.py).
 
-All values are first class in the sense that they can be store in
+All values are first class in the sense that they can be stored in
 memory, passed as argument to functions, etc.
 
 We define the term *environment* to be a dictionary mapping variable
@@ -181,6 +183,7 @@ A pointer includes the following fields:
 * `path` (list of integers)
 * `permission` (fraction)
 * `lender` (another pointer, optional)
+* `kill_when_zero` (a Boolean)
 
 If the value at `address` in memory is a tuple, then the `path`
 specifies which part of the tuple this pointer is referring to.
@@ -195,6 +198,10 @@ A pointer whose `permission` is `1` can be used for writing.
 
 If the pointer is a copy of another pointer, then its `lender` is that
 other pointer.
+
+If the `kill_when_zero` flag is set to true, then the pointer is
+killed when its `permission` reaches zero. This flag is needed for
+`let` variables.
 
 A *null* pointer is a pointer whose `address` is `None`.
 
@@ -230,7 +237,7 @@ Inputs: percentage
 1. If the pointer is null, return a null pointer.
 
 2. If the pointer is alive, create a new pointer with the same address
-   and transfer the given percentage from this pointer to the new
+   and path and transfer the given percentage from this pointer to the new
    pointer.  Return the new pointer.
 
 ### Transfer
@@ -240,23 +247,26 @@ Inputs: source pointer, percentage
 Let `amount` be the permission of the source pointer multiplied by the
 given percentage.  Decrease the permission of the source pointer by
 `amount` and increase the permission of this pointer by `amount`.
-
-
-### Element Address
-
-Inputs: index (integer), percentage
-
-1. Create a new pointer whose `path` is a copy of this pointer's
-   `path` but with the given index appended to the end.
-
-2. Transfer the given percentage from this pointer to the new one.
-
+If the permission of the source pointer becomes `0` and its
+`kill_when_zero` flag is true, then kill it.
 
 ### Upgrade
 
 If the pointer has a living lender, transfer all of the lender's
 permission to this pointer. Return `true` or `false` corresponding to
 whether this pointer's permission is equal to `1`.
+
+## Pointer Offset
+
+We sometimes need to delay the duplication of a pointer when using it
+to index into a tuple, which we accomplish with another pointer-like
+value called a *pointer offset*, which has the following fields.
+
+* `ptr` (a Pointer)
+* `offset` (an integer)
+
+A pointer offset acts like its underlying `ptr` but with the given
+`offset` appended to the end of its `path`.
 
 
 ## Closures
@@ -281,45 +291,37 @@ A comma-separated list of types is a `type_list`.
 <type_list> ::= <type> | <type> , <type_list>
 ```
 
-## Integers
+## Array Type
 
 ```
-<type> ::= int
+<type> ::= [ <type> ]
 ```
 
-## Rationals
-
-```
-<type> ::= rational
-```
-
-## Booleans
+## Boolean Type
 
 ```
 <type> ::= bool
 ```
 
-## The Unknown Type (aka. the "any" type or the "dynamic" type)
-
-```
-<type> ::= ?
-```
-
-This type enables gradual typing.
-
-## Tuple Types
-
-```
-<type> ::= ⟨ <type_list> ⟩
-```
-
-## Function Types
+## Function Type
 
 ```
 <type> ::= ( <type_list> ) -> <type>
 ```
 
-## Recursive Types
+## Integer Type
+
+```
+<type> ::= int
+```
+
+## Rational Type
+
+```
+<type> ::= rational
+```
+
+## Recursive Type
 
 ```
 <type> ::= rec <identifier> in <type>
@@ -335,8 +337,22 @@ another node.
 rec X ⟨ int, X* ⟩
 ```
 
-(Recursive types are somewhat unweildy to deal with directly, so there
-are plans to add syntactic sugar for them.)
+(Recursive types are unweildy to deal with directly, so there are
+plans to add syntactic sugar for them.)
+
+## Tuple Type
+
+```
+<type> ::= ⟨ <type_list> ⟩
+```
+
+## Unknown Type (aka. the "any" type or the "dynamic" type)
+
+```
+<type> ::= ?
+```
+
+This type enables gradual typing.
 
 
 ## Type Variables
