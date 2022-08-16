@@ -684,37 +684,46 @@ percentage. Otherwise use 50%.
 
 ## <a name="definitions"></a>Definitions (program and module level)
 
-### Constant
+**Table of Contents**
+
+* [Constant](#constant)
+* [Import](#import)
+* [Function](#function_def)
+* [Module](#module)
+* [Type Alias](#type_alias)
+* [Variable Definition](#global)
+
+### <a name="constant"></a>Constant
 
 ```
 <definition> ::= const <identifier> [: <type>] = <expression>;
 ```
 
-### Import
+### <a name="import"></a>Import
 
 ```
 <definition> ::= from <expression> import <identifier_list>;
 ```
 
-### Function
+### <a name="function_def"></a>Function
 
 ```
 <definition> ::= fun <identifier> (<parameter_list>) [-> <type>] [<return_mode>] <block>
 ```
 
-### Module
+### <a name="module"></a>Module
 
 ```
 <definition> ::= module <identifier> exports <identifier_list> { <definition_list> }
 ```
 
-### Type Alias
+### <a name="type_alias"></a>Type Alias
 
 ```
 <definition> ::= type <identifier> = <type>;
 ```
 
-### Variable (Global)
+### <a name="global"></a>Variable Definition
 
 ```
 <definition> ::= let <identifier> [: <type>] = <expression>;
@@ -925,10 +934,11 @@ To interpret a two-armed `if`:
 
 * [Address Of](#addressof)
 * [Array Creation](#array)
-* [Call](#call) a fuction
+* [Call](#call) a Function
+* [Dereference](#deref) a Pointer
 * [False Literal](#false)
 * [Function (Lambda)](#function)
-* [Index](#index) (into a tuple or array)
+* [Index](#index) into a Tuple or Array
 * [Integer Literal](#integer)
 * [Member Access](#member)
 * [Null Pointer Literal](#null)
@@ -945,19 +955,18 @@ To interpret a two-armed `if`:
 <expression> ::= & <expression>
 ```
 
-1. Schedule `expression` in address context, requesting 100% of its
-   permission, and with duplication as specified by the current
-   node runner's context.
+1. Schedule `expression` in the current environment with address
+   context with duplication.
    
-2. If the current node runner's context is a value context,
-   if the context is with duplication, let `result` be
-   a duplicate of the result of `expression`, taking
-   the percentage specified by the runner's context.
-   If the context is without duplication, let `result` be
-   the result of `expression`.
-
-3. If the current node runner's context is an address context, 
-   halt with an error.
+2. If the current runner's context is value context, do the following.
+   If the result of `expression` was a temporary, duplicate it
+   and set `result` to the duplicate as a new temporary.
+   If the result of `expression` was not temporary, 
+   set `result` to the result of `expression`.
+    
+3. Otherwise, if the current runner's context is address context,
+   allocate the result's value in memory and set `result` to
+   the new pointer (it's a temporary).
 
 4. Finish this expression with `result`.
 
@@ -977,33 +986,30 @@ UNDER CONSTRUCTION
 <expression> ( <initializer_list> )
 ```
 
-1. Schedule the `expression` in value context with duplicaton
-   requesting `1/2` permission.  The result must be a closure.
+1. Schedule the `expression` in the current environment with value
+   context and duplicaton.  The result must be a closure.
 
-2. Schedule each `initializer` (left to right) in address context
-   requesting the percentage appropriate to the corresponding
-   parameter of the closure. (Same as for `let` statements.)
+2. Schedule each `initializer` (left to right) in the current
+   environment with address context and duplication.
    
-3. Copy the closure's environment into `body_env`. Add an item to
-   `body_env`, mapping each parameter to the corresponding result from
-   its initializer.  Check that the initialer is a pointer and has
-   enough permission for the privilege level of the parameter and
-   halt with an error if the permission is too low.
+3. Copy the closure's environment into `body_env`.
+   [Bind](#bind_param) each parameter to the corresponding result from
+   its initializer.
 
 4. Create a new frame and push it onto the `stack` of the current thread.
    
 5. Schedule the body of the closure with the environment `body_env`
    and the closure's return mode.
 
-6. Upon completion of the body, kill all of the initializers.
-   If the current node runner's `return_value` is `None`,
+6. Upon completion of the body, [deallocate](#dealloc_param) each
+   parameter.  If the current node runner's `return_value` is `None`,
    set it to the void value.
    
      a. If the current node runner's context is a value context, and
         its return mode is `value`, let `result` be the runner's
         `return_value`.  If the runner's return mode is `address`,
         then the runner's `return_value` is a pointer; let `result` be
-        the value read from memory at that address.  Kill the pointer.
+        the value read from memory at that pointer.  Kill the pointer.
 
      b. If the current node runner's context is a address context, and
 	    its return mode is `value`, allocate the runner's `return_value`
@@ -1013,6 +1019,9 @@ UNDER CONSTRUCTION
 
 7. Finish this expression with `result`.
 
+### <a name="deref"></a>Dereference a Pointer
+
+UNDER CONSTRUCTION
 
 ### <a name="false"></a>False Literal
 
@@ -1046,28 +1055,33 @@ by this function's parameters.
  mutable or to capture a variable's value.)
 
 
-### <a name="index"></a> Index
+### <a name="index"></a> Index into a Tuple or Array
 
 ```
 <expression> ::= <expression> [ <expression> ]
 ```
 
-1. Schedule the first `expression` in a value context with duplication
-   requesting 50% of its permission.  Let `aggregate` be the result.
+1. Schedule the first `expression` in the current environemnt 
+   in address context with the duplication specified by the current runner.
+   Let `ptr` be the result.
    
 2. Schedule the second `expression` in a value context with
-   duplication requesting 50% of its permission.  Let `index` be the
-   result, which must be an integer.
+   duplication.  Let `index` be the result, which must be an integer.
    
-3. If the current node runner's context is a value context
-   with duplication, let `result` be a duplicate at 100%
-   of the value at the `index` of the tuple.
-   Without duplication, let `result` be the value at the `index` of
-   the tuple.
-   
-4. If the current node runner's context is an address context, let
-   `result` be the *element address* of the `aggregate` at the
-   `index`.
+3. If the current node runner's context is a value context with
+   duplication, let `tup` be the tuple obtained by reading from memory
+   at `ptr`. If `ptr` is a temporary, then let `result` be a duplicate
+   of the element at `index` of `tup` (which should also be considered
+   a temporary), taking a percentage of the element according to the
+   permission of `ptr.  If `ptr` is not a temporary, let `result` be
+   the element at `index` of `tup`.
+
+4. If the current node runner's context is an address context, create
+   a pointer offset whose offset is `index` and whose underlying
+   pointer is either the `ptr` (if it was not a temporary) or a
+   duplicate of `ptr` (if it was a temporary). Let `result` be the new
+   pointer offeset. We categorize it as temporary if the `ptr` was
+   temporary.
    
 5. Finish this expression with `result`.
 
@@ -1093,22 +1107,21 @@ by this function's parameters.
 <expression> ::= <expression> . <identifier>
 ```
 
-1. Schedule `expression` in address context with duplication,
-   requesting 50% of its permission.
+1. Schedule `expression` in the current environment with address
+   context with duplication.
    
 2. Read from the resulting pointer, which must produce a module value.
    If `identifier` is not a name exported by the module, halt with an error.
    Otherwise, let `ptr` be the associated pointer for the `identifier`
    in the module's exports.
    
-3. If the current node runner's context is a value context,
-   let `result` be the value of reading `ptr` from memory with
-   the runner's context.
+3. If the current node runner's context is a value context, let
+   `result` be a duplicate of the value at `ptr` in memory, taking a
+   percentage according to the permission of `ptr`. Categorize this
+   result as a temporary.
 
-4. If the current node runner's context is an address context, and if
-   the context is with duplication, let `result` be a duplicate of
-   `ptr` taking the percentage specified in the node runner's context.
-   If the context is without duplicatoin, let `result` be `ptr`.
+4. If the current node runner's context is an address context, let
+   `result` be `ptr`. (Not a temporary.)
    
 5. Finish this expression with `result`.
 
@@ -1142,18 +1155,18 @@ UNDER CONSTRUCTION
 <expression> ::= ⟨ <initializer_list> ⟩
 ```
 
-1. Schedule each `initializer` (left-to-right) in a value context
-   with duplication requesting 50% permission.
+1. Schedule each `initializer` (left-to-right) in the current
+   environment with value context with duplication.
    
 2. Create a tuple value whose elements are duplicates (at 100%)
    of the results of the initializers.
    
 3. If the current node runner's context is a value context, 
-   let `result` be the tuple.
+   let `result` be the tuple. (A temporary.)
    
 4. If the current node runner's context is an address context, 
    allocate the tuple in memory and let `result` be a pointer
-   to that memory.
+   to that memory. (A temporary.)
 
 5. Finish this expression with `result`.
 
@@ -1167,14 +1180,14 @@ UNDER CONSTRUCTION
    error.
 
 2. If the current runner's context is a value context, read from
-   memory using the identifier's address (from the current
-   environment) according to the current runner's context.
+   memory using the identifier's pointer (from the current
+   environment). If the current runner's context requests duplication,
+   let `result` be a duplicate of the value in memory, taking the
+   percentage specified by the identifier's pointer. (A temporary.)
+   Otherwise, let `result` be the value in memory. (Not a temporary.)
 
-3. Otherwise the current runner's context is an address context.  If
-   it is with duplication, then let `result` be a duplicate the
-   identifier's address (from the current environment) at 100%. If the
-   context is without duplication, then the `result` is the
-   identifier's address (from the current environment).
+3. Otherwise the current runner's context is an address context.
+   Return the identifier's pointer. (Not a temporary).
    
 4. Instruct the machine to finish this expression with the `result`.
 
