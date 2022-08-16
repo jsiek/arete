@@ -102,13 +102,6 @@ def const_eval_exp(e, env):
         new_thn = const_eval_exp(thn, env)
         new_els = const_eval_exp(els, env)
         return IfExp(e.location, new_cond, new_thn, new_els)
-      case DefExp(var, init, body):
-        new_init = const_eval_exp(init, env)
-        body_env = env.copy()
-        if var.ident in body_env.keys():
-          del body_env[var.ident]
-        new_body = const_eval_exp(body, env)
-        return DefExp(e.location, var, new_init, new_body)
       case BindingExp(param, rhs, body):
         new_rhs = const_eval_exp(rhs, env)
         body_env = env.copy()

@@ -1,4 +1,4 @@
-fun inc(!p) {
+fun inc(var p) {
   p = p + 1;
   return p;
 }

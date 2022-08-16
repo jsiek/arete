@@ -88,8 +88,7 @@ def parse_tree_to_param(e):
     return Param(e.meta, e.children[0].data, None, e.children[1].value,
                  parse_tree_to_type_annot(e.children[2]))
   else:    
-    return Param(e.meta, 'def', e.data, e.children[0].value,
-                 parse_tree_to_type_annot(e.children[1]))
+    raise Exception('unrecognized parameter' + repr(e))
 
 primitive_ops = {'add', 'sub', 'mul', 'div', 'int_div', 'neg',
                  'and', 'or', 'not',
@@ -145,11 +144,6 @@ def parse_tree_to_ast(e):
                      parse_tree_to_ast(e.children[0]),
                      parse_tree_to_ast(e.children[1]),
                      parse_tree_to_ast(e.children[2]))
-    elif e.data == 'def':
-        return DefExp(e.meta,
-                      parse_tree_to_param(e.children[0]),
-                      parse_tree_to_ast(e.children[1]),
-                      parse_tree_to_ast(e.children[2]))
     elif e.data == 'binding_exp':
         return BindingExp(e.meta,
                           Param(e.meta, e.children[0].data,
@@ -163,11 +157,6 @@ def parse_tree_to_ast(e):
         return Wait(e.meta, parse_tree_to_ast(e.children[0]))
     
     # statements
-    elif e.data == 'def_stmt':
-        return DefInit(e.meta,
-                       parse_tree_to_param(e.children[0]),
-                       parse_tree_to_ast(e.children[1]),
-                       parse_tree_to_ast(e.children[2]))
     elif e.data == 'binding_stmt':
         return BindingStmt(e.meta,
                            Param(e.meta, e.children[0].data,

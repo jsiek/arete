@@ -543,7 +543,7 @@ later in the definitions of the expressions, statements, and
 definitions.
 
 ```
-<parameter> ::= [<privilege>] <identifier> [: <type>]
+<parameter> ::= <binding_kind> <identifier> [: <type>]
 ```
 
 The `parameter` category is used for function parameters and other

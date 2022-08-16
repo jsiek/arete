@@ -539,34 +539,6 @@ class BindingExp(Exp):
         machine.finish_expression(result, self.location)
 
 @dataclass
-class DefExp(Exp):
-    var: Param
-    init: Initializer
-    body: Exp
-    __match_args__ = ("var", "init", "body")
-    def __str__(self):
-        return "var " + str(self.var) + " = " + str(self.init) + ";\n" \
-            + str(self.body)
-    def __repr__(self):
-        return str(self)
-    def free_vars(self):
-        return self.init.free_vars() | \
-            (self.body.free_vars() - set([self.var.ident]))
-    def step(self, runner, machine):
-      if runner.state == 0:
-        machine.schedule(self.init, runner.env, AddressCtx())
-      elif runner.state == 1:
-        val = runner.results[0].value
-        runner.body_env = runner.env.copy()
-        bind_param(self.var, val, runner.body_env, machine.memory,
-                   self.location)
-        machine.schedule(self.body, runner.body_env, runner.context)
-      else:
-        dealloc_param(self.var, runner.body_env, machine.memory, self.location)
-        result = duplicate_if_temporary(runner.results[1], self.location)
-        machine.finish_expression(result, self.location)
-
-@dataclass
 class FutureExp(Exp):
   arg: Exp
   __match_args__ = ("arg",)

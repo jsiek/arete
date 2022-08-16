@@ -63,7 +63,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "null"                                            -> null
     | "len" "(" expression ")"                          -> len
     | "split" "(" expression ")"                        -> split
-    | "join" "(" expression "," expression ")"                 -> join
+    | "join" "(" expression "," expression ")"          -> join
     | "permission" "(" expression ")"                   -> permission
     | "upgrade" "(" expression ")"                      -> upgrade
     | IDENT                                             -> var
@@ -116,16 +116,14 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | initializer "," initializer_list                  -> push
 				                 
 ?binding_kind: "let"                                    -> let
+    |                                                   -> let
     | "var"                                             -> var
     | "inout"                                           -> inout
     | "sink"                                            -> sink
     | "set"                                             -> set
     | "ref"                                             -> ref
 
-parameter: IDENT type_opt                      -> read
-    | "!" IDENT type_opt                       -> write
-    | "@" IDENT type_opt                       -> none
-    | binding_kind IDENT type_opt              -> binding
+parameter: binding_kind IDENT type_opt                  -> binding
 				                 
 ?parameter_list:                                     -> empty
     | parameter                                      -> single

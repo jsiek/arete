@@ -95,7 +95,7 @@ fun delete_node(var node: node_t) {
   }
 }
 
-fun delete_tree(!tree: tree_t) {
+fun delete_tree(var tree: tree_t) {
   ! delete_node(*tree);
 }
 

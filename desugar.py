@@ -67,12 +67,6 @@ def desugar_exp(e, env):
         body_env[param.ident] = False
         new_body = desugar_exp(body, body_env)
         return BindingExp(loc, param, new_rhs, new_body)
-      case DefExp(var, init, body):
-        new_init = desugar_exp(init, env)
-        body_env = env.copy()
-        body_env[var.ident] = False
-        new_body = desugar_exp(body, body_env)
-        return DefExp(e.location, var, new_init, new_body)
       case FutureExp(arg):
         new_arg = desugar_exp(arg, env)
         return FutureExp(e.location, new_arg)

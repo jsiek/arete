@@ -357,12 +357,6 @@ def type_check_exp(e, env):
           error(e.location, 'in conditional, branches must be consistent, not '
                 + str(cond_type))
         return join(thn_type, els_type)
-      case DefExp(var, init, body):
-        init_type = type_check_exp(init, env)
-        body_env = env.copy()
-        body_env[var.ident] = init_type
-        body_type = type_check_exp(body, body_env)
-        return body_type
       case BindingExp(param, rhs, body):
         rhs_type = type_check_exp(rhs, env)
         type_annot = simplify(param.type_annot, env)
