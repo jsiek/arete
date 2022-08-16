@@ -76,19 +76,16 @@ with `x` and declare `y` to also be a mutable variable. We then write
 	  return x + y;
 	}
 
-This program halts with an error when we try to read `x` in `x + y`, 
-saying that the pointer (associated with `x`) does not have
-read permission.
-
-In Arete, each pointer has a fraction to control whether it is allowed
-to read or write. A pointer with positive fraction may read and a
-pointer with a fraction of `1` may write.
-
-The pointer associated with variable `x` starts out with a permission
-of `1`, but when we initialize `y` with `x`, all of its permission is
-transfered to the new pointer for `y`. So the write to `y` executes
-successfully, but the later read of `x` is an error because by that
-time, `x` has `0` permission.
+This program halts with an error when we try to read `x` in `x + y`,
+saying that the pointer (associated with `x`) does not have read
+permission.  In Arete, each pointer has a fraction to control whether
+it is allowed to read or write. A pointer with positive fraction may
+read and a pointer with a fraction of `1` may write.  The pointer
+associated with variable `x` starts out with a permission of `1`, but
+when we initialize `y` with `x`, all of its permission is transfered
+to the new pointer for `y`. So the write to `y` executes successfully,
+but the later read of `x` is an error because by that time, `x` has
+`0` permission.
 
 Getting back to the first example, we discuss memory allocation
 and deallocation.
