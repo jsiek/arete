@@ -129,7 +129,9 @@ class Call(Exp):
         if runner.clos.return_mode == 'value':
           result = runner.return_value
         elif runner.clos.return_mode == 'address':
-          result = machine.memory.read(runner.return_value, self.location)
+          val = machine.memory.read(runner.return_value, self.location)
+          result = val.duplicate(runner.return_value.get_permission(),
+                                 self.location)
           runner.return_value.kill(machine.memory, self.location)
         else:
           raise Exception('unrecognized return_mode: '
@@ -192,14 +194,15 @@ class Member(Exp):
         machine.schedule(self.arg, runner.env, AddressCtx())
       else:
         mod_ptr = runner.results[0].value
-        mod = machine.memory.raw_read(mod_ptr.get_address(),
-                                      mod_ptr.get_path(), self.location)
+        mod = machine.memory.read(mod_ptr, self.location)
         if not isinstance(mod, Module):
           error(e.location, "expected a module, not " + str(val))
         if self.field in mod.exports.keys():
           ptr = mod.exports[self.field]
           if isinstance(runner.context, ValueCtx):
-            result = Result(True, machine.memory.read(ptr, self.location))
+            val = machine.memory.read(ptr, self.location)
+            result = Result(True, val.duplicate(ptr.get_permission(),
+                                                self.location))
           elif isinstance(runner.context, AddressCtx):
             result = Result(False, ptr)
           machine.finish_expression(result, self.location)
@@ -275,8 +278,9 @@ class Var(Exp):
             error(self.location, 'use of undefined variable ' + self.ident)
         ptr = runner.env[self.ident]
         if isinstance(runner.context, ValueCtx):
-          val = machine.memory.read(ptr, self.location,
-                                    runner.context.duplicate)
+          val = machine.memory.read(ptr, self.location)
+          if runner.context.duplicate:
+            val = val.duplicate(ptr.get_permission(), self.location)
           result = Result(runner.context.duplicate, val)
         elif isinstance(runner.context, AddressCtx):
           result = Result(False, ptr)
@@ -364,17 +368,13 @@ class Index(Exp):
         if isinstance(runner.context, ValueCtx):
           if tracing_on():
               print('in Index.step, ValueCtx')
-          #tup = runner.results[0].value
           tup_ptr = runner.results[0].value
-          tup = machine.memory.raw_read(tup_ptr.get_address(),
-                                        tup_ptr.get_path(),
-                                        self.location)
+          tup = machine.memory.read(tup_ptr, self.location)
           if not isinstance(tup, TupleValue):
             error(self.location, 'expected a tuple, not ' + str(tup))
           val = tup.elts[int(i)]
           if runner.results[0].temporary:
               percent = tup_ptr.permission
-              #percent = Fraction(1,1)
               val = val.duplicate(percent, self.location)
           result = Result(runner.results[0].temporary, val)
         elif isinstance(runner.context, AddressCtx):
@@ -408,7 +408,9 @@ class Deref(Exp):
         if not isinstance(ptr, Pointer):
           error(self.location, 'deref expected a pointer, not ' + str(ptr))
         if isinstance(runner.context, ValueCtx):
-            result = Result(True, machine.memory.read(ptr, self.location))
+            val = machine.memory.read(ptr, self.location)
+            result = Result(True, val.duplicate(ptr.get_permission(),
+                                                self.location))
         elif isinstance(runner.context, AddressCtx):
             result = duplicate_if_temporary(runner.results[0], self.location)
         machine.finish_expression(result, self.location)
@@ -1006,13 +1008,13 @@ class Import(Decl):
       mod_ptr = runner.results[0].value
       # we don't duplicate modules, so we shouldn't kill them on finish
       runner.results[0].temporary = False
-      mod = machine.memory.raw_read(mod_ptr.get_address(),
-                                    mod_ptr.get_path(), self.location)
+      mod = machine.memory.read(mod_ptr, self.location)
       # mod = machine.memory.read(mod_ptr, self.location)      
       for x in self.imports:
         if x in mod.exports.keys():
           val = machine.memory.read(mod.exports[x], self.location)
-          machine.memory.write(runner.env[x], val, self.location)
+          dup = val.duplicate(mod.exports[x].get_permission, self.location)
+          machine.memory.write(runner.env[x], dup, self.location)
         else:
           error(self.location, 'module does not export ' + x)
       if tracing_on():
