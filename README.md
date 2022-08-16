@@ -4,7 +4,7 @@ Arete is an experimental programming language.
 
 It currently includes
 
-* parallelism (currently via futures)
+* parallelism (via futures)
 
 * controlled mutability for data-race freedom, memory safety, etc.
   via dynamic tracking of fractional permissions.
@@ -20,6 +20,8 @@ and there are plans to add:
 * static tracking of fractional permissions
 
 * generics with contraints
+
+* more features for asynchronous and parallel programming.
 
 The design of Arete is currently captured in a prototype
 implementation written in Python 3.10 that includes:
