@@ -946,8 +946,8 @@ To interpret a two-armed `if`:
 * [True Literal](#true)
 * [Tuple Creation](#tuple)
 * [Variable](#variable)
-* [Spawn](#spawn) a future
-* [Wait](#wait) on a future
+* [Spawn](#spawn) a Future
+* [Wait](#wait) on a Future
 
 ### <a name="addressof"></a>Address Of
 
