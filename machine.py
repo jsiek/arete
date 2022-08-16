@@ -50,7 +50,7 @@ class Frame:
 @dataclass(eq=False)
 class Thread:
     stack: list[Frame]
-    result: Value        # None if not finished
+    return_value: Value        # None if not finished
     parent: Any
     num_children: int
     
@@ -60,7 +60,7 @@ class Machine:
   threads: list[Thread]
   current_thread: Thread
   main_thread: Thread
-  result: Value
+  return_value: Value
 
   def run(self, decls):
       self.main_thread = Thread([], None, None, 0)
@@ -100,7 +100,7 @@ class Machine:
               print(self.memory)
           error(main.location, 'memory leak, memory size = '
                 + str(self.memory.size()))
-      return self.result.value
+      return self.return_value
 
   def loop(self):
       while len(self.threads) > 0:
@@ -115,7 +115,7 @@ class Machine:
               if not self.current_thread.parent is None:
                   self.current_thread.parent.num_children -= 1
               if self.current_thread == self.main_thread:
-                  self.result = self.current_thread.result
+                  self.return_value = self.current_thread.return_value
             continue
           # case current_thread has work to do
           frame = self.current_frame()
@@ -147,6 +147,7 @@ class Machine:
   # runner is finished and register the value it produced with the
   # previous runner.
   def finish_expression(self, result: Result, location):
+      assert isinstance(result, Result)
       if tracing_on():
           print('finish_expression ' + str(result))
           print(self.memory)
@@ -164,24 +165,24 @@ class Machine:
       else:
           if tracing_on():
               print('finished thread ' + str(result))
-          self.current_thread.result = result
+          self.current_thread.return_value = result.value
 
   # Call finish_statement to signal that the current statement runner is done.
   # Propagates the return value if there is one.
   def finish_statement(self, location):
-      retval = self.current_runner().return_value
+      val = self.current_runner().return_value
       if tracing_on():
-          print('finish_statement ' + str(retval))
+          print('finish_statement ' + str(val))
       for res in self.current_runner().results:
           if res.temporary:
               res.value.kill(machine.memory, location)
       self.current_frame().todo.pop()
       if len(self.current_frame().todo) > 0:
-        self.current_runner().return_value = retval
+        self.current_runner().return_value = val
       elif len(self.current_thread.stack) > 1:
-        self.pop_frame(retval)
+        self.pop_frame(val)
       else:
-        self.result = retval
+        self.return_value = val
 
   def finish_definition(self, location):
     for res in self.current_runner().results:
@@ -204,10 +205,10 @@ class Machine:
       return self.current_frame().todo[-1]
 
   def spawn(self, exp: Exp, env):
-      act = NodeRunner(exp, 0, [], None,
+      runner = NodeRunner(exp, 0, [], None,
                        self.current_runner().return_mode, # ??
                        ValueCtx(), env)
-      frame = Frame([act])
+      frame = Frame([runner])
       self.current_thread.num_children += 1
       thread = Thread([frame], None, self.current_thread, 0)
       self.threads.append(thread)

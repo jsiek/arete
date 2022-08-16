@@ -574,9 +574,9 @@ class Wait(Exp):
       future = runner.results[0].value
       if not isinstance(future, Future):
         error(self.location, 'in wait, expected a future, not ' + str(future))
-      if not future.thread.result is None \
+      if not future.thread.return_value is None \
          and future.thread.num_children == 0:
-        val = future.thread.result.value
+        val = future.thread.return_value
         if isinstance(runner.context, ValueCtx):
           result = Result(True, val)
         elif isinstance(runner.context, AddressCtx):

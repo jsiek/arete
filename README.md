@@ -377,14 +377,14 @@ The *machine* has
 * collection of `threads` including the `current_thread`
   and the `main_thread`.
 
-* `result` which eventually holds the value returned by the `main`
+* `return_value` which eventually holds the value returned by the `main`
   function.
 
 Each *thread* has
 
 * `stack` of *frames* (the procedure call stack), 
   with one *frame* for each function call.
-* `result` which eventually holds the value produced by the thread.
+* `return_value` which eventually holds the value produced by the thread.
 * `parent` the thread that spawned this thread (optional).
 * `num_children` the number of threads spawned by this thread that
     are still running.
@@ -402,18 +402,14 @@ Each node runner has
 * `state` an integer to indicate how far along the node runner is in
    executing this AST node.
    
-* `results` a list of value-context pairs, where the values are the
-   results of the subexpressions of this AST node. The contexts
-   are the contexts for the subexpressions.
-   (More about contexts below.)
+* `results` a list of results for the subexpressions of this AST node. 
    
 * `context` specifies whether the expression should be evaluated for
    its value (aka. rvalue) via `ValueCtx` or its address (aka. lvalue)
-   via `AddressCtx`. The context also specifies what `percentage` of
-   its permission is being requested and whether to `duplicate` the
-   result (the default is yes, duplicate the pointer).
+   via `AddressCtx`. The context also specifies whether to `duplicate` the
+   result value (the default is yes, duplicate the pointer).
 
-* `return_value` is to propagate the result of a `return` statement.
+* `return_value` is to propagate the value from a `return` statement.
 
 * `return_mode` (the strings `value` or `address`) is whether the enclosing
   function expects to return a value or address.
@@ -455,46 +451,83 @@ return mode (optional).
 
 ### Finish Expression
 
-Inputs: result value
+Inputs: result 
 
-Let `C` be the context of the current node runner.
-
-1. Kill all the entries in `results` whose subexpressions were
-   evaluated in a `duplicate` context. (This is why we store the
-   contexts in the `results` list).
+1. Kill all the temporary values in the `results` of the current runner.
    
 2. Pop the current runner from the `todo` stack of the current frame.
 
-3. If the `todo` stack of the current frame is not empty, 
-   push the result value paired with context `C` onto the `results`
-   of the current node runner.
+3. If the `todo` stack of the current frame is not empty, push the
+   `result` onto the `results` of the current node runner.
 
-4. Otherwise, if the `stack` of the current thread is not empty,
-   pop the current frame from the `stack` and then set the
-   `return_value` of the current runner to the result value.
+4. Otherwise, if the `stack` of the current thread is not empty, pop
+   the current frame from the `stack` and then set the `return_value`
+   of the current runner to the value of the `result`.
    
-5. Otherwise, set the `result` of the current thread to the result
-   value.
+5. Otherwise, set the `return_value` of the current thread to the
+   value of the `result`.
+
 
 ### Finish Statement
 
-UNDER CONSTRUCTION
+1. Let `val` be the `return_value` of the current runner.
+
+2. Kill all the temporary values in the `results` of the current runner.
+
+3. Pop the current runner from the `todo` stack of the current frame.
+
+4. If the `todo` stack of the current frame is not empty, 
+   set the `return_value` of the current runner to `val`.
+
+5. Otherwise, if the `stack` of the current thread is not empty, pop
+   the current frame from the `stack` and then set the `return_value`
+   of the current runner to `val`.
+   
+6. Otherwise, set the `return_value` of the current thread to the `val`.
+
 
 ### Finish Definition
 
-UNDER CONSTRUCTION
+1. Kill all the temporary values in the `results` of the current runner.
+
+2. Pop the current runner from the `todo` stack of the current frame.
+
 
 ### Spawn
 
-UNDER CONSTRUCTION
+Inputs: an expression and environment
+
+1. Create a node runner with the given expression and environment,
+   with a value context and the same return mode as the current runner.
+   
+2. Create a new frame whose `todo` list just includes the new runner.
+
+3. Increment the `num_children` of this thread.
+
+4. Create a new thread whose `stack` just includes the new frame
+   and whose `parent` is the current thread.
+   
+5. Append the new thread to the `threads` of the machine.
+
+6. Return the new thread.
+
 
 ## Memory Operations
 
 ### Read
 
-Inputs: pointer, context
+Inputs: pointer
 
-UNDER CONSTRUCTION
+1. If the pointer has `0` permission, halt with an error.
+
+2. Obtain the value `val` at the pointer's `address` in memory.
+   Process the `val` and the pointer's `path` recursively as follows.
+   
+    * If the `path` is an empty list, then return `val`.
+	
+    * If the `path` is non-empty, check that `val` is a tuple
+      and halt with an error if not. Recusively process the
+      `path[0]`th element of `val` with `path[1:]`.
 
 ### Write
 
@@ -546,19 +579,16 @@ definitions.
 <parameter> ::= <binding_kind> <identifier> [: <type>]
 ```
 
-The `parameter` category is used for function parameters and other
-variable definitions (e.g. the `let` statement). (See the 
-definition of `privilege` below.) If no type annotation is present,
-the parameter is given the unknown type `?`.
+The `parameter` category is used for function parameters and variable
+definitions (e.g. the `let` statement). (See the definition of
+`binding_kind` below.) If no type annotation is present, the parameter
+is given the unknown type `?`.
 
 ```
-<privilege> ::=   | ! | @
+<binding_kind> ::=   | let | var | inout | ref
 ```
 
-The `privilege` specifies the permissions required of any argument
-value bound to the associated parameter. The notation `!` is for
-writable (fraction `1`), `@` is for no requirement (any fraction), and
-the default is readable (any fraction greater than `0`).
+If no binding kind is specified, it defaults to `let`.
 
 ```
 <initializer> ::= <expression> | <expression> of <expression>
@@ -577,7 +607,7 @@ If no percentage is specified and the context of the current node
 runner is an `AddressCtx`, then use that context's
 percentage. Otherwise use 50%.
 
-## <a name="definitions"></a>Definitions
+## <a name="definitions"></a>Definitions (program and module level)
 
 ### Constant
 
@@ -617,7 +647,16 @@ percentage. Otherwise use 50%.
 
 ## <a name="statements"></a>Statements 
 
-### Assert
+**Table of Contents**
+
+* [Assert](#assert)
+* [Block](#block)
+* [Delete](#delete)
+* [Expression](#expr) Statement
+* [If](#ifstmt) Statement
+* [Local Variable](#local) Definition
+
+### <a name="assert"></a>Assert
 
 ```
 <statement> ::= assert <expression>;
@@ -625,34 +664,13 @@ percentage. Otherwise use 50%.
 
 Evaluate the `expression` and halt the program if the result is `false`.
 
-### Assignment (Write)
-
-```
-<statement> ::= <expression> = <initializer>;
-```
-
-1. Schedule the `initializer` in a value context with duplication
-  requesting 50%.
-  
-2. Schedule the `expression` in an address context with duplication
-  requesting 100%. The result must be a pointer.
-
-3. Write the result of the initializer to the pointer.
-
-4. Finish this statement.
-
-(The order of evaluation here does not follow our usual left-to-right
- policy. Using left-to-right for assignment triggers errors in many of
- our test cases. I have not yet investigated why this is.)
-
-
-### Block
+### <a name="block"></a>Block
 
 ```
 <statement> ::= { <statement_list> }
 ```
 
-### Delete
+### <a name="delete"></a>Delete
 
 ```
 <statement> ::= delete <expression>;
@@ -664,7 +682,7 @@ Evaluate the `expression` and halt the program if the result is `false`.
 2. Deallocate the memory associated with the pointer.
 
 
-### Expression Statement
+### <a name="expr"></a>Expression Statement
 
 ```
 <statement> ::= ! <expression>;
@@ -675,7 +693,7 @@ Evaluate the `expression` for its effects and discard the result.
 (Note: the `!` is there to make the grammar unambiguous, which sucks.
 This needs work.)
 
-### If
+### <a name="ifstmt"></a>If
 
 ```
 <statement> ::= if (<expression>) <block>
@@ -685,13 +703,11 @@ This needs work.)
 ### Local Variable (Let)
 
 ```
-<statement> ::= let <parameter> = <initializer>; <statement_list>
+<statement> ::= <parameter> = <expression>; <statement_list>
 ```
 
-1. Schedule the `initializer` in the current environment, with context
-   `AddressCtx` with duplication, requesting the appropriate
-   percentage of permission corresponding to the privilege level of
-   the `parameter` (1 for writable, 1/2 for readable, 0 for none).
+1. Schedule the `expression` in the current environment, with context
+   `AddressCtx` with duplication.
 
 2. Copy the current environment and name it `body_env`.
    
@@ -755,6 +771,27 @@ requested percentage is 100%.
 ```
 
 Repeatedly execute the `block` so long as the `expression` evaluates to `true`.
+
+
+### Write (Assignment)
+
+```
+<statement> ::= <expression> = <initializer>;
+```
+
+1. Schedule the `initializer` in a value context with duplication
+  requesting 50%.
+  
+2. Schedule the `expression` in an address context with duplication
+  requesting 100%. The result must be a pointer.
+
+3. Write the result of the initializer to the pointer.
+
+4. Finish this statement.
+
+(The order of evaluation here does not follow our usual left-to-right
+ policy. Using left-to-right for assignment triggers errors in many of
+ our test cases. I have not yet investigated why this is.)
 
 
 ## <a name="expressions"></a>Expressions
