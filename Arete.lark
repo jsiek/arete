@@ -119,8 +119,6 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     |                                                   -> let
     | "var"                                             -> var
     | "inout"                                           -> inout
-    | "sink"                                            -> sink
-    | "set"                                             -> set
     | "ref"                                             -> ref
 
 parameter: binding_kind IDENT type_opt                  -> binding
