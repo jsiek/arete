@@ -242,7 +242,7 @@ class Machine:
 
     # The ref kind is not in Val. It doesn't guarantee any
     # read/write ability and it does not guarantee others
-    # won't mutate. Unline `var`, it does not consume the
+    # won't mutate. Unlike `var`, it does not consume the
     # initializing value.
     elif param.kind == 'ref':
       if not res.temporary:

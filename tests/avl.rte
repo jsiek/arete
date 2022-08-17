@@ -16,7 +16,7 @@ const none = 0/1;
 const half = 1/2;
 const all = 1/1;
 
-fun find(let key: int, ref node: node_t, ref p: node_t) -> node_t {
+fun find(let key: int, let node: node_t, ref p: node_t) -> node_t {
   if (is_null(node)) {
     return p;
   }
@@ -29,7 +29,7 @@ fun find(let key: int, ref node: node_t, ref p: node_t) -> node_t {
   return node;
 }
 
-fun gather_permission(ref node: node_t) {
+fun gather_permission(let node: node_t) {
   if (not is_null((*node)[left])) {
     node <- all of (*((*node)[left]))[parent];
   }
@@ -39,7 +39,7 @@ fun gather_permission(ref node: node_t) {
   assert permission(node) == 1/1;
 }
 
-fun scatter_permission(ref node: node_t) {
+fun scatter_permission(let node: node_t) {
   if (not is_null((*node)[left])) {
     (*((*node)[left]))[parent] <- half of node;
   }

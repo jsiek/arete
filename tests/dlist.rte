@@ -43,11 +43,7 @@ fun delete_list(var lst) {
     delete n;
   } else {
     lst[head] <- all of (*(*lst[head])[next])[prev];
-    // The `ref` variable is to allow for variables that have less
-    // than 1 permission (like `let`) but that do not guarantee
-    // immutability. Like `var` they take all the permission from
-    // their initializer, but they do not consume the initializer.
-    ref nxt = copy((*lst[head])[next]);
+    let nxt = copy((*lst[head])[next]);
     delete lst[head];
     lst[head] = nxt;
     ! delete_list(lst);
