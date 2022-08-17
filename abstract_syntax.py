@@ -759,7 +759,7 @@ class Expr(Stmt):
     exp: Exp
     __match_args__ = ("exp",)
     def __str__(self):
-        return str(self.exp) + ";"
+        return "! " + str(self.exp) + ";"
     def __repr__(self):
         return str(self)
     def free_vars(self):

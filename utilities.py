@@ -5,6 +5,8 @@ from fractions import Fraction
 from typing import Any, Optional
 from ast_base import *
 
+# flag for tracing
+
 trace = False
 
 def set_trace(b: bool):
@@ -13,6 +15,8 @@ def set_trace(b: bool):
 
 def tracing_on():
   return trace
+
+# debug mode
 
 debug_cmd = 's'
 
@@ -23,6 +27,9 @@ def set_debug_mode(cmd):
   global debug_cmd
   debug_cmd = cmd
 
+
+# flag for verbose
+
 verbose_flag = False
 
 def verbose():
@@ -31,6 +38,17 @@ def verbose():
 def set_verbose(v):
   global verbose_flag
   verbose_flag = v
+
+# flag for debugging
+
+debug_flag = False
+
+def debug():
+  return debug_flag
+
+def set_debug(v):
+  global debug_flag
+  debug_flag = v
 
   
 # Context information:

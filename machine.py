@@ -74,7 +74,7 @@ class Machine:
   return_value: Value
   pause : bool = False # for debugger control
 
-  def run(self, decls, debug):
+  def run(self, decls):
       self.main_thread = Thread([], None, None, 0)
       self.current_thread = self.main_thread
       self.threads = [self.main_thread]
@@ -87,14 +87,17 @@ class Machine:
         d.declare(env, self.memory)
       for d in reversed(decls):
         self.schedule(d, env, return_mode='-no-return-mode-')
-      self.loop(debug=False)
+      old_debug = debug()
+      set_debug(False)
+      self.loop()
+      set_debug(old_debug)
 
       self.threads = [self.main_thread]
       self.push_frame()
       loc = main.location
       call_main = Call(loc, Var(loc, 'main'), [])
       self.schedule(call_main, env, return_mode='-no-return-mode-')
-      self.loop(debug)
+      self.loop()
       if tracing_on():
           print('** finished program')
       if tracing_on():
@@ -114,7 +117,7 @@ class Machine:
                 + str(self.memory.size()))
       return self.return_value
 
-  def loop(self, debug):
+  def loop(self):
       self.pause = True
       while len(self.threads) > 0:
           t = random.randint(0, len(self.threads)-1)
@@ -137,7 +140,7 @@ class Machine:
             if tracing_on():
               print(error_header(runner.ast.location))
               print('stepping ' + repr(runner))
-            if debug and self.pause and not runner.ast.debug_skip():
+            if debug() and self.pause and not runner.ast.debug_skip():
               while True:
                 print(str(runner.ast) + '\n')
                 debug_cmd = getch()
@@ -190,9 +193,12 @@ class Machine:
   # runner is finished and register the value it produced with the
   # previous runner.
   def finish_expression(self, result: Result, location):
+      assert isinstance(result, Result)
       if self.current_runner().pause_on_finish:
           self.pause = True
-      assert isinstance(result, Result)
+          print('\t=> ' + str(result.value))
+      elif debug() and (debug_mode() == 's' or debug_mode() == 'n'):
+          print('\t=> ' + str(result.value))
       if tracing_on():
           print('finish_expression ' + str(result))
           print(self.memory)
@@ -336,9 +342,9 @@ if __name__ == "__main__":
       if 'trace' in sys.argv:
         set_trace(True)
       if 'debug' in sys.argv:
-        debug = True
+        set_debug(True)
       else:
-        debug = False
+        set_debug(False)
       p = file.read()
       decls += parse(p, False)
       
@@ -358,7 +364,7 @@ if __name__ == "__main__":
         print('**** finished type checking ****')
 
       machine = Machine(Memory(), [], None, None, None)
-      retval = machine.run(decls, debug)
+      retval = machine.run(decls)
       if expect_fail:
           print("expected failure, but didn't, returned " + str(retval))
           exit(-1)

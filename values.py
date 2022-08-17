@@ -326,9 +326,9 @@ class Closure(Value):
       
     def __str__(self):
         if verbose():
-            return self.name + '(' + ', '.join([str(ptr) for x, ptr in self.env.items()]) + ')'
+            return '<' + self.name + '>' + '(' + ', '.join([str(ptr) for x, ptr in self.env.items()]) + ')'
         else:
-            return self.name
+            return '<' + self.name + '>'
       
     def __repr__(self):
         return str(self)
