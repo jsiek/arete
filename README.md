@@ -137,7 +137,7 @@ To debug an Arete program, add the `debug` flag:
 
     python3.10 ./machine.py <filename> debug
 	
-The interpreter will process all the definitions and then pause as its
+The interpreter will process all the definitions and then pause as it is
 about to call your `main` function. You can then enter one of the
 following single-character debugger commands:
 
