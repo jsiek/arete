@@ -1265,7 +1265,7 @@ This is parsed as a call to a primitive function named `null`.
 
 1. Schedule each argument `expression`.
 
-2. Compute the result value according to `eval_prim`
+2. Compute the result value according to the function `eval_prim`
    in [primitive_operations.py](primitive_operations.py).
 
 3. If the current runner's context is address context, allocate the
