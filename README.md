@@ -712,6 +712,18 @@ percentage. Otherwise use 50%.
 <definition> ::= const <identifier> [: <type>] = <expression>;
 ```
 
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Constant Evaluation (compile-time)
+
+The occurences of `identifier` in the program are replaced by the
+result of evaluating `expression`. (See
+[const_eval.py](const_eval.py).)
+
+#### Step
+
 1. Finish this declaration.
 
 ### <a name="import"></a>Import
@@ -719,6 +731,10 @@ percentage. Otherwise use 50%.
 ```
 <definition> ::= from <expression> import <identifier_list>;
 ```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
 
 #### Declare
 
@@ -742,11 +758,18 @@ address in the current environment.
    
 3. Finish this definition.
 
+
 ### <a name="function_def"></a>Function
 
 ```
 <definition> ::= fun <identifier> (<parameter_list>) [-> <type>] [<return_mode>] <block>
 ```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
 
 1. Create a function expression AST node and schedule it in the
    current environment with value context and duplication.
@@ -762,6 +785,12 @@ address in the current environment.
 ```
 <definition> ::= module <identifier> exports <identifier_list> { <definition_list> }
 ```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
 
 1. Let `body_env` be a new empty environment.
 
@@ -789,6 +818,13 @@ address in the current environment.
 <definition> ::= type <identifier> = <type>;
 ```
 
+#### Type Checking
+
+The result of simplifying `type` is associated with `identifier` in
+the type environment.
+
+#### Step
+
 1. Finish this declaration.
 
 ### <a name="global"></a>Variable Definition
@@ -796,6 +832,12 @@ address in the current environment.
 ```
 <definition> ::= let <identifier> [: <type>] = <expression>;
 ```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
 
 1. Schedule the `expression` in a value context with duplication.
 
@@ -827,6 +869,11 @@ address in the current environment.
 <statement> ::= assert <expression>;
 ```
 
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
 1. Schedule the `expression` in the current environment with value
    context with duplication.
 
@@ -840,6 +887,12 @@ address in the current environment.
 ```
 <statement> ::= <parameter> = <expression>; <statement_list>
 ```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
 
 1. Schedule the `expression` in the current environment with address
    context and duplication.
@@ -864,6 +917,12 @@ address in the current environment.
 <statement> ::= { <statement_list> }
 ```
 
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
 1. Schedule the body in the current environment.
 
 2. Finish this statement.
@@ -874,6 +933,12 @@ address in the current environment.
 ```
 <statement> ::= delete <expression>;
 ```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
 
 1. Schedule the `expression` in the current environment with value
    context and duplication.  The result must be a pointer.
@@ -889,6 +954,12 @@ address in the current environment.
 ```
 <statement> ::= ! <expression>;
 ```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
 
 1. Schedule the `expression` in the current environment with value
    context and duplication.
@@ -908,6 +979,12 @@ This needs work.)
 The one-armed `if` is parsed into a two-armed `if` whose
 else branch is a [Pass](#pass) statement.
 
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
 To interpret a two-armed `if`: 
 
 1. Schedule the condition `expression` in the current environment with
@@ -923,6 +1000,8 @@ To interpret a two-armed `if`:
 
 ### <a name="pass"></a>Pass (Do Nothing)
 
+#### Step
+
 1. Finish this statement.
 
 ### <a name="return"></a>Return
@@ -930,6 +1009,12 @@ To interpret a two-armed `if`:
 ```
 <statement> ::= return <expression>;
 ```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
 
 1. Schedule the `expression` in the current environment with
    duplication using value or address context as specified by the
@@ -946,6 +1031,12 @@ To interpret a two-armed `if`:
 ```
 <statement> ::= <expression> <- <expression> of <expression>
 ```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
 
 1. Schedule the target `expression` in the current environment with
    value context and without duplication. The result value must be a
@@ -971,6 +1062,12 @@ To interpret a two-armed `if`:
 <statement> ::= while (<expression>) <block>
 ```
 
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
 1. Schedule the condition `expression` in the current environment
    with value context and duplication.
    
@@ -987,6 +1084,12 @@ To interpret a two-armed `if`:
 ```
 <statement> ::= <expression> = <initializer>;
 ```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
 
 1. Schedule the `initializer` in the current environment with value
   context and duplication.
@@ -1031,6 +1134,12 @@ To interpret a two-armed `if`:
 <expression> ::= & <expression>
 ```
 
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
 1. Schedule `expression` in the current environment with address
    context with duplication.
    
@@ -1071,6 +1180,10 @@ the array and finishes by accessing the last element.
 	  return last - 9;
 	}
 
+#### Type Checking
+
+UNDER CONSTRUCTION
+
 #### Step
 
 1. Schedule the size `expression` in value context with duplication.
@@ -1094,6 +1207,12 @@ the array and finishes by accessing the last element.
 ```
 <expression> ( <initializer_list> )
 ```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
 
 1. Schedule the `expression` in the current environment with value
    context and duplicaton.  The result must be a closure.
@@ -1134,6 +1253,12 @@ the array and finishes by accessing the last element.
 <expression> ::= * <expression>
 ```
 
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
 1. Schedule the `expression` in value context and with the current
    runner's duplication. The result must be a pointer
    
@@ -1161,6 +1286,12 @@ the array and finishes by accessing the last element.
 <expression> ::= fun ( <parameter_list> ) <return_mode> <block>
 ```
 
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
 The *free variables* of a function are those variables that occur
 inside `block` without an enclosing variable binding in the `block` or
 by this function's parameters.
@@ -1184,6 +1315,12 @@ by this function's parameters.
 ```
 <expression> ::= <expression> [ <expression> ]
 ```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
 
 1. Schedule the first `expression` in the current environemnt 
    in address context with the duplication specified by the current runner.
@@ -1216,6 +1353,12 @@ by this function's parameters.
 <expression> ::= <integer>
 ```
 
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
 1. If the current node runner's context is a value context, let
    `result` be the `integer`.
    
@@ -1230,6 +1373,12 @@ by this function's parameters.
 ```
 <expression> ::= <expression> . <identifier>
 ```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
 
 1. Schedule `expression` in the current environment with address
    context with duplication.
@@ -1263,10 +1412,17 @@ This is parsed as a call to a primitive function named `null`.
 <expression> ::= <prim-op> ( <expression_list> )
 ```
 
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
 1. Schedule each argument `expression`.
 
 2. Compute the result value according to the function `eval_prim`
-   in [primitive_operations.py](primitive_operations.py).
+   in [primitive_operations.py](primitive_operations.py) with
+   the argument results and the `prim-op`.
 
 3. If the current runner's context is address context, allocate the
    result value in memory and let `result` be the new pointer. (A
@@ -1286,6 +1442,12 @@ This is parsed as a call to a primitive function named `null`.
 ```
 <expression> ::= ⟨ <initializer_list> ⟩
 ```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
 
 1. Schedule each `initializer` (left-to-right) in the current
    environment with value context with duplication.
@@ -1307,6 +1469,12 @@ This is parsed as a call to a primitive function named `null`.
 ```
 <expression> ::= <identifier>
 ```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
 
 1. If the identifier is not in the current environment, halt with an
    error.
@@ -1330,15 +1498,28 @@ This is parsed as a call to a primitive function named `null`.
 <expression> ::= spawn <expression>
 ```
 
-Evaluate the `expression` in a new thread, concurrent with the current thread.
-Immediately returns a *future* associated with the new thread.
-This *future* can later be passed to `wait` (see below the description for `await`).
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
+Evaluate the `expression` in a new thread, concurrent with the current
+thread.  Immediately returns a *future* associated with the new
+thread.  This *future* can later be passed to `wait` (see below the
+description for `await`).
 
 ### <a name="wait"></a>Wait on a Future
 
 ```
 <expression> ::= wait <expression>
 ```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
 
 The `expression` evaluates to a *future*, then the current thread
 blocks until the future's thread is finished. The result of this
