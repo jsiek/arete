@@ -1074,10 +1074,19 @@ the array and finishes by accessing the last element.
 #### Step
 
 1. Schedule the size `expression` in value context with duplication.
+   The result must be a integer, call it `n`.
 
 2. Schedule the initial `expression` in value context with duplication.
 
-3. Duplic
+3. Duplicate the initial value `n` times, taking 50% permission each time.
+   Create a tuple value whose elements are these duplicates.
+   
+4. If the current runner's context is value context, let `result`
+   be the tuple value. Otherwise, we're in address context,
+   so we allocate the tuple value in memory and let `result` be
+   the new pointer. In either case, the result is a temporary.
+
+5. Finish this expression with `result`.
 
 
 ### <a name="call"></a>Call
@@ -1121,7 +1130,22 @@ the array and finishes by accessing the last element.
 
 ### <a name="deref"></a>Dereference a Pointer
 
-UNDER CONSTRUCTION
+```
+<expression> ::= * <expression>
+```
+
+1. Schedule the `expression` in value context and with the current
+   runner's duplication. The result must be a pointer
+   
+2. If we're in value context, read from memory at the pointer and
+   duplicate it, taking the percentage according to the permission of
+   the pointer. Let `result` be the duplicate. (It's a temporary.)
+   
+3. Otherwise, we're in address context. If the pointer is a temporary,
+   let `result` be a duplicate of it. Otherwise let `result` be the pointer.
+   
+4. Finish this expression with `result`.
+
 
 ### <a name="false"></a>False Literal
 
@@ -1231,7 +1255,7 @@ by this function's parameters.
 <expression> ::= null
 ```
 
-UNDER CONSTRUCTION
+This is parsed as a call to a primitive function named `null`.
 
 ### <a name="primitive"></a>Primitive Call
 
@@ -1239,7 +1263,15 @@ UNDER CONSTRUCTION
 <expression> ::= <prim-op> ( <expression_list> )
 ```
 
-UNDER CONSTRUCTION
+1. Schedule each argument `expression`.
+
+2. Compute the result value according to `eval_prim`
+   in [primitive_operations.py](primitive_operations.py).
+
+3. If the current runner's context is address context, allocate the
+   result value in memory and let `result` be the new pointer. (A
+   temporary). Otherwise, we're in value context and let `result` be
+   the result value. (Also a temporary.)
 
 ### <a name="true"></a>True Literal
 

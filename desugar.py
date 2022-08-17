@@ -22,9 +22,9 @@ def desugar_exp(e, env):
         return e
       case Bool(b):
         return e
-      case Prim(op, args):
+      case PrimitiveCall(op, args):
         new_args = [desugar_exp(arg, env) for arg in args]
-        return Prim(e.location, op, new_args)
+        return PrimitiveCall(e.location, op, new_args)
       case Member(arg, field):
         new_arg = desugar_exp(arg, env)
         return Member(e.location, new_arg, field)

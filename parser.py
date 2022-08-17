@@ -110,7 +110,8 @@ def parse_tree_to_ast(e):
     elif e.data == 'false':
         return Bool(e.meta, False)
     elif e.data in primitive_ops:
-        return Prim(e.meta, e.data, [parse_tree_to_ast(c) for c in e.children])
+        return PrimitiveCall(e.meta, e.data,
+                             [parse_tree_to_ast(c) for c in e.children])
     elif e.data == 'tuple':
         return TupleExp(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'array':

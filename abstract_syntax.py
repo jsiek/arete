@@ -148,7 +148,7 @@ class Call(Exp):
       machine.finish_expression(Result(True, result), self.location)
 
 @dataclass
-class Prim(Exp):
+class PrimitiveCall(Exp):
     op: str
     args: List[Exp]
     __match_args__ = ("op", "args")
@@ -228,7 +228,7 @@ class Array(Exp):
         sz = runner.results[0].value
         val = runner.results[1].value
         size = to_integer(sz, self.location)
-        vals = [val.duplicate(Fraction(1,1), self.location) for i in range(0,size-1)]
+        vals = [val.duplicate(Fraction(1,2), self.location) for i in range(0,size-1)]
         vals.append(val)
         array = TupleValue(vals)
         if isinstance(runner.context, ValueCtx):

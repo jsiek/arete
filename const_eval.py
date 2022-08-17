@@ -41,7 +41,7 @@ def const_eval_prim(loc, op, args):
         right = to_number(eval_constant(args[1]), loc)
         return Frac(loc, Fraction(left, right))
     case _:
-        return Prim(loc, op, args)
+        return PrimitiveCall(loc, op, args)
   
 def const_eval_exp(e, env):
     match e:
@@ -63,7 +63,7 @@ def const_eval_exp(e, env):
         return e
       case Bool(b):
         return e
-      case Prim(op, args):
+      case PrimitiveCall(op, args):
         new_args = [const_eval_exp(arg, env) for arg in args]
         return const_eval_prim(e.location, op, new_args)
       case Member(arg, field):

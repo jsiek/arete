@@ -263,7 +263,7 @@ def type_check_exp(e, env):
         return RationalType(e.location)
       case Bool(b):
         return BoolType(e.location)
-      case Prim(op, args):
+      case PrimitiveCall(op, args):
         arg_types = [type_check_exp(arg, env) for arg in args]
         return type_check_prim(e.location, op, arg_types)
       case Member(arg, field):
