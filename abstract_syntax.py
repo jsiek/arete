@@ -228,7 +228,7 @@ class Array(Exp):
         sz = runner.results[0].value
         val = runner.results[1].value
         size = to_integer(sz, self.location)
-        vals = [val.duplicate(Fraction(1,2), self.location) for i in range(0,size-1)]
+        vals = [val.duplicate(Fraction(1,1), self.location) for i in range(0,size-1)]
         vals.append(val)
         array = TupleValue(vals)
         if isinstance(runner.context, ValueCtx):
@@ -854,7 +854,7 @@ class Block(Stmt):
 # Declarations
     
 @dataclass
-class Global(Exp):
+class Global(Decl):
   name: str
   type_annot: Type
   rhs: Exp
@@ -893,7 +893,7 @@ class ConstantDef(Exp):
     return set([var.ident])
 
 @dataclass
-class TypeDef(Exp):
+class TypeAlias(Decl):
   name: str
   type: Type
   __match_args__ = ("name", "type")
@@ -949,7 +949,7 @@ class ModuleDef(Decl):
     if runner.state == 0:
       runner.body_env = {}
       for d in self.body:
-        declare_decl(d, runner.body_env, machine.memory)
+        d.declare(runner.body_env, machine.memory)
     if runner.state < len(self.body):
       machine.schedule(self.body[runner.state], runner.body_env)
     else:
@@ -967,11 +967,18 @@ class Import(Decl):
   module: Exp
   imports: List[str]
   __match_args__ = ("module", "imports")
+  
   def __str__(self):
     return 'from ' + str(self.module) + ' import ' \
         + ', '.join(im for im in self.imports) + ';'
+
   def __repr__(self):
     return str(self)
+
+  def declare(self, env, mem):
+    for x in self.imports:
+        env[x] = mem.allocate(Void())
+      
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.module, runner.env, AddressCtx())
@@ -994,15 +1001,6 @@ class Import(Decl):
       if tracing_on():
           print('** finish import is complete')
       
-# TODO: instead do allocation and then fill in the result -Jeremy
-def declare_decl(decl, env, mem):
-    match decl:
-      case Import(module, imports):
-        for x in imports:
-            env[x] = mem.allocate(Void())
-      case _:
-        env[decl.name] = mem.allocate(Void())
-        
 # Types
 
 @dataclass(eq=True, frozen=True)

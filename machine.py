@@ -72,7 +72,7 @@ class Machine:
       for d in decls:
         if isinstance(d, Function) and d.name == 'main':
           main = d
-        declare_decl(d, env, self.memory)
+        d.declare(env, self.memory)
       for d in reversed(decls):
         self.schedule(d, env, return_mode='-no-return-mode-')
       self.loop()

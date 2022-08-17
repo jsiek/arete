@@ -139,8 +139,8 @@ def desugar_decl(decl, env):
       case ConstantDef(name, type_annot, rhs):
         new_rhs = desugar_exp(rhs, env)
         return ConstantDef(decl.location, name, type_annot, new_rhs)
-      case TypeDef(name, type):
-        return TypeDef(decl.location, name, type)
+      case TypeAlias(name, type):
+        return TypeAlias(decl.location, name, type)
       case Global(name, ty, rhs):
         new_rhs = desugar_exp(rhs, env)
         return Global(decl.location, name, ty, new_rhs)

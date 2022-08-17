@@ -638,11 +638,24 @@ A *program* is a list of zero or more definitions:
 <definition_list> ::=   | <definition> <definition_list>
 ```
 
-Program execution begins with a call to the function named `main` with
-no arguments. Once the execution of `main` is finished, the program
-exits with the return value of `main` provided memory is empty. If
-memory is non-empty, then the program halts with an error. If there
-is no such `main` function, the program halts with an error.
+Program execution begins with invoking `declare` on every definition.
+For most definitions, this allocates an empty cell in memory and
+associates the name of the definition with its address. Exceptions to
+this behavior are discussed with the description of the particular
+kind of definition. The purpose of this first phase is to enable
+recursive definitions.
+
+Execution then proceeds to interpret each definition by invoking its
+`step` method. We discuss what `step` does for each kind of definition
+below.
+
+Once all the definitions have been interpreted, the machine calls the
+function named `main` with no arguments. Once the execution of `main`
+is finished, the program exits with the return value of `main`,
+provided memory is empty. If memory is non-empty, then the program
+halts with an error. If there is no such `main` function, the program
+halts with an error.
+
 
 ## <a name="auxiliary"></a>Auxiliary Syntax
 
@@ -699,11 +712,35 @@ percentage. Otherwise use 50%.
 <definition> ::= const <identifier> [: <type>] = <expression>;
 ```
 
+1. Finish this declaration.
+
 ### <a name="import"></a>Import
 
 ```
 <definition> ::= from <expression> import <identifier_list>;
 ```
+
+#### Declare
+
+The `declare` method of an import allocates an empty cell in memory
+for each name being imported, and associates the name with the cell's
+address in the current environment.
+
+#### Step
+
+1. Schedule the `expression` in the current environment with address context
+  and duplication.
+  
+2. Read from memory at the resulting pointer, which must produce a module. 
+   For each of the names in the `identifier_list` of the import, 
+   check whether it is in the module's exports and halt with an error
+   if it is not. Otherwise, read from memory using the pointer associated
+   with the name in the export environment of the module. Then duplicate
+   the value, taking the percentage of the pointer's permission.
+   Write the duplicated value to memory, using the pointer associated
+   with the name in the current environment.
+   
+3. Finish this definition.
 
 ### <a name="function_def"></a>Function
 
@@ -711,11 +748,40 @@ percentage. Otherwise use 50%.
 <definition> ::= fun <identifier> (<parameter_list>) [-> <type>] [<return_mode>] <block>
 ```
 
+1. Create a function expression AST node and schedule it in the
+   current environment with value context and duplication.
+   
+2. Write the resulting value to memory at the address associated with
+   the function's name in the current environment.
+
+3. Finish this definition.
+
+
 ### <a name="module"></a>Module
 
 ```
 <definition> ::= module <identifier> exports <identifier_list> { <definition_list> }
 ```
+
+1. Let `body_env` be a new empty environment.
+
+2. Invoke the `declare` method on each definition in the module,
+   with the `body_env`.
+   
+3. Schedule each definition in the module with the `body_env`.
+
+4. For each identifier in the list of exports, check that
+   there is an entry in `body_env`.
+   
+4. Create a module value. It's `exports` environment maps each name in
+   the module's export list to the pointer for that name in
+   `body_env`. The `members` environment of the module is `body_env`.
+
+5. Write the module value to the address associated with its name in
+   the current environment.
+   
+6. Finish this definition.
+
 
 ### <a name="type_alias"></a>Type Alias
 
@@ -723,11 +789,21 @@ percentage. Otherwise use 50%.
 <definition> ::= type <identifier> = <type>;
 ```
 
+1. Finish this declaration.
+
 ### <a name="global"></a>Variable Definition
 
 ```
 <definition> ::= let <identifier> [: <type>] = <expression>;
 ```
+
+1. Schedule the `expression` in a value context with duplication.
+
+2. Write the resulting value to memory using the pointer associated
+   with `identifier` in the current environment.
+   
+3. Finish this definition.
+
 
 ## <a name="statements"></a>Statements 
 
@@ -977,7 +1053,31 @@ To interpret a two-armed `if`:
 <expression> ::= [ <expression> of <expression> ]
 ```
 
-UNDER CONSTRUCTION
+#### Example
+
+The following program creates an array `a` of length `10` that is
+initialized with `0`. It then writes the integers `0` through `9` in
+the array and finishes by accessing the last element.
+
+	fun main() {
+	  let n = 10;
+	  var a = [n of 0];
+	  var i = 0;
+	  while (i < len(a)) {
+		a[i] = i;
+		i = i + 1;
+	  }
+	  let last = a[9];
+	  return last - 9;
+	}
+
+#### Step
+
+1. Schedule the size `expression` in value context with duplication.
+
+2. Schedule the initial `expression` in value context with duplication.
+
+3. Duplic
 
 
 ### <a name="call"></a>Call

@@ -223,9 +223,9 @@ def parse_tree_to_ast(e):
                             parse_tree_to_type_annot(e.children[1]),
                             parse_tree_to_ast(e.children[2]))
     elif e.data == 'type_definition':
-        return TypeDef(e.meta,
-                        str(e.children[0].value),
-                        parse_tree_to_type_annot(e.children[1]))
+        return TypeAlias(e.meta,
+                         str(e.children[0].value),
+                         parse_tree_to_type_annot(e.children[1]))
     elif e.data == 'function':
         return Function(e.meta,
                         str(e.children[0].value),

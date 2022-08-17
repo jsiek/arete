@@ -178,8 +178,8 @@ def const_eval_decl(decl, env):
           error(decl.location, 'right-hand side must be a constant, not '
                 + str(rhs))
         return []
-      case TypeDef(name, type):
-        return [TypeDef(decl.location, name, type)]
+      case TypeAlias(name, type):
+        return [TypeAlias(decl.location, name, type)]
       case Global(name, type_annot, rhs):
         new_rhs = const_eval_exp(rhs, env)
         return [Global(decl.location, name, type_annot, new_rhs)]

@@ -471,7 +471,7 @@ def declare_decl(decl, env):
               env[x] = mod.member_types[x]
         else:
           error(decl.location, "in import, expected a module, not " + str(mod))
-      case TypeDef(name, type):
+      case TypeAlias(name, type):
         env[name] = simplify(type, env)
       case _:
         env[decl.name] = typeof_decl(decl, env)
@@ -498,7 +498,7 @@ def type_check_decl(decl, env):
       # TODO
       pass
 
-    case TypeDef(name, type):
+    case TypeAlias(name, type):
       pass
       
     

@@ -5,28 +5,12 @@ from typing import Any
 from ast_base import Stmt
 from utilities import *
 
-@dataclass
-class Value:
-    def node_name(self):
-        return str(self)
-    def node_label(self):
-        return str(self)
-
 # Result of an expression
 # includes the result value and whether it's a temporary. 
 @dataclass
 class Result:
     temporary: bool
     value: Value
-
-@dataclass
-class Void(Value):
-  def kill(self, mem, loc, progress=set()):
-    pass
-  def clear(self, mem, loc, progress=set()):
-    pass
-  def duplicate(self, percentage, location):
-    pass
 
 @dataclass
 class Number(Value):
