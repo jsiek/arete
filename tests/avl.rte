@@ -16,7 +16,7 @@ const none = 0/1;
 const half = 1/2;
 const all = 1/1;
 
-fun find(let key: int, let node: node_t, ref p: node_t) -> node_t {
+fun find(let key: int, let node: node_t, var p: node_t) -> node_t {
   if (is_null(node)) {
     return p;
   }
@@ -70,7 +70,7 @@ fun insert(let key: int, inout tree: tree_t) {
   if (is_null(*tree)) {
     *tree = &⟨key, null, null, null, 0⟩;
   } else {
-    ref node: node_t = find(key, *tree, null);
+    var node: node_t = find(key, *tree, null);
     if (key < (*node)[data]) {
       var new_node = &⟨key, null, null, null, 0⟩;
       ! gather_permission(node);
