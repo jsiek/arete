@@ -228,6 +228,7 @@ A pointer includes the following fields:
 * `permission` (fraction)
 * `lender` (another pointer, optional)
 * `kill_when_zero` (a Boolean)
+* `no_give_backs` (a Boolean)
 
 If the value at `address` in memory is a tuple, then the `path`
 specifies which part of the tuple this pointer is referring to.
@@ -244,8 +245,12 @@ If the pointer is a copy of another pointer, then its `lender` is that
 other pointer.
 
 If the `kill_when_zero` flag is set to true, then the pointer is
-killed when its `permission` reaches zero. This flag is needed for
-`let` variables.
+killed when its `permission` reaches zero. This used for `let`
+variables.
+
+The if `no_give_backs` flag is set to true, then when the pointer is
+killed, it does not give its permissions back to its ender (as it
+normally would). This is used for `var` variables.
 
 A *null* pointer is a pointer whose `address` is `None`.
 
