@@ -16,7 +16,7 @@ const none = 0/1;
 const half = 1/2;
 const all = 1/1;
 
-fun find(let key: int, let node: node_t, var p: node_t) -> node_t {
+fun find(let key: int, let node: node_t, ref p: node_t) -> node_t {
   if (is_null(node)) {
     return p;
   }
@@ -96,11 +96,12 @@ fun delete_node(var node: node_t) {
 }
 
 fun delete_tree(var tree: tree_t) {
-  ! delete_node(*tree);
+  ! delete_node(copy(*tree));
+  delete tree;
 }
 
 fun main() {
-  var tree = &null;
+  var tree : tree_t = &null;
   ! insert(5, tree);
   ! insert(10, tree);
   ! insert(1, tree);

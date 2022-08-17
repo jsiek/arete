@@ -14,6 +14,15 @@ def set_trace(b: bool):
 def tracing_on():
   return trace
 
+debug_cmd = 's'
+
+def debug_mode():
+  return debug_cmd
+
+def set_debug_mode(cmd):
+  global debug_cmd
+  debug_cmd = cmd
+
 # Context information:
 # do you want value or address of the expression? (i.e. rvalue/lvalue)
 
@@ -69,3 +78,22 @@ def readable(frac):
 
 def none(frac):
     return frac == Fraction(0, 1)
+
+def getch():
+    import termios
+    import sys, tty
+    def _getch():
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(fd)
+            ch = sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        return ch
+    return _getch()  
+
+def print_dict(dict):
+  for (k,v) in dict.items():
+    print(str(k) + ': ' + str(v))
+  print()

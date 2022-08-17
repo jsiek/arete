@@ -113,7 +113,14 @@ class Call(Exp):
           for param, arg in zip(params, runner.args):
             machine.bind_param(param, arg, runner.body_env, self.location)
           machine.push_frame()
+          if machine.current_thread.pause_on_call:
+              machine.pause = True
+              machine.current_thread.pause_on_call = False
           machine.schedule(body, runner.body_env, return_mode=ret_mode)
+          if debug_mode() == 'n':
+              if machine.pause:
+                  machine.pause = False
+                  runner.pause_on_finish = True
         case _:
           error(self.location, 'expected function in call, not '
                 + str(runner.clos))
@@ -144,7 +151,6 @@ class Call(Exp):
                           + runner.clos.return_mode)
       else:
         error(self.location, 'unknown context ' + repr(runner.context))
-        
       machine.finish_expression(Result(True, result), self.location)
 
 @dataclass
@@ -589,15 +595,19 @@ class Seq(Stmt):
   first: Stmt
   rest: Stmt
   __match_args__ = ("first", "rest")
+  
   def __str__(self):
     if verbose:
       return str(self.first) + "\n" + str(self.rest)
     else:
       return "..."
+  
   def __repr__(self):
     return str(self)
+
   def free_vars(self):
     return self.first.free_vars() | self.rest.free_vars()
+
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.first, runner.env)
@@ -606,6 +616,9 @@ class Seq(Stmt):
     else:
       machine.finish_statement(self.location)
       machine.schedule(self.rest, runner.env)
+      
+  def debug_skip(self):
+      return True
     
 # This is meant to have the same semantics as the `let`, `var`, and
 # `inout` statement in Val.
@@ -633,15 +646,17 @@ class BindingStmt(Exp):
         runner.body_env = runner.env.copy()
         machine.bind_param(self.param, runner.results[0],
                            runner.body_env, self.arg.location)
+        # Treat binding statements special for debugging. 
+        # Pretend they finish before the body runs.
+        if runner.pause_on_finish:
+            machine.pause = True
+            runner.pause_on_finish = False
         machine.schedule(self.body, runner.body_env)
       else:
         machine.dealloc_param(self.param, runner.results[0],
                               runner.body_env, self.location)
         machine.finish_statement(self.location)
         
-# Dimitri:
-# return values are always evaluated for their rvalue
-
 @dataclass
 class Return(Stmt):
     arg: Exp
@@ -733,7 +748,10 @@ class Delete(Stmt):
         ptr = runner.results[0].value
         if not isinstance(ptr, Pointer):
           error(self.location, 'in delete, expected a pointer, not ' + str(ptr))
-        delete(ptr, machine.memory, self.location)
+        if not writable(ptr.get_permission()):
+            error(self.location, 'delete needs writable pointer, not '
+                  + str(ptr))
+        machine.memory.deallocate(ptr.get_address(), self.location, set())
         ptr.address = None
         ptr.permission = Fraction(0,1)
         machine.finish_statement(self.location)
@@ -839,18 +857,25 @@ class Pass(Stmt):
 class Block(Stmt):
     body: Exp
     __match_args__ = ("body",)
+    
     def __str__(self):
         return "{\n" + str(self.body) + "\n}"
+    
     def __repr__(self):
         return str(self)
+    
     def free_vars(self):
         return self.body.free_vars()
+    
     def step(self, runner, machine):
       if runner.state == 0:
         machine.schedule(self.body, runner.env)
       else:
         machine.finish_statement(self.location)
-    
+
+    def debug_skip(self):
+      return True
+        
 # Declarations
     
 @dataclass

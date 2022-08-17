@@ -20,6 +20,9 @@ class Void(Value):
 @dataclass
 class AST:
     location: Meta
+    
+    def debug_skip(self):
+      return False
 
 @dataclass
 class Exp(AST):

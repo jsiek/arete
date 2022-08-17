@@ -120,6 +120,7 @@ class Pointer(Value):
     permission: Fraction   # none is 0, read is 1/n, write is 1/1
     lender: Value          # who this pointer borrowed from, if any
     kill_when_zero: bool = False # kill when permission goes to zero (let-bound)
+    no_give_backs: bool = False  # (var-bound)
     
     __match_args__ = ("address", "path", "permission")
 
@@ -233,13 +234,13 @@ class Pointer(Value):
           print('kill: ' + str(self) + ' ignoring ' + str(progress))
         if self.lender is None:
             if self.permission == Fraction(1,1):
-              delete(self, mem, location, progress)
+              mem.deallocate(self.get_address(), location, progress)
             elif self.permission == Fraction(0,1):
               pass # OK, someone else will delete
             else:
               error(location, 'memory leak, killing pointer'
                     + ' without lender ' + str(self))
-        else:
+        elif not self.no_give_backs:
             self.lender.permission += self.permission
             if tracing_on():
               print('returned ' + str(self.permission)
@@ -397,13 +398,6 @@ def to_boolean(val, location):
         return value
       case _:
         error(location, 'expected a boolean, not ' + str(val))
-
-def delete(ptr, mem, location, progress=set()):
-    match ptr:
-      case Pointer(addr, path, priv):
-        if not writable(priv):
-            error(location, 'delete needs writable pointer, not ' + str(ptr))
-        mem.deallocate(addr, location, progress)
 
 def delete_env(label, env, mem, loc):
   changed = True

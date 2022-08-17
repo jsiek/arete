@@ -42,6 +42,7 @@ class NodeRunner:
     return_mode: str     # value or address
     context: Context     # rvalue/lvalue/etc.
     env: dict[str,Pointer]
+    pause_on_finish : bool = False # for debugger control
     
 @dataclass
 class Frame:
@@ -53,6 +54,15 @@ class Thread:
     return_value: Value        # None if not finished
     parent: Any
     num_children: int
+    pause_on_call: bool = False # for debugger control
+
+debug_commands = set(['e',  # print environment
+                      'm',  # print memory
+                      'n',  # next subexpression (don't dive into functions)
+                      's',  # step subexpression (dive into functions)
+                      'f',  # finish this AST node
+                      'd',  # dive into this function call
+                      'q']) # quit
     
 @dataclass
 class Machine:
@@ -61,8 +71,9 @@ class Machine:
   current_thread: Thread
   main_thread: Thread
   return_value: Value
+  pause : bool = False # for debugger control
 
-  def run(self, decls):
+  def run(self, decls, debug):
       self.main_thread = Thread([], None, None, 0)
       self.current_thread = self.main_thread
       self.threads = [self.main_thread]
@@ -75,14 +86,14 @@ class Machine:
         d.declare(env, self.memory)
       for d in reversed(decls):
         self.schedule(d, env, return_mode='-no-return-mode-')
-      self.loop()
+      self.loop(debug=False)
 
       self.threads = [self.main_thread]
       self.push_frame()
       loc = main.location
       call_main = Call(loc, Var(loc, 'main'), [])
       self.schedule(call_main, env, return_mode='-no-return-mode-')
-      self.loop()
+      self.loop(debug)
       if tracing_on():
           print('** finished program')
       if tracing_on():
@@ -102,7 +113,8 @@ class Machine:
                 + str(self.memory.size()))
       return self.return_value
 
-  def loop(self):
+  def loop(self, debug):
+      self.pause = True
       while len(self.threads) > 0:
           t = random.randint(0, len(self.threads)-1)
           self.current_thread = self.threads[t]
@@ -124,6 +136,32 @@ class Machine:
             if tracing_on():
               print(error_header(runner.ast.location))
               print('stepping ' + repr(runner))
+            if debug and self.pause and not runner.ast.debug_skip():
+              while True:
+                print(str(runner.ast) + '\n')
+                debug_cmd = getch()
+                if not (debug_cmd in debug_commands):
+                  print(debug_cmd
+                        + ' is not a valid debugger command, try s or n')
+                if debug_cmd == 'q': # quit
+                  exit(-1)
+                elif debug_cmd == 'e':
+                  print_dict(runner.env)
+                  continue
+                elif debug_cmd == 'm':
+                  print_dict(machine.memory.memory)
+                  continue
+                elif debug_cmd == 'f':
+                  machine.pause = False
+                  runner.pause_on_finish = True
+                  break
+                elif debug_cmd == 'd':
+                  machine.pause = False
+                  machine.current_thread.pause_on_call = True
+                  break
+                else:
+                  break
+              set_debug_mode(debug_cmd)
             runner.ast.step(runner, self)
             if tracing_on() and len(frame.todo) > 0:
               log_graphviz('top', self.current_runner().env, self.memory.memory)
@@ -147,6 +185,8 @@ class Machine:
   # runner is finished and register the value it produced with the
   # previous runner.
   def finish_expression(self, result: Result, location):
+      if self.current_runner().pause_on_finish:
+          self.pause = True
       assert isinstance(result, Result)
       if tracing_on():
           print('finish_expression ' + str(result))
@@ -170,6 +210,8 @@ class Machine:
   # Call finish_statement to signal that the current statement runner is done.
   # Propagates the return value if there is one.
   def finish_statement(self, location):
+      if self.current_runner().pause_on_finish:
+          self.pause = True
       val = self.current_runner().return_value
       if tracing_on():
           print('finish_statement ' + str(val))
@@ -185,6 +227,8 @@ class Machine:
         self.return_value = val
 
   def finish_definition(self, location):
+    if self.current_runner().pause_on_finish:
+        self.pause = True
     for res in self.current_runner().results:
         if res.temporary:
             res.value.kill(machine.memory, location)
@@ -239,6 +283,8 @@ class Machine:
         env[param.ident] = val.duplicate(Fraction(1,1), loc)
         if param.kind == 'var':
           val.kill(self.memory, loc)
+      if param.kind == 'var':
+          env[param.ident].no_give_backs = True
 
     # The ref kind is not in Val. It doesn't guarantee any
     # read/write ability and it does not guarantee others
@@ -270,7 +316,7 @@ class Machine:
     ptr.kill(self.memory, loc)
 
   
-flags = set(['trace', 'fail'])
+flags = set(['trace', 'fail', 'debug'])
 
 if __name__ == "__main__":
     decls = []
@@ -281,9 +327,13 @@ if __name__ == "__main__":
       file = open(filename, 'r')
       expect_fail = False
       if 'fail' in sys.argv:
-          expect_fail = True
+        expect_fail = True
       if 'trace' in sys.argv:
-          set_trace(True)
+        set_trace(True)
+      if 'debug' in sys.argv:
+        debug = True
+      else:
+        debug = False
       p = file.read()
       decls += parse(p, False)
       
@@ -303,7 +353,7 @@ if __name__ == "__main__":
         print('**** finished type checking ****')
 
       machine = Machine(Memory(), [], None, None, None)
-      retval = machine.run(decls)
+      retval = machine.run(decls, debug)
       if expect_fail:
           print("expected failure, but didn't, returned " + str(retval))
           exit(-1)
