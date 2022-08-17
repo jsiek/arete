@@ -7,6 +7,10 @@ compare_ops = { 'less': lambda x, y: x < y,
 
 def eval_prim(op, vals, machine, location):
     match op:
+      case 'breakpoint':
+        machine.pause = True
+        set_debug(True)
+        return Void()
       case 'copy':
         return vals[0].duplicate(1, location)
       case 'len':

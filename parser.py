@@ -96,7 +96,7 @@ primitive_ops = {'add', 'sub', 'mul', 'div', 'int_div', 'neg',
                  'null', 'is_null', 'len', 'split', 'join',
                  'equal', 'not_equal',
                  'less', 'greater', 'less_equal', 'greater_equal',
-                 'permission', 'upgrade'}
+                 'permission', 'upgrade', 'breakpoint'}
     
 def parse_tree_to_ast(e):
     e.meta.filename = filename

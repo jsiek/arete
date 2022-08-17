@@ -63,6 +63,7 @@ debug_commands = set(['e',  # print environment
                       'f',  # finish this AST node
                       'd',  # dive into this function call
                       'v',  # toggle verbose printing
+                      'c',  # continue running the program
                       'q']) # quit
     
 @dataclass
@@ -159,6 +160,9 @@ class Machine:
                 elif debug_cmd == 'f':
                   machine.pause = False
                   runner.pause_on_finish = True
+                  break
+                elif debug_cmd == 'c':
+                  machine.pause = False
                   break
                 elif debug_cmd == 'd':
                   machine.pause = False
@@ -374,7 +378,7 @@ if __name__ == "__main__":
           print("expected failure, but didn't, returned " + str(retval))
           exit(-1)
       else:
-          if tracing_on():
+          if tracing_on() or debug():
               print('result: ' + str(retval.value))
           exit(int(retval.value))
     except Exception as ex:

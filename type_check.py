@@ -130,6 +130,9 @@ def join(ty1, ty2):
 def type_check_prim(location, op, arg_types):
     arg_types = [unfold(arg_ty) for arg_ty in arg_types]
     match op:
+      case 'breakpoint':
+        assert len(arg_types) == 0;
+        return VoidType(location)
       case 'copy':
         return arg_types[0]
       case 'len':

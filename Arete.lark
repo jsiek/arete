@@ -66,6 +66,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "join" "(" expression "," expression ")"          -> join
     | "permission" "(" expression ")"                   -> permission
     | "upgrade" "(" expression ")"                      -> upgrade
+    | "breakpoint" "(" ")"                              -> breakpoint
     | IDENT                                             -> var
     | expression_hi "[" expression "]"                  -> index
     | expression_hi "." IDENT                           -> member
