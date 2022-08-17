@@ -150,9 +150,12 @@ following single-character debugger commands:
 
 * `d` **dive** into the next function call.
 
-* `e` print the current **environment** (the in-scope variables)
+* `e` print the current **environment** (the in-scope variables).
+    Each line displays the name of the variable, the contents of the
+	variable, and the address (a pointer) of the variable.
 
-* `m` print the machine's **memory**
+* `m` print the machine's **memory**. Each line displays the address
+    (an integer) followed by the value stored at that address.
 
 * `v` toggle **verbose** printing
 

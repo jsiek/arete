@@ -151,7 +151,7 @@ class Machine:
                 if debug_cmd == 'q': # quit
                   exit(-1)
                 elif debug_cmd == 'e':
-                  print_dict(runner.env)
+                  self.print_env(runner.env, runner.ast.location)
                   continue
                 elif debug_cmd == 'm':
                   print_dict(machine.memory.memory)
@@ -326,6 +326,11 @@ class Machine:
     #   ptr.transfer(Fraction(1,1), arg.value, loc)
     ptr.kill(self.memory, loc)
 
+  def print_env(self, env, loc):
+    for (k,ptr) in env.items():
+      val = machine.memory.read(ptr, loc)
+      print(str(k) + ':\t' + str(val) + '\t\t\t' + str(ptr))
+    print()
   
 flags = set(['trace', 'fail', 'debug'])
 
