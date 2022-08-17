@@ -267,7 +267,8 @@ pointer in the chain of pointers obtain by following the `lender`
 fields starting with pointer `P`.
 
 1. If the pointer has a living lender, then transfer all of this
-   pointer's permission to the living lender.
+   pointer's permission to the living lender. (Unless the
+   `no_give_backs` flag is set to true.)
    
 2. If the pointer does not have a living lender
 
@@ -585,6 +586,9 @@ Inputs: `parameter`, `result`, `environment`
     b. If the `result` is not a temporary, update the `environment` to
 	   associate the parameter's identifier with a duplicate of the
 	   value of the result, taking 100% of its permission.
+	   
+    c. If the `parameter` is a `var`, set the `no_give_backs` flag to
+	   true on the pointer that just added to the `environment`.
 
 5. Otherwise, if the `parameter` is a `ref` and `result` is not a
    temporary, update the `environment` to associate the parameter's
