@@ -15,7 +15,7 @@ It currently includes
 
 * modules
 
-and there are plans to add:
+and I plan to add:
 
 * static tracking of fractional permissions
 
