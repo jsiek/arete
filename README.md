@@ -121,6 +121,44 @@ The `x` goes to 0 permission on the assignment `x[1] = &x`, so when
 So this program halts with an error.
 
 
+# Running and Debugging Arete Programs
+
+To run an Arete program, run [machine.py](machine.py) on `python3.10`
+with the file name of the Arete program:
+
+    python3.10 ./machine.py <filename>
+
+The result of the program is in the exit code. So the following
+shell command will display it:
+
+    echo $?
+
+To debug an Arete program, add the `debug` flag:
+
+    python3.10 ./machine.py <filename> debug
+	
+The interpreter will process all the definitions and then pause as its
+about to call your `main` function. You can then enter one of the
+following single-character debugger commands:
+
+* `f` evaluate until the current AST node is **finished**.
+
+* `n` evaluate to the **next** subexpression, but don't dive into
+  function calls.
+
+* `s` **step** to the next subexpression, diving into function calls.
+
+* `d` **dive** into the next function call.
+
+* `e` print the current **environment** (the in-scope variables)
+
+* `m` print the machine's **memory**
+
+* `v` toggle **verbose** printing
+
+* `q` **quit**
+
+
 # Specification 
 
 This is the current specification of the Arete language.

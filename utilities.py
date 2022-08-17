@@ -23,6 +23,16 @@ def set_debug_mode(cmd):
   global debug_cmd
   debug_cmd = cmd
 
+verbose_flag = False
+
+def verbose():
+  return verbose_flag
+
+def set_verbose(v):
+  global verbose_flag
+  verbose_flag = v
+
+  
 # Context information:
 # do you want value or address of the expression? (i.e. rvalue/lvalue)
 

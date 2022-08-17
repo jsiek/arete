@@ -7,8 +7,6 @@ from values import *
 from memory import *
 from primitive_operations import eval_prim, compare_ops
 
-verbose = False
-
 # Parameters
 
 @dataclass(frozen=True)
@@ -518,7 +516,7 @@ class BindingExp(Exp):
     body: Exp
     __match_args__ = ("param", "arg", "body")
     def __str__(self):
-      if verbose:
+      if verbose():
         return str(self.param) + " = " + str(self.arg) + ";\n" \
             + str(self.body)
       else:
@@ -597,7 +595,7 @@ class Seq(Stmt):
   __match_args__ = ("first", "rest")
   
   def __str__(self):
-    if verbose:
+    if verbose():
       return str(self.first) + "\n" + str(self.rest)
     else:
       return "..."
@@ -629,7 +627,7 @@ class BindingStmt(Exp):
     body: Stmt
     __match_args__ = ("param", "arg", "body")
     def __str__(self):
-      if verbose:
+      if verbose():
         return str(self.param) + " = " + str(self.arg) + ";\n" \
             + str(self.body)
       else:
@@ -798,7 +796,7 @@ class IfStmt(Stmt):
     els: Stmt
     __match_args__ = ("cond", "thn", "els")
     def __str__(self):
-      if verbose:
+      if verbose():
         return "if " + "(" + str(self.cond) + ") " + str(self.thn) \
             + " else " + str(self.els)
       else:

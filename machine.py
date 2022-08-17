@@ -62,6 +62,7 @@ debug_commands = set(['e',  # print environment
                       's',  # step subexpression (dive into functions)
                       'f',  # finish this AST node
                       'd',  # dive into this function call
+                      'v',  # toggle verbose printing
                       'q']) # quit
     
 @dataclass
@@ -142,7 +143,8 @@ class Machine:
                 debug_cmd = getch()
                 if not (debug_cmd in debug_commands):
                   print(debug_cmd
-                        + ' is not a valid debugger command, try s or n')
+                        + ' is not a valid debugger command, try one of\n'
+                        + str(debug_commands))
                 if debug_cmd == 'q': # quit
                   exit(-1)
                 elif debug_cmd == 'e':
@@ -159,6 +161,9 @@ class Machine:
                   machine.pause = False
                   machine.current_thread.pause_on_call = True
                   break
+                elif debug_cmd == 'v':
+                  set_verbose(not verbose())
+                  continue
                 else:
                   break
               set_debug_mode(debug_cmd)

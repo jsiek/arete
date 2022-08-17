@@ -151,14 +151,18 @@ class Pointer(Value):
         return str(path[0]) + '.' + self.path_str(path[1:])
 
     def __str__(self):
-        self.lender = find_lender(self.lender)
         if self.address is None:
           return 'null'
-        return "ptr(" + str(self.address) + '.' + self.path_str(self.path) \
-          + "@" + priv_str(self.permission) \
-          + "(" + short_id(self) + ")" \
-          + ("->" + short_id(self.lender) if not self.lender is None else "") \
-          + ")"
+        if verbose():
+            return "ptr(" + str(self.address) + '.' + self.path_str(self.path) \
+                + "@" + priv_str(self.permission) \
+                + "(" + short_id(self) + ")" \
+                + ("->" + short_id(self.lender) if not self.lender is None\
+                   else "") \
+                + ")"
+        else:
+            return 'ptr(' + str(self.address) + '.' + self.path_str(self.path) \
+                + ' @ ' + priv_str(self.permission) + ')'
       
     def __repr__(self):
         return str(self)
@@ -321,7 +325,10 @@ class Closure(Value):
         ptr.kill(mem, location, progress)
       
     def __str__(self):
-        return self.name + '(' + ', '.join([str(ptr) for x, ptr in self.env.items()]) + ')'
+        if verbose():
+            return self.name + '(' + ', '.join([str(ptr) for x, ptr in self.env.items()]) + ')'
+        else:
+            return self.name
       
     def __repr__(self):
         return str(self)
