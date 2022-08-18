@@ -159,7 +159,7 @@ following single-character debugger commands:
 
 * `g` output a **graphviz** dot file (named `logs/env_mem_nnn.dot`)
       that represents the environment and memory as a graph. You can
-      then use [https://graphviz.org/](graphviz) to generate a PDF.
+      then use [graphviz](https://graphviz.org/) to generate a PDF.
 
 * `v` toggle **verbose** printing
 
