@@ -124,6 +124,9 @@ class Pointer(Value):
     
     __match_args__ = ("address", "path", "permission")
 
+    def get_kill_when_zero(self):
+        return self.kill_when_zero
+    
     def get_address(self):
         return self.address
 
@@ -187,15 +190,17 @@ class Pointer(Value):
                 + '@' + str(self.permission)
 
     def transfer(self, percent, source, location):
-        if not isinstance(source, Pointer):
+        if not (isinstance(source, Pointer) \
+                or isinstance(source, PointerOffset)):
             error(location, "in transfer, expected pointer, not " + str(source))
-        if self.address != source.address:
+        if self.address != source.get_address():
             error(location, "cannot transfer between different addresses: "
                   + str(self.address) + " != " + str(source.address))
-        amount = source.permission * percent
-        source.permission -= amount
-        if source.kill_when_zero and source.permission <= Fraction(0,1):
-            source.address = None
+        amount = source.get_permission() * percent
+        source.set_permission(source.get_permission() - amount)
+        if source.get_kill_when_zero() \
+           and source.get_permission() <= Fraction(0,1):
+            source.set_address(None)
         self.permission += amount
         if tracing_on():
           print('transferred ' + str(amount) + ' from ' + str(source) + ' to '
@@ -240,7 +245,7 @@ class Pointer(Value):
         self.lender = find_lender(self.lender)
         if tracing_on():
           print('kill: ' + str(self) + ' ignoring ' + str(progress))
-        if self.lender is None:
+        if self.lender is None or self.no_give_backs:
             if self.permission == Fraction(1,1):
               mem.deallocate(self.get_address(), location, progress)
             elif self.permission == Fraction(0,1):
@@ -248,7 +253,7 @@ class Pointer(Value):
             else:
               error(location, 'memory leak, killing pointer'
                     + ' without lender ' + str(self))
-        elif not self.no_give_backs:
+        else:
             self.lender.permission += self.permission
             if tracing_on():
               print('returned ' + str(self.permission)
@@ -270,6 +275,9 @@ class PointerOffset(Value):
     ptr: Pointer
     offset: int
 
+    def get_kill_when_zero(self):
+        return self.ptr.get_kill_when_zero()
+    
     def get_pointer(self):
         return self.ptr.get_pointer()
     
@@ -301,6 +309,9 @@ class PointerOffset(Value):
         # TODO: change to just kill the part
         # kill the whole thing
         self.ptr.kill(mem, loc)
+        
+    def upgrade(self, location):
+        return self.ptr.upgrade(location)
         
 @dataclass
 class Closure(Value):

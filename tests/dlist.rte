@@ -43,7 +43,7 @@ fun delete_list(var lst) {
     delete n;
   } else {
     lst[head] <- all of (*(*lst[head])[next])[prev];
-    let nxt = copy((*lst[head])[next]);
+    var nxt = copy((*lst[head])[next]);
     delete lst[head];
     lst[head] = nxt;
     ! delete_list(lst);

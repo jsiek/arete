@@ -294,7 +294,10 @@ class Machine:
       error(loc, 'for binding, expected a pointer, not ' + str(val))
     if res.temporary:
       # what if val is a PointerOffset??
-      env[param.ident] = val
+      if param.kind == 'let':
+        env[param.ident] = val.duplicate(Fraction(1,2), loc)
+      else:
+        env[param.ident] = val
 
     if param.kind == 'let':
       if (not val.get_address() is None) \
@@ -306,7 +309,8 @@ class Machine:
       env[param.ident].kill_when_zero = True
 
     elif param.kind == 'var' or param.kind == 'inout':
-      if val.get_permission() != Fraction(1,1):
+      success = val.upgrade(loc)
+      if not success:
         error(loc, param.kind + ' binding requires permission 1/1, not '
               + str(val))
       if not res.temporary:
@@ -332,7 +336,7 @@ class Machine:
       if ptr.permission != Fraction(1,1):
           error(loc, 'failed to restore inout variable '
                 + 'to full\npermission by the end of its scope')
-      if source.address is None:
+      if source.get_address() is None:
           error(loc, "inout can't return ownership because"
                 + " previous owner died")
       ptr.transfer(Fraction(1,1), source, loc)
@@ -366,6 +370,7 @@ if __name__ == "__main__":
         expect_fail = True
       if 'trace' in sys.argv:
         set_trace(True)
+        set_verbose(True)
       if 'debug' in sys.argv:
         set_debug(True)
       else:
@@ -384,7 +389,7 @@ if __name__ == "__main__":
       print(decls)
       print()
     try:
-      type_check_decls(decls, {})
+      #type_check_decls(decls, {})
       if tracing_on():
         print('**** finished type checking ****')
 

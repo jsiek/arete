@@ -440,7 +440,8 @@ def type_check_statement(s, env):
       case Block(body):
         return type_check_statement(body, env)
       case _:
-        error(s.location, 'error in type_check_statement, unhandled: ' + repr(s)) 
+        error(s.location, 'error in type_check_statement, unhandled: '
+              + repr(s))
 
 def typeof_decl(decl, env):
   match decl:
@@ -460,7 +461,9 @@ def typeof_decl(decl, env):
     case _:
       error(decl.location, 'error in typeof_decl, unhandled: ' + str(decl))
   return ret
-    
+
+# This function is responsible for collecting up the declared types
+# of the declarations and 
 def declare_decl(decl, env):
     match decl:
       case Import(module, imports):
@@ -483,7 +486,11 @@ def type_check_decl(decl, env):
   match decl:
     case Global(name, ty, rhs):
       rhs_type = type_check_exp(rhs, env)
-      # TODO
+      type_annot = simplify(ty, env)
+      if not consistent(rhs_type, type_annot):
+        error(decl.location, 'type of initializer ' + str(rhs_type) + '\n'
+              + ' is inconsistent with declared type ' + str(type_annot))
+      
     case Function(name, params, ret_ty, ret_mode, body):
       ret_ty = simplify(ret_ty, env)
       body_env = env.copy()
@@ -491,25 +498,30 @@ def type_check_decl(decl, env):
           body_env[p.ident] = simplify(p.type_annot, env)
       body_type = type_check_statement(body, body_env)
       if not consistent(body_type, ret_ty):
-        error(decl.location, 'return type mismatch:\n' + str(ret_ty) + ' inconsistent with '
-              + str(body_type))
+        error(decl.location, 'return type mismatch:\n' + str(ret_ty)
+              + ' inconsistent with ' + str(body_type))
       
     case ModuleDef(name, exports, body):
-      type_check_decls(body, env)
+      body_env = env.copy()
+      for d in body:
+        declare_decl(d, body_env, members)
+      for d in body:
+        type_check_decl(d, body_env)
 
     case Import(module, imports):
-      # TODO
+      # the checking was done in declare_decl 
       pass
 
     case TypeAlias(name, type):
+      # the work was done in declare_decl 
       pass
       
     
 def type_check_decls(decls, env):
     body_env = env.copy()
     for d in decls:
-      declare_decl(d, body_env)
+      declare_decl(d, body_env, body_env)
     for d in decls:
-      type_check_decl(d, body_env)
+      type_check_decl(d,  body_env)
         
     
