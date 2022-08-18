@@ -16,6 +16,17 @@ def set_trace(b: bool):
 def tracing_on():
   return trace
 
+# flag for debugging
+
+debug_flag = False
+
+def debug():
+  return debug_flag
+
+def set_debug(v):
+  global debug_flag
+  debug_flag = v
+
 # debug mode
 
 debug_cmd = 's'
@@ -39,16 +50,6 @@ def set_verbose(v):
   global verbose_flag
   verbose_flag = v
 
-# flag for debugging
-
-debug_flag = False
-
-def debug():
-  return debug_flag
-
-def set_debug(v):
-  global debug_flag
-  debug_flag = v
 
   
 # Context information:
@@ -88,9 +89,6 @@ def error_header(location):
                 line1=location.line, column1=location.column,
                 line2=location.end_line, column2=location.end_column)
             
-def error(location, msg):
-    raise Exception(error_header(location) + msg)
-
 def warning(location, msg):
     header = '{file}:{line1}.{column1}-{line2}.{column2}: ' \
         .format(file=location.filename,
@@ -98,6 +96,9 @@ def warning(location, msg):
                 line2=location.end_line, column2=location.end_column)
     print(header + 'warning: ' + msg)
 
+def error(location, msg):
+  raise Exception(error_header(location) + msg)
+      
 def writable(frac):
     return frac == Fraction(1, 1)
 

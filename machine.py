@@ -63,6 +63,7 @@ debug_commands = set(['e',  # print environment
                       'f',  # finish this AST node
                       'd',  # dive into this function call
                       'v',  # toggle verbose printing
+                      'g',  # output a graphviz file of memory
                       'c',  # continue running the program
                       'q']) # quit
     
@@ -143,13 +144,13 @@ class Machine:
               print('stepping ' + repr(runner))
             if debug() and self.pause and not runner.ast.debug_skip():
               while True:
-                print(str(runner.ast) + '\n')
+                print('> ' + str(runner.ast))
                 debug_cmd = getch()
                 if not (debug_cmd in debug_commands):
                   print(debug_cmd
                         + ' is not a valid debugger command, try one of\n'
                         + str(debug_commands))
-                if debug_cmd == 'q': # quit
+                elif debug_cmd == 'q': # quit
                   exit(-1)
                 elif debug_cmd == 'e':
                   self.print_env(runner.env, runner.ast.location)
@@ -168,13 +169,27 @@ class Machine:
                   machine.pause = False
                   machine.current_thread.pause_on_call = True
                   break
+                elif debug_cmd == 'g':
+                  log_graphviz('top', self.current_runner().env,
+                               self.memory.memory)
+                  continue
                 elif debug_cmd == 'v':
                   set_verbose(not verbose())
                   continue
                 else:
                   break
               set_debug_mode(debug_cmd)
-            runner.ast.step(runner, self)
+            try:
+              runner.ast.step(runner, self)
+            except Exception as ex:
+              if debug():
+                print(ex)
+                self.pause = True
+                continue
+              else:
+                new_ex = Exception(str(ex) + '\nin evaluation of\n'
+                                   + str(self.current_runner().ast))
+                raise new_ex
             if tracing_on() and len(frame.todo) > 0:
               log_graphviz('top', self.current_runner().env, self.memory.memory)
               print(machine.memory)
@@ -301,10 +316,11 @@ class Machine:
       if param.kind == 'var':
           env[param.ident].no_give_backs = True
 
-    # The ref kind is not in Val. It doesn't guarantee any
+    # The `ref` kind is not in Val. It doesn't guarantee any
     # read/write ability and it does not guarantee others
     # won't mutate. Unlike `var`, it does not consume the
-    # initializing value.
+    # initializing value. I'm not entirely sure if `ref`
+    # is needed, but it has come in handy a few times.
     elif param.kind == 'ref':
       if not res.temporary:
         env[param.ident] = val.duplicate(Fraction(1,1), loc)
@@ -325,17 +341,17 @@ class Machine:
     ptr = env[param.ident]
     if param.kind == 'inout':
       self.inout_end_of_life(ptr, arg.value, loc)
-    # TODO: get the following working
-    # if param.kind == 'let' or param.kind == 'ref':
-    #   ptr.transfer(Fraction(1,1), arg.value, loc)
     ptr.kill(self.memory, loc)
 
   def print_env(self, env, loc):
     for (k,ptr) in env.items():
-      val = machine.memory.read(ptr, loc)
+      if ptr.get_address() is None:
+        val = None
+      else:
+        val = machine.memory.raw_read(ptr.get_address(), ptr.get_path(), loc)
       print(str(k) + ':\t' + str(val) + '\t\t\t' + str(ptr))
     print()
-  
+
 flags = set(['trace', 'fail', 'debug'])
 
 if __name__ == "__main__":
@@ -386,7 +402,7 @@ if __name__ == "__main__":
             exit(0)
         else:
             print('unexpected failure')
-            if tracing_on():
+            if tracing_on() or debug():
                 raise ex
             else:
                 print(str(ex))

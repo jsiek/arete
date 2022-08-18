@@ -178,9 +178,13 @@ class Pointer(Value):
     def node_label(self):
         if self.address is None:
           return 'null'
-        return str(self.address) + '.' + self.path_str(self.path) \
-          + '@' + str(self.permission) + ' ' \
-            + '(' + str(id(self)) + ')' 
+        if verbose():
+            return str(self.address) + '.' + self.path_str(self.path) \
+                + '@' + str(self.permission) + ' ' \
+                + '(' + str(id(self)) + ')'
+        else:
+            return str(self.address) + '.' + self.path_str(self.path) \
+                + '@' + str(self.permission)
 
     def transfer(self, percent, source, location):
         if not isinstance(source, Pointer):

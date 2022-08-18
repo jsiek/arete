@@ -157,9 +157,17 @@ following single-character debugger commands:
 * `m` print the machine's **memory**. Each line displays the address
     (an integer) followed by the value stored at that address.
 
+* `g` output a **graphviz** dot file (named `logs/env_mem_nnn.dot`)
+      that represents the environment and memory as a graph. You can
+      then use [https://graphviz.org/](graphviz) to generate a PDF.
+
 * `v` toggle **verbose** printing
 
 * `q` **quit**
+
+Breakpoints can be inserted by editing the Arete program to add a call
+to the `breakpoint()` primitive function. To express a conditional
+breakpoint, place the call to `breakpoint()` inside an `if`.
 
 
 # Specification 
