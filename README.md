@@ -1587,3 +1587,5 @@ blocks until the future's thread is finished. The result of this
 # TODO
 
 [ ] Test cases for type checking failures.
+[ ] Add variants. (safe unions)
+[ ] Remove null pointers.

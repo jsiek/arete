@@ -40,28 +40,45 @@ def simplify(type: Type, env) -> Type:
       error(type.location, "in simplify, unrecognized type " + str(type))
   return ret
       
-def substitute(var: str, ty1: Type, ty2: Type) -> Type:
+def substitute(subst: dict[str, Type], ty2: Type) -> Type:
   match ty2:
     case TypeVar(name):
-      if var == name:
-        return ty1
+      if name in subst.keys():
+        return subst[name]
       else:
         return ty2
     case TupleType(ts2):
       return TupleType(ty2.location,
-                       tuple(substitute(var, ty1, elt_ty) for elt_ty in ts2))
+                       tuple(substitute(subst, elt_ty) for elt_ty in ts2))
     case PointerType(elt_ty):
-      return PointerType(ty2.location, substitute(var, ty1, elt_ty))
+      return PointerType(ty2.location, substitute(subst, elt_ty))
+    case ArrayType(elt_ty):
+      return ArrayType(ty2.location, substitute(subst, elt_ty))
+    case RecursiveType(name, ty):
+      subst2 = subst.copy()
+      subst2[name] = TypeVar(ty2.location, name)
+      return RecursiveType(ty2.location, name, substitute(subst2, ty))
+    case FunctionType(type_params, param_types, return_type):
+      subst2 = subst.copy()
+      for t in type_params:
+        subst2[t] = TypeVar(ty2.location, t)
+      params = tuple(substitute(subst2, pt) for pt in param_types)
+      ret = substitute(subst2, return_type)
+      return FunctionType(ty2.location, type_params, params, ret)
     case IntType():
       return ty2
     case BoolType():
       return ty2
+    case VoidType():
+      return ty2
+    case AnyType():
+      return ty2
     case _:
-      error(ty1.location, 'in substitute, unrecognized type ' + str(ty2))
+      error(ty2.location, 'in substitute, unrecognized type ' + str(ty2))
 
 def unfold(ty: Type) -> Type:
   if isinstance(ty, RecursiveType):
-    ret = substitute(ty.name, ty, ty.type)
+    ret = substitute({ty.name: ty}, ty.type)
     return ret
   else:
     return ty
@@ -135,39 +152,63 @@ def join(ty1: Type, ty2: Type) -> Type:
     case (_, _):
       return ty1
 
-def match(vars: tuple[str], pat_ty: Type, match_ty: Type,
-          matches: dict[str,Type]):
-  match pat_ty:
-    case TypeVar(name):
+def match_types(vars: tuple[str],
+                pat_ty: Type,
+                match_ty: Type,
+                matches: dict[str,Type],
+                assumed_consistent):
+  if tracing_on():
+    print('match\t' + str(pat_ty) + '\nwith\t' + str(match_ty)
+          + '\nin\t' + str(assumed_consistent))
+  if (pat_ty, match_ty) in assumed_consistent:
+    return True
+  match (pat_ty, match_ty):
+    case (AnyType(), _):
+      return True
+    case (_, AnyType()):
+      return True
+    case (TypeVar(name), _):
       if name in matches.keys():
-        return match(vars, matches[name], match_ty)
-    case TupleType(pat_ts):
-      match match_ty:
-        case TupleType(match_ts):
-          return all([match(vars, pt, mt, matches) \
-                      for (pt,mt) in zip(pat_ts, match_ts)])
-        case _:
-          return False
-    case PointerType(pat_elt):
-      match match_ty:
-        case PointerType(match_elt):
-            return match(vars, pt, mt, matches)
-        case _:
-          return False
-    case IntType():
-      match match_ty:
-        case IntType():
-            return True
-        case _:
-          return False
-    case BoolType():
-      match match_ty:
-        case BoolType():
-            return True
-        case _:
-          return False
+        return match_types(vars, matches[name], match_ty, assumed_consistent)
+      elif name in vars:
+        matches[name] = match_ty
+        return True
+      else:
+        match match_ty:
+          case TypeVar(other_name):
+            return name == other_name
+          case _:
+            return False
+    case (TupleType(pat_ts), TupleType(match_ts)):
+      return all([match_types(vars, pt, mt, matches, assumed_consistent) \
+                  for (pt,mt) in zip(pat_ts, match_ts)])
+    case (PointerType(pt), PointerType(mt)):
+      return match_types(vars, pt, mt, matches, assumed_consistent)
+    case (ArrayType(pt), ArrayType(mt)):
+      return match_types(vars, pt, mt, matches, assumed_consistent)
+    case (RecursiveType(X, t1), _):
+      assm = assumed_consistent | set([(pat_ty,match_ty)])
+      return match_types(vars, unfold(pat_ty), match_ty, matches, assm)
+    case (_, RecursiveType(X, t2)):
+      assm = assumed_consistent | set([(pat_ty,match_ty)])
+      return match_types(vars, pat_ty, unfold(match_ty), matches, assm)
+    case (FunctionType(tps1, pts1, rt1),
+          FunctionType(tps2, pts2, rt2)):
+      # TODO: handle type parameters
+      return all([match_types(vars, pt1, pt2, matches, assumed_consistent) \
+                  for (pt1, pt2) in zip(pts1, pts2)]) \
+             and match_types(vars, rt1, rt2, matches, assumed_consistent)
+    case (IntType(), IntType()):
+      return True
+    case (RationalType(), RationalType()):
+      return True
+    case (BoolType(), BoolType()):
+      return True
+    case (VoidType(), VoidType()):
+      return True
     case _:
-      error(pat_ty.location, 'in match, unrecognized type ' + str(pat_ty))
+      error(pat_ty.location, 'in match_types, unrecognized types:\n'
+            + str(pat_ty) + '\n' + str(match_ty))
     
 def type_check_prim(location, op, arg_types):
     arg_types = [unfold(arg_ty) for arg_ty in arg_types]
@@ -347,13 +388,22 @@ def type_check_exp(e, env):
         if tracing_on():
           print('call to function of type ' + str(fun_type))
         if isinstance(fun_type, FunctionType):
+          fun_env = env.copy()
+          for t in fun_type.type_params:
+            fun_env[t] = TypeVar(e.location, t)
+          # perform type argument deduction
+          matches = {}
           for (param_ty, arg_ty) in zip(fun_type.param_types, arg_types):
-              pt = simplify(param_ty, env)
-              if not consistent(pt, arg_ty):
+              pt = simplify(param_ty, fun_env)
+              if not match_types(fun_type.type_params, pt, arg_ty, matches,
+                                 set()):
                   error(e.location, 'in call, '
-                        + 'expected argument of type ' + str(param_ty)
+                        + 'expected type ' + str(param_ty)
                         + ' not ' + str(arg_ty))
-          return simplify(fun_type.return_type, env)
+          if tracing_on():
+            print('deduced: ' + str(matches))
+          rt = simplify(fun_type.return_type, fun_env)
+          return substitute(matches, rt)
         elif isinstance(fun_type, AnyType):
           return AnyType(e.location)
         else:

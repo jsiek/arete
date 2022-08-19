@@ -1,0 +1,5 @@
+fun id<T>(let x: T) -> T { return x; }
+
+fun main() {
+  return id(0);
+}
