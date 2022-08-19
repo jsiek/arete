@@ -445,43 +445,48 @@ def type_check_statement(s, env):
 
 def typeof_decl(decl, env):
   match decl:
-    case Global(name, ty, rhs):
-      ret = simplify(ty, env)
-    case Function(name, params, ret_ty, ret_mode, body):
-      ty = FunctionType(decl.location,
-                        tuple(p.type_annot for p in params),
-                        ret_ty)
-      ret = simplify(ty, env)
-    case ModuleDef(name, exports, body):
-      member_types = {}
-      for d in body:
-        if not isinstance(d, Import):
-          member_types[d.name] = typeof_decl(d, env)
-      ret = ModuleType(decl.location, member_types)
     case _:
       error(decl.location, 'error in typeof_decl, unhandled: ' + str(decl))
   return ret
 
-# This function is responsible for collecting up the declared types
-# of the declarations and 
-def declare_decl(decl, env):
-    match decl:
-      case Import(module, imports):
-        mod = type_check_exp(module, env)
-        mod = unfold(mod)
-        if isinstance(mod, ModuleType):
-          for x in imports:
-              if not x in mod.member_types.keys():
-                error(decl.location, "in import, no " + x
-                      + " in " + str(module))
-              env[x] = mod.member_types[x]
-        else:
-          error(decl.location, "in import, expected a module, not " + str(mod))
-      case TypeAlias(name, type):
-        env[name] = simplify(type, env)
-      case _:
-        env[decl.name] = typeof_decl(decl, env)
-    
+# This function is responsible for collecting up the declared types of
+# the declarations and adding them to the environment and to the
+# output (for members of a module).
+def declare_decl(decl, env, output):
+  match decl:
+    case Import(module, imports):
+      mod = type_check_exp(module, env)
+      mod = unfold(mod)
+      if isinstance(mod, ModuleType):
+        for x in imports:
+            if not x in mod.member_types.keys():
+              error(decl.location, "in import, no " + x
+                    + " in " + str(module))
+            env[x] = mod.member_types[x]
+            output[x] = env[x]
+      else:
+        error(decl.location, "in import, expected a module, not " + str(mod))
+    case TypeAlias(name, type):
+      env[name] = simplify(type, env)
+    case Global(name, ty, rhs):
+      env[name] = simplify(ty, env)
+      output[name] = env[name]
+    case Function(name, params, ret_ty, ret_mode, body):
+      ty = FunctionType(decl.location,
+                        tuple(p.type_annot for p in params),
+                        ret_ty)
+      env[name] = simplify(ty, env)
+      output[name] = env[name]
+    case ModuleDef(name, exports, body):
+      member_types = {}
+      for d in body:
+        declare_decl(d, env, member_types)
+      env[name] = ModuleType(decl.location, member_types)
+      output[name] = env[name]
+
+# This function is responsible for type checking the internals of the
+# definitions, such as the body of a function or the initializing
+# expression of a global variable.
 def type_check_decl(decl, env):
   match decl:
     case Global(name, ty, rhs):
@@ -490,7 +495,6 @@ def type_check_decl(decl, env):
       if not consistent(rhs_type, type_annot):
         error(decl.location, 'type of initializer ' + str(rhs_type) + '\n'
               + ' is inconsistent with declared type ' + str(type_annot))
-      
     case Function(name, params, ret_ty, ret_mode, body):
       ret_ty = simplify(ret_ty, env)
       body_env = env.copy()
@@ -500,28 +504,25 @@ def type_check_decl(decl, env):
       if not consistent(body_type, ret_ty):
         error(decl.location, 'return type mismatch:\n' + str(ret_ty)
               + ' inconsistent with ' + str(body_type))
-      
     case ModuleDef(name, exports, body):
       body_env = env.copy()
+      members = {}
       for d in body:
         declare_decl(d, body_env, members)
       for d in body:
         type_check_decl(d, body_env)
-
     case Import(module, imports):
       # the checking was done in declare_decl 
       pass
-
     case TypeAlias(name, type):
       # the work was done in declare_decl 
       pass
-      
     
-def type_check_decls(decls, env):
-    body_env = env.copy()
+def type_check_program(decls):
+    env = {}
     for d in decls:
-      declare_decl(d, body_env, body_env)
+      declare_decl(d, env, env)
     for d in decls:
-      type_check_decl(d,  body_env)
+      type_check_decl(d,  env)
         
     

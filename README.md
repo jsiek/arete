@@ -39,7 +39,8 @@ implementation written in Python 3.10 that includes:
 
 The design of Arete is based on discussions with Dave Abrahams and
 Dimitri Racordon about their Val language and it is influenced by the
-design of the Carbon language.
+design of the Carbon language. The abstract machine is organized in a
+similar way to the one in Carbon Explorer.
 
 
 # Examples
@@ -1583,3 +1584,6 @@ The `expression` evaluates to a *future*, then the current thread
 blocks until the future's thread is finished. The result of this
 `wait` is the result of the future's thread.
 
+# TODO
+
+[ ] Test cases for type checking failures.

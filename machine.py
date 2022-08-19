@@ -28,7 +28,7 @@ from abstract_syntax import *
 from desugar import desugar_decls
 from utilities import *
 from parser import parse, set_filename
-from type_check import type_check_decls
+from type_check import type_check_program
 from const_eval import const_eval_decls
 from memory import *
 from graphviz import log_graphviz
@@ -389,7 +389,7 @@ if __name__ == "__main__":
       print(decls)
       print()
     try:
-      #type_check_decls(decls, {})
+      type_check_program(decls)
       if tracing_on():
         print('**** finished type checking ****')
 
@@ -407,7 +407,7 @@ if __name__ == "__main__":
             exit(0)
         else:
             print('unexpected failure')
-            if tracing_on() or debug():
+            if True or tracing_on() or debug():
                 raise ex
             else:
                 print(str(ex))
