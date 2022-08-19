@@ -27,12 +27,17 @@ lark_parser = Lark(open("./Arete.lark").read(), start='arete', parser='lalr',
 ##################################################
 
 def parse_tree_to_str_list(e):
-    if e.data == 'empty':
-        return []
+    if e.data == 'nothing':
+        return tuple()
+    elif e.data == 'just':
+        return parse_tree_to_str_list(e.children[0])
+    elif e.data == 'empty':
+        return type()
     elif e.data == 'single':
-        return [e.children[0].value]
+        return tuple([e.children[0].value])
     elif e.data == 'push':
-        return [e.children[0].value] + parse_tree_to_str_list(e.children[1])
+        return tuple([e.children[0].value]) \
+            + parse_tree_to_str_list(e.children[1])
     else:
         raise Exception('parse_tree_to_str_list, unexpected ' + str(e))
 
@@ -230,10 +235,11 @@ def parse_tree_to_ast(e):
     elif e.data == 'function':
         return Function(e.meta,
                         str(e.children[0].value),
-                        parse_tree_to_param(e.children[1]),
-                        parse_tree_to_type_annot(e.children[2]),
-                        str(e.children[3].data),
-                        parse_tree_to_ast(e.children[4]))
+                        parse_tree_to_str_list(e.children[1]),
+                        parse_tree_to_param(e.children[2]),
+                        parse_tree_to_type_annot(e.children[3]),
+                        str(e.children[4].data),
+                        parse_tree_to_ast(e.children[5]))
     elif e.data == 'module':
         return ModuleDef(e.meta,
                           str(e.children[0].value),

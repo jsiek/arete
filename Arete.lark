@@ -135,9 +135,12 @@ parameter: binding_kind IDENT type_opt                  -> binding
 ?ret_type: "->" type                             -> just
     |                                            -> nothing
 
+?type_params_opt:                                -> nothing
+    | "<" ident_list ">"                         -> just
+
 ?definition: "let" IDENT type_opt "=" expression ";"              -> global
     | "const" IDENT type_opt "=" expression ";"                   -> constant
-    | "fun" IDENT "(" parameter_list ")" ret_type return_mode block  -> function
+    | "fun" IDENT type_params_opt "(" parameter_list ")" ret_type return_mode block  -> function
     | "module" IDENT "exports" ident_list "{" definition_list "}" -> module
     | "from" expression "import" ident_list ";"                   -> import
     | "type" IDENT "=" type ";"                                   -> type_definition

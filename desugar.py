@@ -144,12 +144,13 @@ def desugar_decl(decl, env):
       case Global(name, ty, rhs):
         new_rhs = desugar_exp(rhs, env)
         return Global(decl.location, name, ty, new_rhs)
-      case Function(name, params, ret_ty, ret_mode, body):
+      case Function(name, ty_params, params, ret_ty, ret_mode, body):
         body_env = env.copy()
         for p in params:
             body_env[p.ident] = False
         new_body = desugar_statement(body, body_env)
-        return Function(decl.location, name, params, ret_ty, ret_mode, new_body)
+        return Function(decl.location, name, ty_params, params, ret_ty,
+                        ret_mode, new_body)
       case ModuleDef(name, exports, body):
         new_body = desugar_decls(body, env)
         return ModuleDef(decl.location, name, exports, new_body)

@@ -931,13 +931,18 @@ class TypeAlias(Decl):
 @dataclass
 class Function(Decl):
     name: str
-    params: List[Param]
+    type_params: list[str]
+    params: list[Param]
     return_type: Type
     return_mode: str    # 'value' or 'address'
     body: Exp
-    __match_args__ = ("name", "params", "return_type", "return_mode", "body")
+    __match_args__ = ("name", "type_params", "params", "return_type",
+                      "return_mode", "body")
     def __str__(self):
         return "function " + self.name \
+            + ("<" + ", ".join(self.type_params) + ">" \
+               if len(self.type_params) > 0 \
+               else "") \
             + "(" + ", ".join([str(p) for p in self.params]) + ")" \
             + " -> " + str(self.return_type) \
             + " " + str(self.body)
@@ -1026,6 +1031,9 @@ class Import(Decl):
       
 # Types
 
+# Note: we use tuples instead of lists inside types because types need
+# to be hashable, so they may only contain immutable values.
+
 @dataclass(eq=True, frozen=True)
 class AnyType(Type):
   def __str__(self):
@@ -1100,12 +1108,16 @@ class TupleType(Type):
   
 @dataclass(eq=True, frozen=True)
 class FunctionType(Type):
+  type_params: tuple[str]
   param_types: tuple[Type]
   return_type: Type
-  __match_args__ = ("param_types", "return_type")
+  __match_args__ = ("type_params", "param_types", "return_type")
   def __str__(self):
-    return '(' + ', '.join([str(t) for t in self.param_types]) + ')' \
-        + '->' + str(self.return_type)
+    return ('<' + ', '.join(self.type_params) + '>'
+            if len(self.type_params) > 0\
+            else '') \
+           + '(' + ', '.join([str(t) for t in self.param_types]) + ')' \
+           + '->' + str(self.return_type)
   def __repr__(self):
     return str(self)
     
@@ -1133,7 +1145,7 @@ class TypeVar(Type):
     ident: str
     __match_args__ = ("ident",)
     def __str__(self):
-        return self.ident
+        return '`' + self.ident
     def __repr__(self):
         return str(self)
   

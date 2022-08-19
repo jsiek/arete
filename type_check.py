@@ -3,7 +3,7 @@ from utilities import *
 
 # TODO: need different type checking rules for ObserveCtx
 
-def require_consistent(ty1, ty2, msg, location):
+def require_consistent(ty1 : Type, ty2 : Type, msg: str, location: Meta):
   if not consistent(ty1, ty2):
     error(location, msg + ', ' + str(ty1) + ' inconsistent with ' + str(ty2))
 
@@ -20,10 +20,14 @@ def simplify(type: Type, env) -> Type:
       body_env = env.copy()
       body_env[name] = TypeVar(type.location, name)
       ret = RecursiveType(type.location, name, simplify(elt_ty, body_env))
-    case FunctionType(param_tys, ret_ty):
+    case FunctionType(ty_params, param_tys, ret_ty):
+      body_env = env.copy()
+      for t in ty_params:
+        body_env[t] = TypeVar(type.location, t)
       ret = FunctionType(type.location,
-                          tuple(simplify(ty, env) for ty in param_tys),
-                          simplify(ret_ty, env))
+                         ty_params,
+                         tuple(simplify(ty, body_env) for ty in param_tys),
+                         simplify(ret_ty, body_env))
     case IntType():
       ret = type
     case BoolType():
@@ -55,14 +59,14 @@ def substitute(var: str, ty1: Type, ty2: Type) -> Type:
     case _:
       error(ty1.location, 'in substitute, unrecognized type ' + str(ty2))
 
-def unfold(ty):
+def unfold(ty: Type) -> Type:
   if isinstance(ty, RecursiveType):
     ret = substitute(ty.name, ty, ty.type)
     return ret
   else:
     return ty
 
-def consistent(ty1, ty2, assumed_consistent=set()):
+def consistent(ty1: Type, ty2: Type, assumed_consistent=set()) -> Bool:
   if (ty1,ty2) in assumed_consistent:
     return True
   match (ty1,ty2):
@@ -83,7 +87,8 @@ def consistent(ty1, ty2, assumed_consistent=set()):
     case (TupleType(ts1), TupleType(ts2)):
       result = all([consistent(t1, t2, assumed_consistent) \
                     for t1,t2 in zip(ts1, ts2)])
-    case (FunctionType(ps1, rt1), FunctionType(ps2, rt2)):
+    case (FunctionType(tp1, ps1, rt1), FunctionType(tp2, ps2, rt2)):
+      # TODO: deal with type parameters
       result = all([consistent(t1, t2, assumed_consistent) \
                     for t1, t2 in zip(ps1, ps2)]) \
         and consistent(rt1,rt2, assumed_consistent)
@@ -99,11 +104,13 @@ def consistent(ty1, ty2, assumed_consistent=set()):
       result = True
     case (BoolType(), BoolType()):
       result = True
+    case (TypeVar(x), TypeVar(y)):
+      result = x == y
     case _:
       result = False
   return result    
 
-def join(ty1, ty2):
+def join(ty1: Type, ty2: Type) -> Type:
   match (ty1,ty2):
     case (None, _):
       return ty2
@@ -119,13 +126,48 @@ def join(ty1, ty2):
       return PointerType(join(t1, t2))
     case (TupleType(ts1), TupleType(ts2)):
       return TupleType(tuple(join(t1, t2) for t1,t2 in zip(ts1, ts2)))
-    case (FunctionType(ps1, rt1), FunctionType(ps2, rt2)):
-      return FunctionType(tuple(join(t1, t2) for t1, t2 in zip(ps1, ps2)),
+    case (FunctionType(tp1, ps1, rt1), FunctionType(tp2, ps2, rt2)):
+      return FunctionType(tp1,
+                          tuple(join(t1, t2) for t1, t2 in zip(ps1, ps2)),
                           join(rt1,rt2))
     case (FutureType(t1), FutureType(t2)):
       return FutureType(join(t1, t2))
     case (_, _):
       return ty1
+
+def match(vars: tuple[str], pat_ty: Type, match_ty: Type,
+          matches: dict[str,Type]):
+  match pat_ty:
+    case TypeVar(name):
+      if name in matches.keys():
+        return match(vars, matches[name], match_ty)
+    case TupleType(pat_ts):
+      match match_ty:
+        case TupleType(match_ts):
+          return all([match(vars, pt, mt, matches) \
+                      for (pt,mt) in zip(pat_ts, match_ts)])
+        case _:
+          return False
+    case PointerType(pat_elt):
+      match match_ty:
+        case PointerType(match_elt):
+            return match(vars, pt, mt, matches)
+        case _:
+          return False
+    case IntType():
+      match match_ty:
+        case IntType():
+            return True
+        case _:
+          return False
+    case BoolType():
+      match match_ty:
+        case BoolType():
+            return True
+        case _:
+          return False
+    case _:
+      error(pat_ty.location, 'in match, unrecognized type ' + str(pat_ty))
     
 def type_check_prim(location, op, arg_types):
     arg_types = [unfold(arg_ty) for arg_ty in arg_types]
@@ -294,15 +336,20 @@ def type_check_exp(e, env):
         for p in params:
             body_env[p.ident] = p.type_annot
         ret_type = type_check_statement(body, body_env)
-        return FunctionType(e.location, tuple(p.type_annot for p in params),
+        return FunctionType(e.location,
+                            tuple(),
+                            tuple(p.type_annot for p in params),
                             ret_type)
       case Call(fun, inits):
         fun_type = type_check_exp(fun, env)
         arg_types = [type_check_exp(init, env) for init in inits]
         fun_type = unfold(fun_type)
+        if tracing_on():
+          print('call to function of type ' + str(fun_type))
         if isinstance(fun_type, FunctionType):
           for (param_ty, arg_ty) in zip(fun_type.param_types, arg_types):
-              if not consistent(simplify(param_ty, env), arg_ty):
+              pt = simplify(param_ty, env)
+              if not consistent(pt, arg_ty):
                   error(e.location, 'in call, '
                         + 'expected argument of type ' + str(param_ty)
                         + ' not ' + str(arg_ty))
@@ -471,8 +518,9 @@ def declare_decl(decl, env, output):
     case Global(name, ty, rhs):
       env[name] = simplify(ty, env)
       output[name] = env[name]
-    case Function(name, params, ret_ty, ret_mode, body):
+    case Function(name, ty_params, params, ret_ty, ret_mode, body):
       ty = FunctionType(decl.location,
+                        ty_params,
                         tuple(p.type_annot for p in params),
                         ret_ty)
       env[name] = simplify(ty, env)
@@ -495,11 +543,13 @@ def type_check_decl(decl, env):
       if not consistent(rhs_type, type_annot):
         error(decl.location, 'type of initializer ' + str(rhs_type) + '\n'
               + ' is inconsistent with declared type ' + str(type_annot))
-    case Function(name, params, ret_ty, ret_mode, body):
-      ret_ty = simplify(ret_ty, env)
+    case Function(name, ty_params, params, ret_ty, ret_mode, body):
       body_env = env.copy()
+      for t in ty_params:
+        body_env[t] = TypeVar(decl.location, t)
+      ret_ty = simplify(ret_ty, body_env)
       for p in params:
-          body_env[p.ident] = simplify(p.type_annot, env)
+          body_env[p.ident] = simplify(p.type_annot, body_env)
       body_type = type_check_statement(body, body_env)
       if not consistent(body_type, ret_ty):
         error(decl.location, 'return type mismatch:\n' + str(ret_ty)
