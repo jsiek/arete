@@ -1586,6 +1586,7 @@ blocks until the future's thread is finished. The result of this
 
 # TODO
 
-[ ] Test cases for type checking failures.
-[ ] Add variants. (safe unions)
+[X] Add variants. (safe unions)
 [ ] Remove null pointers.
+[ ] Refactor desugar, const_eval, and type_check into AST methods
+[ ] Test cases for type checking failures.

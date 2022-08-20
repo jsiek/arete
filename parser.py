@@ -61,6 +61,9 @@ def parse_tree_to_type_annot(e):
     elif e.data == 'tuple_type':
         return TupleType(e.meta,
                          parse_tree_to_type_list(e.children[0]))
+    elif e.data == 'variant_type':
+        return VariantType(e.meta,
+                           parse_tree_to_alt_list(e.children[0]))
     elif e.data == 'recursive_type':
         return RecursiveType(e.meta,
                              str(e.children[0].value),
@@ -72,11 +75,28 @@ def parse_tree_to_type_annot(e):
     
 def parse_tree_to_type_list(e):
     e.meta.filename = filename
-    if e.data == 'single':
+    if e.data == 'empty':
+        return ()
+    elif e.data == 'single':
         return (parse_tree_to_type_annot(e.children[0]),)
     elif e.data == 'push':
         return (parse_tree_to_type_annot(e.children[0]),) \
             + parse_tree_to_type_list(e.children[1])
+    else:
+        raise Exception('unrecognized as a type list ' + repr(e))
+
+def parse_tree_to_alt(e):
+    return (str(e.children[0].value),
+            parse_tree_to_type_annot(e.children[1]))
+    
+def parse_tree_to_alt_list(e):
+    if e.data == 'empty':
+        return ()
+    elif e.data == 'single':
+        return (parse_tree_to_alt(e.children[0]),)
+    elif e.data == 'push':
+        return (parse_tree_to_alt(e.children[0]),) \
+            + parse_tree_to_alt_list(e.children[1])
     else:
         raise Exception('unrecognized as a type list ' + repr(e))
     
@@ -95,6 +115,21 @@ def parse_tree_to_param(e):
   else:    
     raise Exception('unrecognized parameter' + repr(e))
 
+def parse_tree_to_case(e):
+    tag = str(e.children[0].value)
+    var = str(e.children[1].value)
+    body = parse_tree_to_ast(e.children[2])
+    return (tag, var, body)
+
+def parse_tree_to_case_list(e):
+    if e.data == 'single':
+        return (parse_tree_to_case(e.children[0]),)
+    elif e.data == 'push':
+        return (parse_tree_to_case(e.children[0]),) \
+            + parse_tree_to_case_list(e.children[1])
+    else:
+        raise Exception('unrecognized as a type list ' + repr(e))
+    
 primitive_ops = {'add', 'sub', 'mul', 'div', 'int_div', 'neg',
                  'and', 'or', 'not',
                  'copy',
@@ -161,6 +196,11 @@ def parse_tree_to_ast(e):
         return FutureExp(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'wait':
         return Wait(e.meta, parse_tree_to_ast(e.children[0]))
+    elif e.data == 'tag_variant':
+        return TagVariant(e.meta,
+                          str(e.children[0].value),
+                          parse_tree_to_ast(e.children[1]),
+                          parse_tree_to_type_annot(e.children[2]))
     
     # statements
     elif e.data == 'binding_stmt':
@@ -212,6 +252,10 @@ def parse_tree_to_ast(e):
         return Block(e.meta, body=parse_tree_to_ast(e.children[0]))
     elif e.data == 'pass':
         return Pass(e.meta)
+    elif e.data == 'match':
+        return Match(e.meta,
+                     parse_tree_to_ast(e.children[0]),
+                     parse_tree_to_case_list(e.children[1]))
 
     # definitions
     elif e.data == 'import':

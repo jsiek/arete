@@ -35,6 +35,8 @@ def desugar_exp(e, env):
       case TupleExp(inits):
         new_inits = [desugar_exp(init, env) for init in inits]
         return TupleExp(e.location, new_inits)
+      case TagVariant(tag, arg, ty):
+        return TagVariant(e.location, tag, desugar_exp(arg, env), ty)
       case Lambda(params, ret_mode, body, name):
         body_env = env.copy()
         for p in params:
@@ -123,6 +125,13 @@ def desugar_statement(s, env):
         return While(s.location, new_cond, new_body)
       case Block(body):
         return Block(s.location, desugar_statement(body, env))
+      case Match(cond, cases):
+        new_cases = []
+        for (tag, x, body) in cases:
+          body_env = env.copy()
+          body_env[x] = False
+          new_cases += [(tag, x, desugar_statement(body, body_env))]
+        return Match(s.location, desugar_exp(cond, env), new_cases)
       case _:
         error(s.location, 'error in desugar_statement, unhandled: ' + repr(s)) 
 

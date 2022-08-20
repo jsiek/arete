@@ -1,0 +1,19 @@
+type ptr_opt = variant  ptr: int* | nul: ⟨⟩;
+
+fun null_() -> ptr_opt { return tag nul(⟨⟩) as ptr_opt; }
+fun ptr_(var p : int*) -> ptr_opt { return tag ptr(p) as ptr_opt; }
+
+fun match_ptr(x : ptr_opt) -> int {
+  match (x) {
+    case nul(p):
+      return -42;
+    case ptr(p):
+      return *p;
+  }
+}
+
+fun main() {
+  var x : ptr_opt = null_();
+  var y : ptr_opt = ptr_(&42);
+  return match_ptr(x) + match_ptr(y);
+}

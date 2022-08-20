@@ -36,6 +36,9 @@ def simplify(type: Type, env) -> Type:
       ret = type
     case VoidType():
       ret = type
+    case VariantType(alts):
+      ret = VariantType(type.location,
+                        tuple((x, simplify(t, env)) for x,t in alts))
     case _:
       error(type.location, "in simplify, unrecognized type " + str(type))
   return ret
@@ -50,6 +53,9 @@ def substitute(subst: dict[str, Type], ty2: Type) -> Type:
     case TupleType(ts2):
       return TupleType(ty2.location,
                        tuple(substitute(subst, elt_ty) for elt_ty in ts2))
+    case VariantType(alts):
+      return VariantType(ty2.location,
+                         tuple((x, substitute(subst, t)) for x,t in alts))
     case PointerType(elt_ty):
       return PointerType(ty2.location, substitute(subst, elt_ty))
     case ArrayType(elt_ty):
@@ -104,6 +110,9 @@ def consistent(ty1: Type, ty2: Type, assumed_consistent=set()) -> Bool:
     case (TupleType(ts1), TupleType(ts2)):
       result = all([consistent(t1, t2, assumed_consistent) \
                     for t1,t2 in zip(ts1, ts2)])
+    case (VariantType(ts1), VariantType(ts2)):
+      result = all([x1 == x2 and consistent(t1, t2, assumed_consistent) \
+                    for (x1,t1),(x2,t2) in zip(ts1, ts2)])
     case (FunctionType(tp1, ps1, rt1), FunctionType(tp2, ps2, rt2)):
       # TODO: deal with type parameters
       result = all([consistent(t1, t2, assumed_consistent) \
@@ -182,6 +191,10 @@ def match_types(vars: tuple[str],
     case (TupleType(pat_ts), TupleType(match_ts)):
       return all([match_types(vars, pt, mt, matches, assumed_consistent) \
                   for (pt,mt) in zip(pat_ts, match_ts)])
+    case (VariantType(ts1), VariantType(ts2)):
+      return all([x1 == x2 and match_types(vars, t1, t2, matches, \
+                                           assumed_consistent) \
+                  for (x1,t1),(x2,t2) in zip(ts1, ts2)])
     case (PointerType(pt), PointerType(mt)):
       return match_types(vars, pt, mt, matches, assumed_consistent)
     case (ArrayType(pt), ArrayType(mt)):
@@ -372,6 +385,23 @@ def type_check_exp(e, env):
       case TupleExp(inits):
         init_types = tuple(type_check_exp(init, env) for init in inits)
         return TupleType(e.location, init_types)
+      case TagVariant(tag, arg, ty_annot):
+        ty = simplify(ty_annot, env)
+        if not (isinstance(ty, VariantType) or isinstance(ty, AnyType)):
+          error(e.location, 'expected variant type in tagging, not '
+                + str(ty_annot))
+        arg_ty = type_check_exp(arg, env)
+        if isinstance(ty, VariantType):
+          found = False
+          for (alt_tag, alt_ty) in ty.alternative_types:
+            if tag == alt_tag:
+              if not consistent(arg_ty, alt_ty):
+                error(e.location, 'expected ' + str(alt_ty) + '\nnot ' 
+                      + str(arg_ty))
+              found = True
+          if not found:
+            error(e.location, 'no tag ' + tag + ' in ' + str(ty_annot))
+        return ty
       case Lambda(params, ret_mode, body, name):
         body_env = env.copy()
         for p in params:
@@ -536,6 +566,31 @@ def type_check_statement(s, env):
         return body_type
       case Block(body):
         return type_check_statement(body, env)
+      case Match(cond, cases):
+        cond_ty = type_check_exp(cond, env)
+        if not (isinstance(cond_ty, VariantType) \
+                or isinstance(cond_ty, AnyType)):
+          error(e.location, 'expected variant type in match, not '
+                + str(cond_ty))
+        return_type = None
+        for (tag, x, body) in cases:
+          # tag in the variant type?
+          if isinstance(cond_ty, VariantType):
+            found = False
+            for (alt_tag,alt_ty) in cond_ty.alternative_types:
+              if tag == alt_tag:
+                body_env = env.copy()
+                body_env[x] = alt_ty
+                retty = type_check_statement(body, body_env)
+                if return_type is None:
+                  return_type = retty
+                elif not retty is None:
+                  return_type = join(retty, return_type)
+                found = True
+            if found == False:
+              error(s.location, tag + ' is not a tag in ' + str(cond_ty))
+        return return_type
+        # TODO: check for completeness of the cases wrt the cond_ty
       case _:
         error(s.location, 'error in type_check_statement, unhandled: '
               + repr(s))

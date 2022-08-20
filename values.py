@@ -79,7 +79,24 @@ class TupleValue(Value):
         return '|'.join(['<' + str(i) + '>' + elt.node_label() \
                          for (i,elt) in zip(range(0,len(self.elts)),
                                             self.elts)])
+
+@dataclass
+class Variant(Value):
+  tag: str
+  value: Value
+
+  def __str__(self):
+    return 'tag ' + self.tag + ':' + str(self.value)
       
+  def __repr__(self):
+    return str(self)
+
+  def duplicate(self, percentage, loc):
+    return Variant(self.tag, self.value.duplicate(percentage, loc))
+
+  def kill(self, mem, location, progress=set()):
+    self.value.kill(mem, location, progress)
+  
 # find the first ptr in the lender chain that is not yet killed,
 # i.e. that has a non-None address.
 def find_lender(ptr):

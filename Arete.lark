@@ -15,12 +15,20 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "[" type "]"                               -> array_type
     | type "*"                                   -> ptr_type
     | "⟨" type_list "⟩"                          -> tuple_type
+    | "variant" alternative_list                 -> variant_type
     | "(" type_list ")" "->" type                -> function_type
     | "rec" IDENT "in" type                      -> recursive_type
     | IDENT                                      -> type_var
     
-?type_list: type                                 -> single
+?type_list:                                     -> empty
+    | type                                      -> single
     | type "," type_list                         -> push
+
+
+?alternative: IDENT ":" type                     -> alternative
+    
+?alternative_list: alternative                   -> single
+    | alternative "|" alternative_list           -> push
 
 ?type_opt: ":" type                              -> just
     |                                            -> nothing
@@ -81,6 +89,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "false"                                           -> false
     | "spawn" expression                                -> future
     | "wait" expression_hi                              -> wait
+    | "tag" IDENT "(" expression ")" "as" type          -> tag_variant
 
 ?statement: expression "=" initializer ";"              -> write
     | expression "<-" expression "of" expression ";"    -> transfer
@@ -90,6 +99,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "while" "(" expression ")" block                  -> while
     | block
     | if_statement
+    | "match" "(" expression ")" "{" case_list "}"      -> match
 
 ?if_statement: "if" "(" expression ")" block if_rest    -> if
 
@@ -104,6 +114,11 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 
 ?block: "{" statement_list "}"                          -> block
     | "{" "}"                                           -> pass
+
+?case: "case" IDENT "(" IDENT ")" ":" statement_list    -> case
+
+?case_list: case                                        -> single
+    | case case_list                                    -> push
 
 ?expression_list:                                       -> empty
     | expression                                        -> single

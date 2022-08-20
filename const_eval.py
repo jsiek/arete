@@ -76,6 +76,8 @@ def const_eval_exp(e, env):
       case TupleExp(inits):
         new_inits = [const_eval_exp(init, env) for init in inits]
         return TupleExp(e.location, new_inits)
+      case TagVariant(tag, arg, ty):
+        return TagVariant(e.location, tag, const_eval_exp(arg, env), ty)
       case Lambda(params, ret_mode, body, name):
         body_env = env.copy()
         for p in params:
@@ -165,6 +167,14 @@ def const_eval_statement(s, env):
         return While(s.location, new_cond, new_body)
       case Block(body):
         return Block(s.location, const_eval_statement(body, env))
+      case Match(cond, cases):
+        new_cases = []
+        for (tag, x, body) in cases:
+          body_env = env.copy()
+          if x in body_env.keys():
+            del body_env[x]
+          new_cases += [(tag, x, const_eval_statement(body, body_env))]
+        return Match(s.location, const_eval_exp(cond, env), new_cases)
       case _:
         error(s.location, 'error in const_eval_statement, unhandled: ' + repr(s)) 
 

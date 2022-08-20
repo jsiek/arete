@@ -13,7 +13,7 @@ from primitive_operations import eval_prim, compare_ops
 class Param:
     location: Meta
     kind: str # let, var, inout, sink, set
-    privilege: str # read, write
+    privilege: str # read, write # OBSOLETE?
     ident: str
     type_annot: Type
     __match_args__ = ("privilege", "ident")
@@ -256,8 +256,6 @@ class TupleExp(Exp):
         machine.schedule(self.inits[runner.state], runner.env)
       else:
         vals = [res.value.duplicate(1, self.location) for res in runner.results]
-        for res in runner.results:
-          res.value.kill(machine.memory, self.location)
         tup = TupleValue(vals)
         if isinstance(runner.context, ValueCtx):
           result = tup
@@ -265,6 +263,35 @@ class TupleExp(Exp):
           result = machine.memory.allocate(tup)
         machine.finish_expression(Result(True, result), self.location)
         
+@dataclass
+class TagVariant(Exp):
+  tag: str
+  arg: Exp
+  type: Type
+  __match_args__ = ("tag", "arg", "type")
+    
+  def __str__(self):
+    return 'tag ' + self.tag + ': ' + str(self.arg) + ' as ' \
+      + str(self.type)
+    
+  def __repr__(self):
+    return str(self)
+  
+  def free_vars(self):
+    return self.arg.free_vars()
+  
+  def step(self, runner, machine):
+    if runner.state == 0:
+      machine.schedule(self.arg, runner.env)
+    else:
+      val = runner.results[0].value
+      variant = Variant(self.tag, val.duplicate(1, self.location))
+      if isinstance(runner.context, ValueCtx):
+        result = variant
+      elif isinstance(runner.context, AddressCtx):
+        result = machine.memory.allocate(variant)
+      machine.finish_expression(Result(True, result), self.location)
+
 @dataclass
 class Var(Exp):
     ident: str
@@ -588,6 +615,58 @@ class Wait(Exp):
     
 # Statements
 
+@dataclass
+class Match(Stmt):
+  condition: Exp
+  cases: list[tuple[str,str,Stmt]]
+  __match_args__ = ("condition", "cases")
+  
+  def __str__(self):
+    if verbose():
+      return 'match (' + str(self.condition) + ') {\n' \
+        + '\n'.join(['case ' + tag + '(' + x + '):\n' + str(body) \
+                     for (tag,x,body) in self.cases]) \
+        + '}\n'
+    else:
+      return 'match (' + str(self.condition) + ') ...'
+  
+  def __repr__(self):
+    return str(self)
+
+  def free_vars(self):
+    case_fvs = set()
+    for (tag, x, stmt) in self.cases:
+      case_fvs |= stmt.free_vars() - set([x])
+    return self.condition.free_vars() | case_fvs
+
+  def step(self, runner, machine):
+    if runner.state == 0:
+      machine.schedule(self.condition, runner.env)
+      runner.matched = False
+    elif runner.state <= len(self.cases) and not runner.matched:
+      variant = runner.results[0].value
+      if runner.state == 1 and not isinstance(variant, Variant):
+          error(self.location, 'in match, expected a variant, not '
+                + str(variant))
+      current_case = self.cases[runner.state - 1]
+      if variant.tag == current_case[0]:
+        runner.body_env = runner.env.copy()
+        runner.param = Param(self.location, 'let', 'none', current_case[1],
+                      AnyType(self.location))
+        #dup = variant.value.duplicate(1, self.location)
+        variant_val_addr = machine.memory.allocate(variant.value)
+        runner.arg = Result(False, variant_val_addr)
+        machine.bind_param(runner.param, runner.arg, runner.body_env,
+                           self.location)
+        machine.schedule(current_case[2], runner.body_env)
+        runner.matched = True
+    else:
+      machine.dealloc_param(runner.param, runner.arg, runner.body_env,
+                            self.location)
+      runner.arg.value.kill(machine.memory, self.location)
+      machine.finish_statement(self.location)
+      
+      
 @dataclass
 class Seq(Stmt):
   first: Stmt
@@ -1105,7 +1184,17 @@ class TupleType(Type):
     return '⟨' + ', '.join([str(t) for t in self.member_types]) + '⟩'
   def __repr__(self):
     return str(self)
-  
+
+@dataclass(eq=True, frozen=True)
+class VariantType(Type):
+  alternative_types: tuple[tuple[str,Type]]  
+  __match_args__ = ("alternative_types",)
+  def __str__(self):
+    return '(variant ' + '| '.join([x + ':' + str(t) \
+                            for x,t in self.alternative_types]) + ')'
+  def __repr__(self):
+    return str(self)
+
 @dataclass(eq=True, frozen=True)
 class FunctionType(Type):
   type_params: tuple[str]

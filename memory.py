@@ -25,10 +25,10 @@ class Memory:
   def get_block(self, addr):
     return self.memory[addr]
   
-  def allocate(self, vals):
+  def allocate(self, val):
     addr = self.next_address
     self.next_address += 1
-    self.memory[addr] = vals
+    self.memory[addr] = val
     return Pointer(addr, [], Fraction(1,1), None)
 
   def deallocate(self, addr, location, progress):
