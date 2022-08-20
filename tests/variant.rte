@@ -3,10 +3,10 @@ type ptr_opt = variant ptr: int* | nul: ⟨⟩;
 fun null_() -> ptr_opt { return tag nul(⟨⟩) as ptr_opt; }
 fun ptr_(var p : int*) -> ptr_opt { return tag ptr(p) as ptr_opt; }
 
-fun match_ptr(x : ptr_opt) -> int {
+fun deref_ptr(x : ptr_opt, default: int) -> int {
   match (x) {
     case nul(p):
-      return -42;
+      return default;
     case ptr(p):
       return *p;
   }
@@ -15,5 +15,5 @@ fun match_ptr(x : ptr_opt) -> int {
 fun main() {
   var x : ptr_opt = null_();
   var y : ptr_opt = ptr_(&42);
-  return match_ptr(x) + match_ptr(y);
+  return deref_ptr(x, -42) + deref_ptr(y, -42);
 }
