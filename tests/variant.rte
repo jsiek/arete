@@ -1,4 +1,4 @@
-type ptr_opt = variant  ptr: int* | nul: ⟨⟩;
+type ptr_opt = variant ptr: int* | nul: ⟨⟩;
 
 fun null_() -> ptr_opt { return tag nul(⟨⟩) as ptr_opt; }
 fun ptr_(var p : int*) -> ptr_opt { return tag ptr(p) as ptr_opt; }
