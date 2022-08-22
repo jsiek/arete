@@ -23,7 +23,13 @@ to the following design principles:
    number of features, but those features will be powerful and work
    well in combination.
 
-It currently includes the following features
+The Arete language is being designed using an incremental
+prototype-first approach. The best way to evaluate a language design
+is to try to write and run lots of programs in the new language. The
+Arete abstract machine (the prototype) is a low-cost way to precisely
+express the language design and it provides a way to run programs.
+
+Arete currently includes the following features
 
 * parallelism (via futures)
 
