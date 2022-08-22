@@ -125,7 +125,7 @@ class Call(Exp):
     else:
       # return from the function
       for (param, arg) in zip(runner.params, runner.args):
-        machine.dealloc_param(param, arg, runner.body_env, self.location)
+        machine.dealloc_param(param, arg, runner.body_env, runner.clos.body.location)
       if runner.return_value is None:
         runner.return_value = Void()
       if isinstance(runner.context, ValueCtx):
@@ -646,7 +646,6 @@ class Match(Stmt):
     elif runner.state <= len(self.cases) and not runner.matched:
       ptr = runner.results[0].value
       variant = machine.memory.read(ptr, self.location)
-      #variant = runner.results[0].value
       if runner.state == 1 and not isinstance(variant, Variant):
           error(self.location, 'in match, expected a variant, not '
                 + str(variant))
@@ -663,7 +662,6 @@ class Match(Stmt):
     else:
       machine.dealloc_param(runner.param, runner.arg, runner.body_env,
                             self.location)
-      runner.arg.value.kill(machine.memory, self.location)
       machine.finish_statement(self.location)
       
       

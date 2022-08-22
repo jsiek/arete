@@ -47,7 +47,7 @@ fun remove_last(inout n) {
   match (n) {
   case null(q):
     return null();
-  case ptr(var node):
+  case ptr(inout node):
     if (is_last(next(node))) {
       var q = copy((*node)[1]); // want all permissions to next(n)
       (*node)[1] = null();
