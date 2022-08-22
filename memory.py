@@ -39,33 +39,10 @@ class Memory:
     self.memory[addr].kill(self, location, progress | set([addr]))
     del self.memory[addr]
 
-  def get_tuple_element(self, tup, path, loc):
-    if len(path) == 0:
-      return tup
-    else:
-      if not isinstance(tup, TupleValue):
-        error(loc, 'expected tuple in get_tuple_element, not ' + repr(tup))
-      return self.get_tuple_element(tup.elts[path[0]], path[1:], loc)
-
-  def set_tuple_element(self, old, path, val, loc):
-      if len(path) == 0:
-        return val
-      else:
-        if not isinstance(old, TupleValue):
-          error(loc, 'expected tuple in set_tuple_element not ' + str(old))
-        tup = old
-        i = path[0]
-        front = tup.elts[:i]
-        back = tup.elts[i+1:]
-        ith = self.set_tuple_element(tup.elts[i], path[1:], val, loc)
-        if tracing_on():
-          print('new middle: ' + str(ith))
-        return TupleValue(front + [ith] + back)
-
   def raw_read(self, address, path, loc):
     if tracing_on():
       print('raw_read(' + str(address) + ', ' + str(path) + ')')
-    return self.get_tuple_element(self.memory[address], path, loc)
+    return self.memory[address].get_subobject(path, loc)
 
   def read(self, ptr, location):
       if not (isinstance(ptr, Pointer) or isinstance(ptr, PointerOffset)):
@@ -75,7 +52,7 @@ class Memory:
       if not self.valid_address(ptr.get_address()):
           error(location, 'in read, bad address: ' + str(ptr.address))
 
-      retval = self.raw_read(ptr.get_address(), ptr.get_path(), location)
+      retval = self.raw_read(ptr.get_address(), ptr.get_ptr_path(), location)
       if tracing_on():
           print('read from ' + str(ptr))
           print('    value: ' + str(self.memory[ptr.get_address()]))
@@ -84,12 +61,11 @@ class Memory:
 
   def unchecked_write(self, ptr, val, location):
       address = ptr.get_address()
-      path = ptr.get_path()
-      old_val = self.get_tuple_element(self.memory[address], path, location)
+      path = ptr.get_ptr_path()
+      old_val = self.memory[address].get_subobject(path, location)
       val_copy = val.duplicate(1, location)
       self.memory[address] = \
-          self.set_tuple_element(self.memory[address],
-                                 path, val_copy, location)
+          self.memory[address].set_subobject(path, val_copy, location)
       if tracing_on():
         print('wrote ' + str(val_copy) + ' into ' + str(ptr))
       old_val.kill(self, location)

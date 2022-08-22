@@ -1,8 +1,29 @@
 # Arete
 
-Arete is an experimental programming language.
+Arete is an experimental programming language. It aspires
+to the following design principles:
 
-It currently includes
+1. safety: no undefined behavior. All safety errors are either caught
+   at compile time or at runtime. For many kinds of errors, the
+   programmer can control when they want the checking (that is, Arete
+   will provide gradual typing).
+  
+2. separate compilation: libraries (include generic ones) can be
+   separately compiled and linked with applications. This will ensure
+   scalable and efficient compilation of applications and libraries
+   with large software dependencies.
+   
+3. efficient runtime: runtime overheads will in general be low and
+   under control of the programmer. Memory management is not by
+   garbage collection, but is instead under programmer control.
+   Specialization/monomorphization of generics will be available as a
+   compiler optimization.
+
+4. high power-to-weight ratio: the language will have a relatively low
+   number of features, but those features will be powerful and work
+   well in combination.
+
+It currently includes the following features
 
 * parallelism (via futures)
 
@@ -11,13 +32,13 @@ It currently includes
   
 * semi-automatic memory management via fractional permissions
   
-* gradual typing (but not yet sound gradual typing)
+* gradual typing (but not yet sound gradual typing, which is planned)
 
 * modules
 
 and I plan to add:
 
-* static tracking of fractional permissions
+* static checking of fractional permissions
 
 * generics with contraints
 
@@ -29,11 +50,11 @@ implementation written in Python 3.10 that includes:
 * grammar and parser ([Arete.lark](Arete.lark) and [parser.py](parser.py))
   using the [Lark](https://github.com/lark-parser/lark) parser generater.
 
+* desugaring ([desugar.py](desugar.py))
+
 * constant evaluation ([const_eval.py](const_eval.py))
 
 * type checking ([type_check.py](type_check.py))
-
-* desugaring ([desugar.py](desugar.py))
 
 * interpreting (an abstract machine) ([machine.py](machine.py))
 
@@ -1586,7 +1607,8 @@ blocks until the future's thread is finished. The result of this
 
 # TODO
 
-[X] Add variants. (safe unions)
-[ ] Remove null pointers.
+[/] Add variants. (safe unions)
+[X] Remove null pointers.
+[ ] debugger: show stack
 [ ] Refactor desugar, const_eval, and type_check into AST methods
 [ ] Test cases for type checking failures.

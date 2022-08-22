@@ -352,7 +352,8 @@ class Machine:
       if ptr.get_address() is None:
         val = None
       else:
-        val = machine.memory.raw_read(ptr.get_address(), ptr.get_path(), loc)
+        val = machine.memory.raw_read(ptr.get_address(),
+                                      ptr.get_ptr_path(), loc)
       print(str(k) + ':\t' + str(val) + '\t\t\t' + str(ptr))
     print()
 

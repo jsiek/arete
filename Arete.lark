@@ -19,6 +19,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "(" type_list ")" "->" type                -> function_type
     | "rec" IDENT "in" type                      -> recursive_type
     | IDENT                                      -> type_var
+    | "(" type ")"
     
 ?type_list:                                     -> empty
     | type                                      -> single
@@ -67,14 +68,13 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 
 ?expression_hi: INT                                     -> int
     | "copy" "(" expression ")"                         -> copy
-    | "is_null" "(" expression ")"                      -> is_null
-    | "null"                                            -> null
     | "len" "(" expression ")"                          -> len
     | "split" "(" expression ")"                        -> split
     | "join" "(" expression "," expression ")"          -> join
     | "permission" "(" expression ")"                   -> permission
     | "upgrade" "(" expression ")"                      -> upgrade
     | "breakpoint" "(" ")"                              -> breakpoint
+    | "exit" "(" expression ")"                         -> exit
     | IDENT                                             -> var
     | expression_hi "[" expression "]"                  -> index
     | expression_hi "." IDENT                           -> member
@@ -115,7 +115,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 ?block: "{" statement_list "}"                          -> block
     | "{" "}"                                           -> pass
 
-?case: "case" IDENT "(" IDENT ")" ":" statement_list    -> case
+?case: "case" IDENT "(" parameter ")" ":" statement_list -> case
 
 ?case_list: case                                        -> single
     | case case_list                                    -> push

@@ -117,7 +117,7 @@ def parse_tree_to_param(e):
 
 def parse_tree_to_case(e):
     tag = str(e.children[0].value)
-    var = str(e.children[1].value)
+    var = parse_tree_to_param(e.children[1])
     body = parse_tree_to_ast(e.children[2])
     return (tag, var, body)
 
@@ -133,10 +133,10 @@ def parse_tree_to_case_list(e):
 primitive_ops = {'add', 'sub', 'mul', 'div', 'int_div', 'neg',
                  'and', 'or', 'not',
                  'copy',
-                 'null', 'is_null', 'len', 'split', 'join',
+                 'len', 'split', 'join',
                  'equal', 'not_equal',
                  'less', 'greater', 'less_equal', 'greater_equal',
-                 'permission', 'upgrade', 'breakpoint'}
+                 'permission', 'upgrade', 'breakpoint', 'exit'}
     
 def parse_tree_to_ast(e):
     e.meta.filename = filename

@@ -1,13 +1,31 @@
+type opt_ptr = variant ptr: ?* | null: ⟨⟩;
+
+fun null() -> opt_ptr { return tag null(⟨⟩) as opt_ptr; }
+fun is_null(let p : opt_ptr) {
+  match (p) {
+    case null(t):
+      return true;
+    case ptr(q):
+      return false;
+  }
+}
+fun ptr(var p : ?*) -> opt_ptr { return tag ptr(p) as opt_ptr; }
+
 fun listof(let data) {
-  return &⟨data, null⟩;
+  return ptr(&⟨data, null()⟩);
 }
 
 fun push(let data, var list) {
-  return &⟨data, list⟩;
+  return ptr(&⟨data, list⟩);
 }
 
 fun data(let node) & {
-  return (*node)[0];
+  match (node) {
+  case null(w):
+    return 0; // raise an exception
+  case ptr(n):
+    return (*n)[0];
+  }
 }
 
 fun next(let node) & {
@@ -15,22 +33,24 @@ fun next(let node) & {
 }
 
 fun is_last(let node) {
-  if (is_null(node)) {
+  match (node) {
+  case null(w):
     return false;
-  } else {
-    return is_null(next(node));
+  case ptr(n):
+    return is_null(next(n));
   }
 }
 
 // Split the list into two parts, with the second
 // part just containing the last element.
 fun remove_last(inout n) {
-  if (is_null(n)) {
-    return null;
-  } else {
-    if (is_last(next(n))) {
-      var q = copy((*n)[1]); // want all permissions to next(n)
-      (*n)[1] = null;
+  match (n) {
+  case null(q):
+    return null();
+  case ptr(var node):
+    if (is_last(next(node))) {
+      var q = copy((*node)[1]); // want all permissions to next(n)
+      (*node)[1] = null();
       return q;
     } else {
       return remove_last((*n)[1]);

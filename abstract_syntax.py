@@ -28,7 +28,7 @@ class Param:
 # Miscelaneous
 
 @dataclass
-class Initializer:
+class Initializer(Exp):
   location: Meta
   percentage: Exp
   arg: Exp
@@ -618,14 +618,14 @@ class Wait(Exp):
 @dataclass
 class Match(Stmt):
   condition: Exp
-  cases: list[tuple[str,str,Stmt]]
+  cases: list[tuple[str,Param,Stmt]]
   __match_args__ = ("condition", "cases")
   
   def __str__(self):
     if verbose():
       return 'match (' + str(self.condition) + ') {\n' \
-        + '\n'.join(['case ' + tag + '(' + x + '):\n' + str(body) \
-                     for (tag,x,body) in self.cases]) \
+        + '\n'.join(['case ' + tag + '(' + str(param) + '):\n' + str(body) \
+                     for (tag,param,body) in self.cases]) \
         + '}\n'
     else:
       return 'match (' + str(self.condition) + ') ...'
@@ -635,26 +635,26 @@ class Match(Stmt):
 
   def free_vars(self):
     case_fvs = set()
-    for (tag, x, stmt) in self.cases:
-      case_fvs |= stmt.free_vars() - set([x])
+    for (tag, param, stmt) in self.cases:
+      case_fvs |= stmt.free_vars() - set([param.ident])
     return self.condition.free_vars() | case_fvs
 
   def step(self, runner, machine):
     if runner.state == 0:
-      machine.schedule(self.condition, runner.env)
+      machine.schedule(self.condition, runner.env, AddressCtx())
       runner.matched = False
     elif runner.state <= len(self.cases) and not runner.matched:
-      variant = runner.results[0].value
+      ptr = runner.results[0].value
+      variant = machine.memory.read(ptr, self.location)
+      #variant = runner.results[0].value
       if runner.state == 1 and not isinstance(variant, Variant):
           error(self.location, 'in match, expected a variant, not '
                 + str(variant))
       current_case = self.cases[runner.state - 1]
       if variant.tag == current_case[0]:
         runner.body_env = runner.env.copy()
-        runner.param = Param(self.location, 'let', 'none', current_case[1],
-                      AnyType(self.location))
-        #dup = variant.value.duplicate(1, self.location)
-        variant_val_addr = machine.memory.allocate(variant.value)
+        runner.param = current_case[1]
+        variant_val_addr = PointerOffset(ptr, variant.tag)
         runner.arg = Result(False, variant_val_addr)
         machine.bind_param(runner.param, runner.arg, runner.body_env,
                            self.location)

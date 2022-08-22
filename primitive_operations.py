@@ -11,6 +11,8 @@ def eval_prim(op, vals, machine, location):
         machine.pause = True
         set_debug(True)
         return Void()
+      case 'exit':
+        exit(vals[0])
       case 'copy':
         return vals[0].duplicate(1, location)
       case 'len':
@@ -60,15 +62,6 @@ def eval_prim(op, vals, machine, location):
       case 'not':
         val = to_boolean(vals[0], location)
         return Boolean(not val)
-      case 'null':
-        return Pointer(None, [], Fraction(1,1), None)
-      case 'is_null':
-        ptr = vals[0]
-        match ptr:
-          case Pointer(addr, path, priv):
-            return Boolean(addr is None)
-          case _:
-            return Boolean(False)
       case 'split':
         ptr = vals[0]
         ptr1 = ptr.duplicate(Fraction(1, 2), location)

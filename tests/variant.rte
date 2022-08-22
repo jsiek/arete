@@ -1,11 +1,19 @@
-type ptr_opt = variant ptr: int* | nul: ⟨⟩;
+type opt_ptr = variant ptr: ?* | nul: ⟨⟩;
 
-fun null_() -> ptr_opt { return tag nul(⟨⟩) as ptr_opt; }
-fun ptr_(var p : int*) -> ptr_opt { return tag ptr(p) as ptr_opt; }
+fun null() -> opt_ptr { return tag nul(⟨⟩) as opt_ptr; }
+fun is_null(let p : opt_ptr) {
+  match (p) {
+    case nul(t):
+      return true;
+    case ptr(q):
+      return false;
+  }
+}
+fun ptr(var p : int*) -> opt_ptr { return tag ptr(p) as opt_ptr; }
 
-fun deref_ptr(x : ptr_opt, default: int) -> int {
+fun deref(x : opt_ptr, default: int) -> int {
   match (x) {
-    case nul(p):
+    case nul(t):
       return default;
     case ptr(p):
       return *p;
@@ -13,7 +21,11 @@ fun deref_ptr(x : ptr_opt, default: int) -> int {
 }
 
 fun main() {
-  var x : ptr_opt = null_();
-  var y : ptr_opt = ptr_(&42);
-  return deref_ptr(x, -42) + deref_ptr(y, -42);
+  var x : opt_ptr = null();
+  var y : opt_ptr = ptr(&42);
+  if (is_null(x)) {
+    return deref(x, -42) + deref(y, -42);
+  } else {
+    return 1;
+  }
 }

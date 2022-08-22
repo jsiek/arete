@@ -30,6 +30,8 @@ def simplify(type: Type, env) -> Type:
                          simplify(ret_ty, body_env))
     case IntType():
       ret = type
+    case RationalType():
+      ret = type
     case BoolType():
       ret = type
     case AnyType():
@@ -220,8 +222,9 @@ def match_types(vars: tuple[str],
     case (VoidType(), VoidType()):
       return True
     case _:
-      error(pat_ty.location, 'in match_types, unrecognized types:\n'
-            + str(pat_ty) + '\n' + str(match_ty))
+      return False
+      # error(pat_ty.location, 'in match_types, unrecognized types:\n'
+      #       + str(pat_ty) + '\n' + str(match_ty))
     
 def type_check_prim(location, op, arg_types):
     arg_types = [unfold(arg_ty) for arg_ty in arg_types]
@@ -277,6 +280,10 @@ def type_check_prim(location, op, arg_types):
         assert len(arg_types) == 1
         require_consistent(arg_types[0], IntType(location), 'in -', location)
         return IntType(location)
+      case 'exit':
+        assert len(arg_types) == 1
+        require_consistent(arg_types[0], IntType(location), 'in exit', location)
+        return VoidType(location)
       case 'and':
         assert len(arg_types) == 2
         require_consistent(arg_types[0], BoolType(location), 'in and', location)
@@ -568,19 +575,20 @@ def type_check_statement(s, env):
         return type_check_statement(body, env)
       case Match(cond, cases):
         cond_ty = type_check_exp(cond, env)
+        cond_ty = unfold(cond_ty)
         if not (isinstance(cond_ty, VariantType) \
                 or isinstance(cond_ty, AnyType)):
-          error(e.location, 'expected variant type in match, not '
+          error(s.location, 'expected variant type in match, not '
                 + str(cond_ty))
         return_type = None
-        for (tag, x, body) in cases:
+        for (tag, param, body) in cases:
           # tag in the variant type?
           if isinstance(cond_ty, VariantType):
             found = False
             for (alt_tag,alt_ty) in cond_ty.alternative_types:
               if tag == alt_tag:
                 body_env = env.copy()
-                body_env[x] = alt_ty
+                body_env[param.ident] = alt_ty
                 retty = type_check_statement(body, body_env)
                 if return_type is None:
                   return_type = retty

@@ -3,8 +3,8 @@ fun front(let ls) & { return ls[0]; }
 fun rest(let ls) & { return ls[1]; }
 
 fun map(let f, let ls) {
-  if (is_null(ls)) {
-    return null;
+  if (ls == ⟨⟩) {
+    return ⟨⟩;
   } else {
     return ⟨f(front(ls)), map(f, rest(ls))⟩;
   }
@@ -13,7 +13,7 @@ fun map(let f, let ls) {
 fun inc(let x) { return x + 1; }
 
 fun main() {
-  var ls1 = ⟨0, ⟨1, ⟨2, null⟩⟩⟩;
+  var ls1 = ⟨0, ⟨1, ⟨2, ⟨⟩⟩⟩⟩;
   var ls2 = map(inc, ls1);
   let three = front(rest(rest(ls2)));
   return three - 3;
