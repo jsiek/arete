@@ -3,17 +3,24 @@
 # features by desugaring into other language features.
 
 from abstract_syntax import *
+from functions import *
+from variables_and_binding import *
+from tuples_and_arrays import *
+from variants import *
+from modules import *
+from pointers import *
+from futures import *
 from utilities import *
 
 def desugar_exp(e, env):
     match e:
-      case Initializer(loc, percent, arg):
+      case PercentOf(loc, percent, arg):
         if percent == 'default':
             new_percent = 'default'
         else:
             new_percent = desugar_exp(percent, env)
         new_arg = desugar_exp(arg, env)
-        return Initializer(loc, new_percent, new_arg)
+        return PercentOf(loc, new_percent, new_arg)
       case Var(x):
         return e
       case Int(n):

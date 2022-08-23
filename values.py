@@ -560,3 +560,11 @@ def delete_env(label, env, mem, loc):
     for x in deletes:
         del env[x]
         
+def duplicate_if_temporary(result: Result, loc):
+  if result.temporary:
+    tmp = True
+    val = result.value.duplicate(1, loc)
+  else:
+    tmp = False
+    val = result.value
+  return Result(tmp, val)

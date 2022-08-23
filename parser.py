@@ -1,4 +1,11 @@
 from abstract_syntax import *
+from functions import *
+from variables_and_binding import *
+from tuples_and_arrays import *
+from variants import *
+from modules import *
+from pointers import *
+from futures import *
 from ast_types import *
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -293,10 +300,9 @@ def parse_tree_to_ast(e):
     
     # miscelaneous
     elif e.data == 'default_initializer':
-        #return Initializer(e.meta, 'default', parse_tree_to_ast(e.children[0]))
         return parse_tree_to_ast(e.children[0])
     elif e.data == 'frac_initializer':
-        return Initializer(e.meta, parse_tree_to_ast(e.children[0]), parse_tree_to_ast(e.children[1]))
+        return PercentOf(e.meta, parse_tree_to_ast(e.children[0]), parse_tree_to_ast(e.children[1]))
     
     # lists
     elif e.data == 'single':

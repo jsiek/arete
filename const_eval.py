@@ -2,6 +2,13 @@
 # TODO: more partial evaluation.
 
 from abstract_syntax import *
+from functions import *
+from variables_and_binding import *
+from variants import *
+from tuples_and_arrays import *
+from modules import *
+from pointers import *
+from futures import *
 from dataclasses import dataclass
 from parser import parse, set_filename
 from typing import List, Set, Dict, Tuple, Any
@@ -45,13 +52,13 @@ def const_eval_prim(loc, op, args):
   
 def const_eval_exp(e, env):
     match e:
-      case Initializer(loc, percent, arg):
+      case PercentOf(loc, percent, arg):
         if percent == 'default':
           new_percent = 'default'
         else:
           new_percent = const_eval_exp(percent, env)
         new_arg = const_eval_exp(arg, env)
-        return Initializer(loc, new_percent, new_arg)
+        return PercentOf(loc, new_percent, new_arg)
       case Var(x):
         if x in env:
           return env[x]

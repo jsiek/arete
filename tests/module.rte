@@ -2,7 +2,7 @@ module M
   exports empty, push, front, rest, map
 {
   const all = 1;
-  let empty = null;
+  let empty = ⟨⟩;
   fun push(let data, let rest) {
     return ⟨data, rest⟩;
   }
@@ -10,8 +10,8 @@ module M
   fun rest(let ls) { return ls[1]; }
   
   fun map(let f, let ls) {
-    if (is_null(ls)) {
-      return null;
+    if (ls == ⟨⟩) {
+      return ⟨⟩;
     } else {
       return ⟨f(front(ls)), map(f, rest(ls))⟩;
     }

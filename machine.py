@@ -25,6 +25,12 @@ import random
 import sys
 
 from abstract_syntax import *
+from functions import *
+from variables_and_binding import *
+from tuples_and_arrays import *
+from variants import *
+from modules import *
+from pointers import *
 from desugar import desugar_decls
 from utilities import *
 from parser import parse, set_filename
