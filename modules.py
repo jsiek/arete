@@ -1,6 +1,7 @@
 #
 # This file defines the language features related to modules in Arete,
 # which includes
+# * module values,
 # * module definitions,
 # * imports, and
 # * member access.
@@ -9,8 +10,38 @@ from dataclasses import dataclass
 from abstract_syntax import Param, Int
 from ast_base import *
 from ast_types import *
-from values import *
+from values import Pointer, Result, delete_env
 from utilities import *
+
+@dataclass(eq=False)
+class Module(Value):
+    name: str
+    exports: dict[str, Pointer] # only the exports
+    members: dict[str, Pointer] # all the members
+    __match_args__ = ("name", "exports")
+    def duplicate(self, percentage, loc):
+        error(loc, 'modules may not be copied')
+        # members_copy = {x: val.duplicate(percentage, loc) \
+        #                 for x,val in self.members.items()}
+        # exports_copy = {x: members_copy[x] for x in self.exports.keys()}
+        # return Module(self.name, exports_copy, self.members)
+    def __str__(self):
+      return self.name + '(' + str(id(self)) + ')' + '{' + ','.join([x + '=' + str(v) for x,v in self.exports.items()]) + '}'
+    def __repr__(self):
+        return str(self)
+    def kill(self, mem, location, progress=set()):
+        if tracing_on():
+          print('*** killing module ' + self.name + ' (' + str(id(self)) + ')')
+        delete_env(self.name, self.members, mem, location)
+        if tracing_on():
+          print('*** finished killing module ' + self.name + ' (' + str(id(self)) + ')')
+    def clear(self, mem, location, progress=set()):
+        for val in self.members.values():
+          val.clear(mem, location, progress)
+    def node_name(self):
+        return str(self.name)
+    def node_label(self):
+        return str(self.name)
 
 @dataclass
 class ModuleDef(Decl):

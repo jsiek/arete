@@ -6,6 +6,8 @@ compare_ops = { 'less': lambda x, y: x < y,
                 'greater': lambda x, y: x > y,
                 'greater_equal': lambda x, y: x >= y}
 
+# TODO: move most of these out into separate files.
+
 def eval_prim(op, vals, machine, location):
     match op:
       case 'breakpoint':
@@ -16,12 +18,6 @@ def eval_prim(op, vals, machine, location):
         exit(vals[0])
       case 'copy':
         return vals[0].duplicate(1, location)
-      case 'len':
-        tup = vals[0]
-        if not isinstance(tup, TupleValue):
-          error(location, "in len, expected a tuple or array not " + str(tup))
-        n = len(tup.elts)
-        return Number(n)
       case 'equal':
         left, right = vals
         return Boolean(left.equals(right))
@@ -63,13 +59,6 @@ def eval_prim(op, vals, machine, location):
       case 'not':
         val = to_boolean(vals[0], location)
         return Boolean(not val)
-      case 'split':
-        ptr = vals[0]
-        ptr1 = ptr.duplicate(Fraction(1, 2), location)
-        ptr2 = ptr.duplicate(Fraction(1, 1), location)
-        # is this allocation necessary?
-        #return machine.memory.allocate(TupleValue([ptr1, ptr2]))
-        return TupleValue([ptr1, ptr2])
       case 'join':
         ptr1, ptr2 = vals
         ptr = ptr1.duplicate(1, location)
@@ -91,7 +80,7 @@ def eval_prim(op, vals, machine, location):
         r = to_number(right, location)
         return Boolean(compare_ops[cmp](l, r))
       case _:
-        error(location, 'unknown primitive operator ' + op)    
+        return get_primitive_interp(op)(vals, machine, location)
         
 def type_check_prim(location, op, arg_types):
     arg_types = [unfold(arg_ty) for arg_ty in arg_types]
@@ -101,12 +90,6 @@ def type_check_prim(location, op, arg_types):
         return VoidType(location)
       case 'copy':
         return arg_types[0]
-      case 'len':
-        assert len(arg_types) == 1
-        assert isinstance(arg_types[0], ArrayType) \
-          or isinstance(arg_types[0], TupleType) \
-          or isinstance(arg_types[0], AnyType)
-        return IntType(location)
       case 'equal':
         assert len(arg_types) == 2
         if not consistent(arg_types[0], arg_types[1]):
@@ -173,11 +156,6 @@ def type_check_prim(location, op, arg_types):
         assert isinstance(arg_types[0], PointerType) \
           or isinstance(arg_types[0], AnyType)
         return BoolType(location)
-      case 'split':
-        assert len(arg_types) == 1
-        assert isinstance(arg_types[0], PointerType) \
-          or isinstance(arg_types[0], AnyType)
-        return TupleType(location, (arg_types[0], arg_types[0]))
       case 'join':
         assert len(arg_types) == 2
         # assert isinstance(arg_types[0], PointerType) \
@@ -206,4 +184,5 @@ def type_check_prim(location, op, arg_types):
         require_consistent(arg_types[1], IntType(location), 'in ' + cmp, location)
         return BoolType(location)
       case _:
-        error(location, 'in type_check_prim, unknown primitive operator ' + op)
+        return get_primitive_type_check(op)(arg_types, location)
+        

@@ -8,10 +8,24 @@ from dataclasses import dataclass
 from abstract_syntax import Param
 from ast_base import *
 from ast_types import *
-from values import *
+from values import Result
 from utilities import *
 
-      
+@dataclass
+class Future(Value):
+    thread: Any
+    __match_args__ = ("thread",)
+    def duplicate(self, percentage, loc):
+        return self
+    def kill(self, mem, location, progress=set()):
+        pass # ???
+    def clear(self, mem, location, progress=set()):
+        pass # ???
+    def __str__(self):
+        return "future"
+    def __repr__(self):
+        return str(self)
+    
 @dataclass
 class FutureExp(Exp):
   arg: Exp

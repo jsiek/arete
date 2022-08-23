@@ -50,7 +50,25 @@ def set_verbose(v):
   global verbose_flag
   verbose_flag = v
 
+# interpreting primitives
 
+interp_prim = {}
+
+def set_primitive_interp(op, fun):
+  interp_prim[op] = fun
+
+def get_primitive_interp(op):
+  return interp_prim[op]
+
+# type checking primitives
+
+type_check_prim = {}
+
+def set_primitive_type_check(op, fun):
+  type_check_prim[op] = fun
+
+def get_primitive_type_check(op):
+  return type_check_prim[op]
   
 # Context information:
 # do you want value or address of the expression? (i.e. rvalue/lvalue)

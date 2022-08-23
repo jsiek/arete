@@ -1,6 +1,7 @@
 #
 # This file defines the language features related to functions in Arete,
 # which includes
+# * function values (closures),
 # * module-level function definitions,
 # * function calls,
 # * return statements, and
@@ -11,8 +12,50 @@ from dataclasses import dataclass
 from abstract_syntax import Param
 from ast_base import *
 from ast_types import *
-from values import *
+from values import Result, Pointer
 from utilities import *
+
+@dataclass
+class Closure(Value):
+    name: str
+    params: list[Any]
+    return_mode: str    # 'value' or 'address'
+    body: Stmt
+    env: dict[str,Pointer]
+    __match_args__ = ("name", "params", "return_mode", "body", "env")
+    
+    def duplicate(self, percentage, loc):
+      if tracing_on():
+        print('duplicating closure ' + str(self))
+      env_copy = {x: v.duplicate(Fraction(1,2), loc) for x,v in self.env.items()}
+      return Closure(self.name, self.params, self.return_mode, self.body,
+                       env_copy)
+    
+    def kill(self, mem, location, progress=set()):
+      if tracing_on():
+        print('kill closure ' + str(self))
+      for x, ptr in self.env.items():
+        ptr.kill(mem, location, progress)
+        
+    def clear(self, mem, location, progress=set()):
+      for x, ptr in self.env.items():
+        ptr.kill(mem, location, progress)
+      
+    def __str__(self):
+        if verbose():
+            return '<' + self.name + '>' + '(' + ', '.join([str(ptr) for x, ptr in self.env.items()]) + ')'
+        else:
+            return '<' + self.name + '>'
+      
+    def __repr__(self):
+        return str(self)
+
+    def node_name(self):
+        return str(self.name)
+      
+    def node_label(self):
+        return 'fun ' + str(self.name) + '(' + ', '.join([ptr.node_label() for x, ptr in self.env.items()]) + ')'
+    
 
 @dataclass
 class Function(Decl):

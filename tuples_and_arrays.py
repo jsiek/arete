@@ -1,16 +1,142 @@
 #
 # This file defines the language features related to tuples and arrays in Arete,
 # which includes
-# * array creation
-# * tuple creation
-# * element access (indexing)
+# * tuple values,
+# * the `split` and `let` primitives,
+# * array creation,
+# * tuple creation, and
+# * element access (indexing).
+#
+# Tuple values are defined in `values.py` because some pointer
+# operations (split) also make use of tuple values.
 
 from dataclasses import dataclass
 from abstract_syntax import Param, Int
 from ast_base import *
 from ast_types import *
-from values import *
+from values import Result, to_integer, duplicate_if_temporary, PointerOffset, \
+    Number
 from utilities import *
+
+@dataclass
+class TupleValue(Value):
+    elts: list[Value]
+
+    def equals(self, other):
+      if len(self.elts) == len(other.elts):
+        return all([e1 == e2 for e1,e2 in zip(self.elts, other.elts)])
+      else:
+        return False
+    
+    def duplicate(self, percentage, loc):
+      return TupleValue([elt.duplicate(percentage, loc) for elt in self.elts])
+    
+    def kill(self, mem, location, progress=set()):
+      for elt in self.elts:
+        elt.kill(mem, location, progress)
+
+    def clear(self, mem, location, progress=set()):
+      for elt in self.elts:
+        elt.clear(mem, location, progress)
+
+    def get_subobject(self, path, loc):
+      if len(path) == 0:
+        return self
+      else:
+        return self.elts[path[0]].get_subobject(path[1:], loc)
+
+    def set_subobject(self, path, val, loc):
+        if len(path) == 0:
+          return val
+        else:
+          i = path[0]
+          if i < 0 or i >= len(self.elts):
+            error(loc, 'path index ' + str(i) + ' is out of bounds for tuple '
+                  + str(self))
+          front = self.elts[:i]
+          back = self.elts[i+1:]
+          ith = self.elts[i].set_subobject(path[1:], val, loc)
+          return TupleValue(front + [ith] + back)
+      
+    def __str__(self):
+        return '⟨' + ', '.join([str(elt) for elt in self.elts]) + '⟩'
+      
+    def __repr__(self):
+        return str(self)
+      
+    def node_name(self):
+        return str(self)
+      
+    def node_label(self):
+        return '|'.join(['<' + str(i) + '>' + elt.node_label() \
+                         for (i,elt) in zip(range(0,len(self.elts)),
+                                            self.elts)])
+    def gen_graphviz(self, addr):
+      result = ''
+      elt_names = []
+      elt_labels = []
+      for elt in self.elts:
+        subresult, elt_name, elt_label = elt.gen_graphviz(None)
+        result += subresult
+        elt_names.append(elt_name)
+        elt_labels.append(elt_label)
+      if addr is None:
+        name = str(id(self))
+        base = ''
+      else:
+        name = str(addr)
+        base = '<base> ' + str(addr) + ': |'
+      tuple_label = base \
+        + '|'.join(['<' + str(i) + '>' + label \
+                    for (i,label) in zip(range(0,len(elt_labels)),elt_labels)])
+      # add node
+      result += name + ' [shape=record,label="' + tuple_label + '"];\n'
+
+      # add out-edges
+      for i, elt_name in zip(range(0, len(elt_names)), elt_names):
+        if not elt_name is None:
+          result += name + ':' + str(i) + ' -> ' + elt_name + ';\n'
+
+      return result, name, '•'
+
+# The primitive `split` operator
+
+def interp_split(vals, machine, location):
+    ptr = vals[0]
+    ptr1 = ptr.duplicate(Fraction(1, 2), location)
+    ptr2 = ptr.duplicate(Fraction(1, 1), location)
+    return TupleValue([ptr1, ptr2])
+
+set_primitive_interp('split', interp_split)
+
+def type_check_split(arg_types, location):
+  assert len(arg_types) == 1
+  assert isinstance(arg_types[0], PointerType) \
+    or isinstance(arg_types[0], AnyType)
+  return TupleType(location, (arg_types[0], arg_types[0]))
+
+set_primitive_type_check('split', type_check_split)
+  
+# The primitive `len` operator
+
+def interp_len(vals, machine, location):
+  tup = vals[0]
+  if not isinstance(tup, TupleValue):
+      error(location, 'in len, expected a tuple, not ' + str(tup))
+  return Number(len(tup.elts))
+
+set_primitive_interp('len', interp_len)
+
+def type_check_len(arg_types, location):
+  assert len(arg_types) == 1
+  assert isinstance(arg_types[0], ArrayType) \
+    or isinstance(arg_types[0], TupleType) \
+    or isinstance(arg_types[0], AnyType)
+  return IntType(location)
+    
+set_primitive_type_check('len', type_check_len)
+
+# Array creation
 
 @dataclass
 class Array(Exp):
@@ -54,7 +180,9 @@ class Array(Exp):
         error(self.location, "expected integer array size, not "
               + str(size_type))
     return ArrayType(self.location, arg_type)
-      
+
+# Tuple Creation
+
 @dataclass
 class TupleExp(Exp):
   inits: list[Exp]
@@ -84,7 +212,9 @@ class TupleExp(Exp):
   def type_check(self, env):
     init_types = tuple(init.type_check(env) for init in self.inits)
     return TupleType(self.location, init_types)
-    
+
+# Element Access
+
 @dataclass
 class Index(Exp):
   arg: Exp
