@@ -1,8 +1,9 @@
 #
 # This file defines the language features related to variants in Arete,
 # which includes
-# * variant creation (tag)
-# * match statement
+# * variant values,
+# * variant creation (tagging), and
+# * match statement.
 
 from dataclasses import dataclass
 from abstract_syntax import Param
