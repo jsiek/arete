@@ -226,262 +226,146 @@ def match_types(vars: tuple[str],
       # error(pat_ty.location, 'in match_types, unrecognized types:\n'
       #       + str(pat_ty) + '\n' + str(match_ty))
     
-def type_check_prim(location, op, arg_types):
-    arg_types = [unfold(arg_ty) for arg_ty in arg_types]
-    match op:
-      case 'breakpoint':
-        assert len(arg_types) == 0;
-        return VoidType(location)
-      case 'copy':
-        return arg_types[0]
-      case 'len':
-        assert len(arg_types) == 1
-        assert isinstance(arg_types[0], ArrayType) \
-          or isinstance(arg_types[0], TupleType) \
-          or isinstance(arg_types[0], AnyType)
-        return IntType(location)
-      case 'equal':
-        assert len(arg_types) == 2
-        if not consistent(arg_types[0], arg_types[1]):
-          error(location, 'equal operator, '
-                + str(arg_types[0]) + ' not consistent with '
-                + str(arg_types[1]))
-        return BoolType(location)
-      case 'not_equal':
-        assert len(arg_types) == 2
-        require_consistent(arg_types[0], arg_types[1], 'in !=', location)
-        return BoolType(location)
-      case 'add':
-        assert len(arg_types) == 2
-        require_consistent(arg_types[0], IntType(location), 'in +', location)
-        require_consistent(arg_types[1], IntType(location), 'in +', location)
-        return IntType(location)
-      case 'sub':
-        assert len(arg_types) == 2
-        require_consistent(arg_types[0], IntType(location), 'in -', location)
-        require_consistent(arg_types[1], IntType(location), 'in -', location)
-        return IntType(location)
-      case 'mul':
-        assert len(arg_types) == 2
-        require_consistent(arg_types[0], IntType(location), 'in *', location)
-        require_consistent(arg_types[1], IntType(location), 'in *', location)
-        return IntType(location)
-      case 'div':
-        assert len(arg_types) == 2
-        require_consistent(arg_types[0], IntType(location), 'in /', location)
-        require_consistent(arg_types[1], IntType(location), 'in /', location)
-        return RationalType(location)
-      case 'int_div':
-        assert len(arg_types) == 2
-        require_consistent(arg_types[0], IntType(location), 'in //', location)
-        require_consistent(arg_types[1], IntType(location), 'in //', location)
-        return IntType(location)
-      case 'neg':
-        assert len(arg_types) == 1
-        require_consistent(arg_types[0], IntType(location), 'in -', location)
-        return IntType(location)
-      case 'exit':
-        assert len(arg_types) == 1
-        require_consistent(arg_types[0], IntType(location), 'in exit', location)
-        return VoidType(location)
-      case 'and':
-        assert len(arg_types) == 2
-        require_consistent(arg_types[0], BoolType(location), 'in and', location)
-        require_consistent(arg_types[1], BoolType(location), 'in and', location)
-        return BoolType(location)
-      case 'or':
-        assert len(arg_types) == 2
-        require_consistent(arg_types[0], BoolType(location), 'in or', location)
-        require_consistent(arg_types[1], BoolType(location), 'in or', location)
-        return BoolType(location)
-      case 'not':
-        assert len(arg_types) == 1
-        require_consistent(arg_types[0], BoolType(location), 'in not', location)
-        return BoolType(location)
-      case 'null':
-        assert len(arg_types) == 0
-        return PointerType(location, AnyType(location))
-      case 'is_null':
-        assert len(arg_types) == 1
-        assert isinstance(arg_types[0], PointerType) \
-          or isinstance(arg_types[0], AnyType)
-        return BoolType(location)
-      case 'split':
-        assert len(arg_types) == 1
-        assert isinstance(arg_types[0], PointerType) \
-          or isinstance(arg_types[0], AnyType)
-        return TupleType(location, (arg_types[0], arg_types[0]))
-      case 'join':
-        assert len(arg_types) == 2
-        # assert isinstance(arg_types[0], PointerType) \
-        #   or isinstance(arg_types[0], ArrayType) \
-        #   or isinstance(arg_types[0], AnyType)
-        # assert isinstance(arg_types[1], PointerType) \
-        #   or isinstance(arg_types[1], ArrayType) \
-        #   or isinstance(arg_types[1], AnyType)
-        require_consistent(arg_types[0], arg_types[1], 'in join', location)
-        return join(arg_types[0], arg_types[1])
-      case 'permission':
-        assert len(arg_types) == 1
-        # assert isinstance(arg_types[0], PointerType) \
-        #   or isinstance(arg_types[0], ArrayType) \
-        #   or isinstance(arg_types[0], AnyType)
-        return RationalType(location)
-      case 'upgrade':
-        assert len(arg_types) == 1
-        # assert isinstance(arg_types[0], PointerType) \
-        #   or isinstance(arg_types[0], ArrayType) \
-        #   or isinstance(arg_types[0], AnyType)
-        return BoolType(location)
-      case cmp if cmp in compare_ops.keys():
-        assert len(arg_types) == 2
-        require_consistent(arg_types[0], IntType(location), 'in ' + cmp, location)
-        require_consistent(arg_types[1], IntType(location), 'in ' + cmp, location)
-        return BoolType(location)
-      case _:
-        error(location, 'in type_check_prim, unknown primitive operator ' + op)
-
-  
 def type_check_exp(e, env):
     match e:
-      case Initializer(loc, percent, arg):
-        if percent == 'default':
-          percent_type = RationalType(init.location)
-        else:
-          percent_type = type_check_exp(percent, env)
-        percent_type = unfold(percent_type)
-        if isinstance(percent_type, RationalType) \
-           or isinstance(percent_type, IntType):
-          arg_type = type_check_exp(arg, env)
-          return arg_type
-        elif isinstance(percent_type, AnyType):
-          return AnyType(loc)
-        else:
-          error(init.location, 'in initializer, expected percentage '
-                + 'not ' + str(percent_type))
-      case Var(x):
-        if x not in env:
-            error(e.location, 'use of undefined variable ' + x)
-        return env[x]
-      case Int(n):
-        return IntType(e.location)
-      case Frac(f):
-        return RationalType(e.location)
-      case Bool(b):
-        return BoolType(e.location)
-      case PrimitiveCall(op, args):
-        arg_types = [type_check_exp(arg, env) for arg in args]
-        return type_check_prim(e.location, op, arg_types)
-      case Member(arg, field):
-        mod_type = type_check_exp(arg, env)
-        mod_type = unfold(mod_type)
-        if not isinstance(mod_type, ModuleType):
-            error(e.location, "expected a module, not " + str(mod_type))
-        if not field in mod_type.member_types.keys():
-            error(e.location, "module " + str(arg) + " does not contain "
-                  + field)
-        return mod_type.member_types[field]
-      case Array(size, arg):
-        size_type = type_check_exp(size, env)
-        arg_type = type_check_exp(arg, env)
-        if not (isinstance(size_type, IntType)
-                or isinstance(size_type, AnyType)):
-            error(e.location, "expected integer array size, not "
-                  + str(size_type))
-        return ArrayType(e.location, arg_type)
-      case TupleExp(inits):
-        init_types = tuple(type_check_exp(init, env) for init in inits)
-        return TupleType(e.location, init_types)
-      case TagVariant(tag, arg, ty_annot):
-        ty = simplify(ty_annot, env)
-        if not (isinstance(ty, VariantType) or isinstance(ty, AnyType)):
-          error(e.location, 'expected variant type in tagging, not '
-                + str(ty_annot))
-        arg_ty = type_check_exp(arg, env)
-        if isinstance(ty, VariantType):
-          found = False
-          for (alt_tag, alt_ty) in ty.alternative_types:
-            if tag == alt_tag:
-              if not consistent(arg_ty, alt_ty):
-                error(e.location, 'expected ' + str(alt_ty) + '\nnot ' 
-                      + str(arg_ty))
-              found = True
-          if not found:
-            error(e.location, 'no tag ' + tag + ' in ' + str(ty_annot))
-        return ty
-      case Lambda(params, ret_mode, body, name):
-        body_env = env.copy()
-        for p in params:
-            body_env[p.ident] = p.type_annot
-        ret_type = type_check_statement(body, body_env)
-        return FunctionType(e.location,
-                            tuple(),
-                            tuple(p.type_annot for p in params),
-                            ret_type)
-      case Call(fun, inits):
-        fun_type = type_check_exp(fun, env)
-        arg_types = [type_check_exp(init, env) for init in inits]
-        fun_type = unfold(fun_type)
-        if tracing_on():
-          print('call to function of type ' + str(fun_type))
-        if isinstance(fun_type, FunctionType):
-          fun_env = env.copy()
-          for t in fun_type.type_params:
-            fun_env[t] = TypeVar(e.location, t)
-          # perform type argument deduction
-          matches = {}
-          for (param_ty, arg_ty) in zip(fun_type.param_types, arg_types):
-              pt = simplify(param_ty, fun_env)
-              if not match_types(fun_type.type_params, pt, arg_ty, matches,
-                                 set()):
-                  error(e.location, 'in call, '
-                        + 'expected type ' + str(param_ty)
-                        + ' not ' + str(arg_ty))
-          if tracing_on():
-            print('deduced: ' + str(matches))
-          rt = simplify(fun_type.return_type, fun_env)
-          return substitute(matches, rt)
-        elif isinstance(fun_type, AnyType):
-          return AnyType(e.location)
-        else:
-          error(e.location, "in call, expected a function, not "
-                + str(fun_type))
-      case Index(arg, index):
-        arg_type = type_check_exp(arg, env)
-        index_type = type_check_exp(index, env)
-        arg_type = unfold(arg_type)
-        if isinstance(arg_type, TupleType):
-          if isinstance(index, Int):
-            if 0 <= index.value and index.value < len(arg_type.member_types):
-              return arg_type.member_types[index.value]
-            else:
-              error(e.location, 'index ' + str(index.value)
-                    + ' out of bounds for pointer ' + str(arg_type))
-          else:
-            error(e.location, 'in subscript, expected an integer index, not '
-                  + str(index))
-        elif isinstance(arg_type, ArrayType):
-          return arg_type.element_type
-        elif isinstance(arg_type, AnyType):
-          return AnyType(e.location)
-        else:
-          error(e.location, 'in subscript, expected tuple or array, not '
-                + str(arg_type))
-      case Deref(arg):
-        arg_type = type_check_exp(arg, env)
-        arg_type = unfold(arg_type)
-        if isinstance(arg_type, PointerType):
-          return arg_type.type
-        # elif isinstance(arg_type, ArrayType):
-        #   return arg_type.element_type
-        elif isinstance(arg_type, AnyType):
-          return AnyType(e.location)
-        else:
-          error(e.location, 'in deref, expected a pointer, not '
-                + str(arg_type))
-      case AddressOf(arg):
-        arg_type = type_check_exp(arg, env)
-        return PointerType(e.location, arg_type)
+      # case Initializer(loc, percent, arg):
+      #   if percent == 'default':
+      #     percent_type = RationalType(e.location)
+      #   else:
+      #     percent_type = type_check_exp(percent, env)
+      #   percent_type = unfold(percent_type)
+      #   if isinstance(percent_type, RationalType) \
+      #      or isinstance(percent_type, IntType):
+      #     arg_type = type_check_exp(arg, env)
+      #     return arg_type
+      #   elif isinstance(percent_type, AnyType):
+      #     return AnyType(loc)
+      #   else:
+      #     error(e.location, 'in initializer, expected percentage '
+      #           + 'not ' + str(percent_type))
+      # case Var(x):
+      #   if x not in env:
+      #       error(e.location, 'use of undefined variable ' + x)
+      #   return env[x]
+      # case Int(n):
+      #   return IntType(e.location)
+      # case Frac(f):
+      #   return RationalType(e.location)
+      # case Bool(b):
+      #   return BoolType(e.location)
+      # case PrimitiveCall(op, args):
+      #   arg_types = [type_check_exp(arg, env) for arg in args]
+      #   return type_check_prim(e.location, op, arg_types)
+      # case Member(arg, field):
+      #   mod_type = type_check_exp(arg, env)
+      #   mod_type = unfold(mod_type)
+      #   if not isinstance(mod_type, ModuleType):
+      #       error(e.location, "expected a module, not " + str(mod_type))
+      #   if not field in mod_type.member_types.keys():
+      #       error(e.location, "module " + str(arg) + " does not contain "
+      #             + field)
+      #   return mod_type.member_types[field]
+      # case Array(size, arg):
+      #   size_type = type_check_exp(size, env)
+      #   arg_type = type_check_exp(arg, env)
+      #   if not (isinstance(size_type, IntType)
+      #           or isinstance(size_type, AnyType)):
+      #       error(e.location, "expected integer array size, not "
+      #             + str(size_type))
+      #   return ArrayType(e.location, arg_type)
+      # case TupleExp(inits):
+      #   init_types = tuple(type_check_exp(init, env) for init in inits)
+      #   return TupleType(e.location, init_types)
+      # case TagVariant(tag, arg, ty_annot):
+      #   ty = simplify(ty_annot, env)
+      #   if not (isinstance(ty, VariantType) or isinstance(ty, AnyType)):
+      #     error(e.location, 'expected variant type in tagging, not '
+      #           + str(ty_annot))
+      #   arg_ty = type_check_exp(arg, env)
+      #   if isinstance(ty, VariantType):
+      #     found = False
+      #     for (alt_tag, alt_ty) in ty.alternative_types:
+      #       if tag == alt_tag:
+      #         if not consistent(arg_ty, alt_ty):
+      #           error(e.location, 'expected ' + str(alt_ty) + '\nnot ' 
+      #                 + str(arg_ty))
+      #         found = True
+      #     if not found:
+      #       error(e.location, 'no tag ' + tag + ' in ' + str(ty_annot))
+      #   return ty
+      # case Lambda(params, ret_mode, body, name):
+      #   body_env = env.copy()
+      #   for p in params:
+      #       body_env[p.ident] = p.type_annot
+      #   ret_type = type_check_statement(body, body_env)
+      #   return FunctionType(e.location,
+      #                       tuple(),
+      #                       tuple(p.type_annot for p in params),
+      #                       ret_type)
+      # case Call(fun, inits):
+      #   fun_type = type_check_exp(fun, env)
+      #   arg_types = [type_check_exp(init, env) for init in inits]
+      #   fun_type = unfold(fun_type)
+      #   if tracing_on():
+      #     print('call to function of type ' + str(fun_type))
+      #   if isinstance(fun_type, FunctionType):
+      #     fun_env = env.copy()
+      #     for t in fun_type.type_params:
+      #       fun_env[t] = TypeVar(e.location, t)
+      #     # perform type argument deduction
+      #     matches = {}
+      #     for (param_ty, arg_ty) in zip(fun_type.param_types, arg_types):
+      #         pt = simplify(param_ty, fun_env)
+      #         if not match_types(fun_type.type_params, pt, arg_ty, matches,
+      #                            set()):
+      #             error(e.location, 'in call, '
+      #                   + 'expected type ' + str(param_ty)
+      #                   + ' not ' + str(arg_ty))
+      #     if tracing_on():
+      #       print('deduced: ' + str(matches))
+      #     rt = simplify(fun_type.return_type, fun_env)
+      #     return substitute(matches, rt)
+      #   elif isinstance(fun_type, AnyType):
+      #     return AnyType(e.location)
+      #   else:
+      #     error(e.location, "in call, expected a function, not "
+      #           + str(fun_type))
+      # case Index(arg, index):
+      #   arg_type = type_check_exp(arg, env)
+      #   index_type = type_check_exp(index, env)
+      #   arg_type = unfold(arg_type)
+      #   if isinstance(arg_type, TupleType):
+      #     if isinstance(index, Int):
+      #       if 0 <= index.value and index.value < len(arg_type.member_types):
+      #         return arg_type.member_types[index.value]
+      #       else:
+      #         error(e.location, 'index ' + str(index.value)
+      #               + ' out of bounds for pointer ' + str(arg_type))
+      #     else:
+      #       error(e.location, 'in subscript, expected an integer index, not '
+      #             + str(index))
+      #   elif isinstance(arg_type, ArrayType):
+      #     return arg_type.element_type
+      #   elif isinstance(arg_type, AnyType):
+      #     return AnyType(e.location)
+      #   else:
+      #     error(e.location, 'in subscript, expected tuple or array, not '
+      #           + str(arg_type))
+      # case Deref(arg):
+      #   arg_type = type_check_exp(arg, env)
+      #   arg_type = unfold(arg_type)
+      #   if isinstance(arg_type, PointerType):
+      #     return arg_type.type
+      #   # elif isinstance(arg_type, ArrayType):
+      #   #   return arg_type.element_type
+      #   elif isinstance(arg_type, AnyType):
+      #     return AnyType(e.location)
+      #   else:
+      #     error(e.location, 'in deref, expected a pointer, not '
+      #           + str(arg_type))
+      # case AddressOf(arg):
+      #   arg_type = type_check_exp(arg, env)
+      #   return PointerType(e.location, arg_type)
       case IfExp(cond, thn, els):
         cond_type = type_check_exp(cond, env)
         thn_type = type_check_exp(thn, env)
@@ -517,7 +401,7 @@ def type_check_exp(e, env):
           error(arg.location, 'in wait, expected a future, not '
                 + str(arg_type))
       case _:
-        error(e.location, 'error in type_check_exp, unhandled: ' + repr(e)) 
+        return e.type_check(env)
     
 def type_check_statement(s, env):
     match s:

@@ -14,10 +14,10 @@ to the following design principles:
    with large software dependencies.
    
 3. efficient runtime: runtime overheads will in general be low and
-   under control of the programmer. Memory management is not by
-   garbage collection, but is instead under programmer control.
-   Specialization/monomorphization of generics will be available as a
-   compiler optimization.
+   under control of the programmer. Memory management is not via
+   garbage collection, but is semi-automatic and under programmer
+   control.  Specialization/monomorphization of generics will be
+   available as a compiler optimization.
 
 4. high power-to-weight ratio: the language will have a relatively low
    number of features, but those features will be powerful and work
@@ -44,9 +44,9 @@ Arete currently includes the following features
 
 and I plan to add:
 
-* static checking of fractional permissions
+* static checking of fractional permissions,
 
-* generics with contraints
+* generics with contraints and lexically scoped implementationns,
 
 * more features for asynchronous and parallel programming.
 
@@ -66,8 +66,8 @@ implementation written in Python 3.10 that includes:
 
 The design of Arete is based on discussions with Dave Abrahams and
 Dimitri Racordon about their Val language and it is influenced by the
-design of the Carbon language. The abstract machine is organized in a
-similar way to the one in Carbon Explorer.
+design of the Carbon language. The organization of the abstract
+machine is based on Carbon Explorer.
 
 
 # Examples
@@ -1614,7 +1614,7 @@ blocks until the future's thread is finished. The result of this
 # TODO
 
 [/] Add variants. (safe unions)
-[X] Remove null pointers.
-[ ] debugger: show stack
+[/] Remove null pointers.
+[ ] debugger: command to display the stack (like backtrace in gdb)
 [ ] Refactor desugar, const_eval, and type_check into AST methods
 [ ] Test cases for type checking failures.
