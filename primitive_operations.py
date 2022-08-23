@@ -1,5 +1,5 @@
 from values import *
-from types import *
+from ast_types import *
 
 compare_ops = { 'less': lambda x, y: x < y,
                 'less_equal': lambda x, y: x <= y,

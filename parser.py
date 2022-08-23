@@ -1,5 +1,5 @@
 from abstract_syntax import *
-from types import *
+from ast_types import *
 from collections import OrderedDict
 from dataclasses import dataclass
 from lark import Lark, Token, logger

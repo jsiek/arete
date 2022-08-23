@@ -5,7 +5,9 @@ from fractions import Fraction
 from utilities import *
 from values import *
 from memory import *
-from primitive_operations import eval_prim, compare_ops
+from primitive_operations import eval_prim, compare_ops, type_check_prim
+from ast_base import *
+from ast_types import *
 
 # Parameters
 
@@ -62,14 +64,14 @@ class Initializer(Exp):
                                 self.location)
 
   def type_check(self, env):
-    if self.percent == 'default':
+    if self.percentage == 'default':
       percent_type = RationalType(self.location)
     else:
-      percent_type = self.percent.type_check(self.percent, env)
+      percent_type = self.percentage.type_check(env)
     percent_type = unfold(percent_type)
     if isinstance(percent_type, RationalType) \
        or isinstance(percent_type, IntType):
-      arg_type = self.arg.type_check(arg, env)
+      arg_type = self.arg.type_check(env)
       return arg_type
     elif isinstance(percent_type, AnyType):
       return AnyType(self.location)
@@ -176,7 +178,7 @@ class Call(Exp):
     if isinstance(fun_type, FunctionType):
       fun_env = env.copy()
       for t in fun_type.type_params:
-        fun_env[t] = TypeVar(e.location, t)
+        fun_env[t] = TypeVar(self.location, t)
       # perform type argument deduction
       matches = {}
       for (param_ty, arg_ty) in zip(fun_type.param_types, arg_types):
@@ -232,7 +234,7 @@ class PrimitiveCall(Exp):
 
   def type_check(self, env):
     arg_types = [arg.type_check(env) for arg in self.args]
-    return type_check_prim(e.location, self.op, arg_types)
+    return type_check_prim(self.location, self.op, arg_types)
 
     
 @dataclass
@@ -257,7 +259,7 @@ class Member(Exp):
       mod_ptr = runner.results[0].value
       mod = machine.memory.read(mod_ptr, self.location)
       if not isinstance(mod, Module):
-        error(e.location, "expected a module, not " + str(val))
+        error(self.location, "expected a module, not " + str(val))
       if self.field in mod.exports.keys():
         ptr = mod.exports[self.field]
         if isinstance(runner.context, ValueCtx):
@@ -275,7 +277,7 @@ class Member(Exp):
     mod_type = self.arg.type_check(env)
     mod_type = unfold(mod_type)
     if not isinstance(mod_type, ModuleType):
-        error(e.location, "expected a module, not " + str(mod_type))
+        error(self.location, "expected a module, not " + str(mod_type))
     if not self.field in mod_type.member_types.keys():
         error(self.location, "module " + str(self.arg) + " does not contain "
               + self.field)
@@ -322,7 +324,7 @@ class Array(Exp):
             or isinstance(size_type, AnyType)):
         error(self.location, "expected integer array size, not "
               + str(size_type))
-    return ArrayType(e.location, arg_type)
+    return ArrayType(self.location, arg_type)
       
 @dataclass
 class TupleExp(Exp):
@@ -385,21 +387,21 @@ class TagVariant(Exp):
       machine.finish_expression(Result(True, result), self.location)
 
   def type_check(self, env):
-    ty = simplify(ty_annot, env)
+    ty = simplify(self.type, env)
     if not (isinstance(ty, VariantType) or isinstance(ty, AnyType)):
-      error(e.location, 'expected variant type in tagging, not '
-            + str(ty_annot))
+      error(self.location, 'expected variant type in tagging, not '
+            + str(self.type))
     arg_ty = self.arg.type_check(env)
     if isinstance(ty, VariantType):
       found = False
       for (alt_tag, alt_ty) in ty.alternative_types:
         if self.tag == alt_tag:
           if not consistent(arg_ty, alt_ty):
-            error(e.location, 'expected ' + str(alt_ty) + '\nnot ' 
+            error(self.location, 'expected ' + str(alt_ty) + '\nnot ' 
                   + str(arg_ty))
           found = True
       if not found:
-        error(self.location, 'no tag ' + self.tag + ' in ' + str(ty_annot))
+        error(self.location, 'no tag ' + self.tag + ' in ' + str(self.type))
     return ty
     
       
@@ -613,7 +615,7 @@ class Deref(Exp):
     if isinstance(arg_type, PointerType):
       return arg_type.type
     elif isinstance(arg_type, AnyType):
-      return AnyType(e.location)
+      return AnyType(self.location)
     else:
       error(self.location, 'in deref, expected a pointer, not '
             + str(arg_type))
@@ -702,14 +704,18 @@ class IfExp(Exp):
   thn: Exp
   els: Exp
   __match_args__ = ("cond", "thn", "els")
+  
   def __str__(self):
       return "(" + str(self.cond) + "?" + str(self.thn) \
           + " : " + str(self.els) + ")"
+    
   def __repr__(self):
       return str(self)
+    
   def free_vars(self):
       return self.cond.free_vars() | self.thn.free_vars() \
           | self.els.free_vars()
+    
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.cond, runner.env)
@@ -724,6 +730,20 @@ class IfExp(Exp):
                       runner.results[1].value.duplicate(1, self.location))
       machine.finish_expression(result, self.location)
 
+  def type_check(self, env):
+    cond_type = self.cond.type_check(env)
+    thn_type = self.thn.type_check(env)
+    els_type = self.els.type_check(env)
+    if not (isinstance(cond_type, BoolType)
+            or isinstance(cond_type, AnyType)):
+      error(self.location, 'in conditional, expected a Boolean, not '
+            + str(cond_type))
+    if not consistent(thn_type, els_type):
+      error(self.location, 'in conditional, branches must be consistent, not '
+            + str(cond_type))
+    return join(thn_type, els_type)
+    
+      
 def duplicate_if_temporary(result: Result, loc):
   if result.temporary:
     tmp = True
@@ -735,45 +755,65 @@ def duplicate_if_temporary(result: Result, loc):
 
 @dataclass
 class BindingExp(Exp):
-    param: Param
-    arg: Exp
-    body: Exp
-    __match_args__ = ("param", "arg", "body")
-    def __str__(self):
-      if verbose():
-        return str(self.param) + " = " + str(self.arg) + ";\n" \
-            + str(self.body)
-      else:
-        return str(self.param) + " = " + str(self.arg) + "; ..."
-    def __repr__(self):
-        return str(self)
-    def free_vars(self):
-        return self.arg.free_vars() \
-            | (self.body.free_vars() - set([self.param.ident]))
-    def step(self, runner, machine):
-      if runner.state == 0:
-        machine.schedule(self.arg, runner.env, AddressCtx())
-      elif runner.state == 1:
-        runner.body_env = runner.env.copy()
-        machine.bind_param(self.param, runner.results[0],
-                           runner.body_env, self.arg.location)
-        machine.schedule(self.body, runner.body_env, runner.context)
-      else:
-        machine.dealloc_param(self.param, runner.results[0],
-                              runner.body_env, self.location)
-        result = duplicate_if_temporary(runner.results[1], self.location)
-        machine.finish_expression(result, self.location)
+  param: Param
+  arg: Exp
+  body: Exp
+  __match_args__ = ("param", "arg", "body")
 
+  def __str__(self):
+    if verbose():
+      return str(self.param) + " = " + str(self.arg) + ";\n" \
+          + str(self.body)
+    else:
+      return str(self.param) + " = " + str(self.arg) + "; ..."
+
+  def __repr__(self):
+      return str(self)
+
+  def free_vars(self):
+      return self.arg.free_vars() \
+          | (self.body.free_vars() - set([self.param.ident]))
+
+  def step(self, runner, machine):
+    if runner.state == 0:
+      machine.schedule(self.arg, runner.env, AddressCtx())
+    elif runner.state == 1:
+      runner.body_env = runner.env.copy()
+      machine.bind_param(self.param, runner.results[0],
+                         runner.body_env, self.arg.location)
+      machine.schedule(self.body, runner.body_env, runner.context)
+    else:
+      machine.dealloc_param(self.param, runner.results[0],
+                            runner.body_env, self.location)
+      result = duplicate_if_temporary(runner.results[1], self.location)
+      machine.finish_expression(result, self.location)
+
+  def type_check(self, env):
+    rhs_type = self.arg.type_check(env)
+    type_annot = simplify(self.param.type_annot, env)
+    if not consistent(rhs_type, type_annot):
+      error(e.location, 'type of initializer ' + str(rhs_type) + '\n'
+            + ' is inconsistent with declared type ' + str(type_annot))
+    body_env = env.copy()
+    body_env[self.param.ident] = rhs_type
+    return self.body.type_check(body_env)
+
+  
+      
 @dataclass
 class FutureExp(Exp):
   arg: Exp
   __match_args__ = ("arg",)
+  
   def __str__(self):
     return "future " + str(self.arg)
+  
   def __repr__(self):
     return str(self)
+  
   def free_vars(self):
     return self.arg.free_vars()
+  
   def step(self, runner, machine):
     thread = machine.spawn(self.arg, runner.env)
     if isinstance(runner.context, ValueCtx):
@@ -783,16 +823,25 @@ class FutureExp(Exp):
       result = machine.memory.allocate(future)
     machine.finish_expression(Result(True, result), self.location)
 
+  def type_check(self, env):
+    arg_type = self.arg.type_check(env)
+    return FutureType(self.location, arg_type)
+    
+    
 @dataclass
 class Wait(Exp):
   arg: Exp
   __match_args__ = ("arg",)
+  
   def __str__(self):
     return "wait " + str(self.arg)
+  
   def __repr__(self):
     return str(self)
+  
   def free_vars(self):
     return self.arg.free_vars()
+  
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.arg, runner.env)
@@ -808,7 +857,18 @@ class Wait(Exp):
         elif isinstance(runner.context, AddressCtx):
           result = Result(True, machine.memory.allocate(val))
         machine.finish_expression(result, self.location)
-  
+
+  def type_check(self, env):
+    arg_type = self.arg.type_check(env)
+    arg_type = unfold(arg_type)
+    if isinstance(arg_type, FutureType):
+      return arg_type.result_type
+    elif isinstance(arg_type, AnyType):
+      return AnyType(self.location)
+    else:
+      error(self.arg.location, 'in wait, expected a future, not '
+            + str(arg_type))
+    
     
 # Statements
 
@@ -861,6 +921,33 @@ class Match(Stmt):
                             self.location)
       machine.finish_statement(self.location)
       
+  def type_check(self, env):
+    cond_ty = self.condition.type_check(env)
+    cond_ty = unfold(cond_ty)
+    if not (isinstance(cond_ty, VariantType) \
+            or isinstance(cond_ty, AnyType)):
+      error(self.location, 'expected variant type in match, not '
+            + str(cond_ty))
+    return_type = None
+    for (tag, param, body) in self.cases:
+      # tag in the variant type?
+      if isinstance(cond_ty, VariantType):
+        found = False
+        for (alt_tag,alt_ty) in cond_ty.alternative_types:
+          if tag == alt_tag:
+            body_env = env.copy()
+            body_env[param.ident] = alt_ty
+            retty = body.type_check(body_env)
+            if return_type is None:
+              return_type = retty
+            elif not retty is None:
+              return_type = join(retty, return_type)
+            found = True
+        if found == False:
+          error(self.location, tag + ' is not a tag in ' + str(cond_ty))
+    return return_type
+    # TODO: check for completeness of the cases wrt the cond_ty
+    
       
 @dataclass
 class Seq(Stmt):
@@ -891,262 +978,379 @@ class Seq(Stmt):
       
   def debug_skip(self):
       return True
+
+  def type_check(self, env):
+    first_type = self.first.type_check(env)
+    rest_type = self.rest.type_check(env)
+    return join(first_type, rest_type) # ??
+    
     
 # This is meant to have the same semantics as the `let`, `var`, and
 # `inout` statement in Val.
 @dataclass
 class BindingStmt(Exp):
-    param: Param
-    arg: Exp
-    body: Stmt
-    __match_args__ = ("param", "arg", "body")
-    def __str__(self):
-      if verbose():
-        return str(self.param) + " = " + str(self.arg) + ";\n" \
-            + str(self.body)
-      else:
-        return str(self.param) + " = " + str(self.arg) + "; ..."
-    def __repr__(self):
-        return str(self)
-    def free_vars(self):
-        return self.arg.free_vars() \
-            | (self.body.free_vars() - set([self.param.ident]))
-    def step(self, runner, machine):
-      if runner.state == 0:
-        machine.schedule(self.arg, runner.env, AddressCtx())
-      elif runner.state == 1:
-        runner.body_env = runner.env.copy()
-        machine.bind_param(self.param, runner.results[0],
-                           runner.body_env, self.arg.location)
-        # Treat binding statements special for debugging. 
-        # Pretend they finish before the body runs.
-        if runner.pause_on_finish:
-            machine.pause = True
-            runner.pause_on_finish = False
-        machine.schedule(self.body, runner.body_env)
-      else:
-        machine.dealloc_param(self.param, runner.results[0],
-                              runner.body_env, self.location)
-        machine.finish_statement(self.location)
-        
+  param: Param
+  arg: Exp
+  body: Stmt
+  __match_args__ = ("param", "arg", "body")
+  
+  def __str__(self):
+    if verbose():
+      return str(self.param) + " = " + str(self.arg) + ";\n" \
+          + str(self.body)
+    else:
+      return str(self.param) + " = " + str(self.arg) + "; ..."
+    
+  def __repr__(self):
+      return str(self)
+    
+  def free_vars(self):
+      return self.arg.free_vars() \
+          | (self.body.free_vars() - set([self.param.ident]))
+    
+  def step(self, runner, machine):
+    if runner.state == 0:
+      machine.schedule(self.arg, runner.env, AddressCtx())
+    elif runner.state == 1:
+      runner.body_env = runner.env.copy()
+      machine.bind_param(self.param, runner.results[0],
+                         runner.body_env, self.arg.location)
+      # Treat binding statements special for debugging. 
+      # Pretend they finish before the body runs.
+      if runner.pause_on_finish:
+          machine.pause = True
+          runner.pause_on_finish = False
+      machine.schedule(self.body, runner.body_env)
+    else:
+      machine.dealloc_param(self.param, runner.results[0],
+                            runner.body_env, self.location)
+      machine.finish_statement(self.location)
+
+  def type_check(self, env):
+    arg_type = self.arg.type_check(env)
+    type_annot = simplify(self.param.type_annot, env)
+    if not consistent(arg_type, type_annot):
+      error(self.location, 'type of initializer ' + str(arg_type) + '\n'
+            + ' is inconsistent with declared type ' + str(type_annot))
+    body_env = env.copy()
+    body_env[self.param.ident] = type_annot
+    body_type = self.body.type_check(body_env)
+    return body_type
+    
 @dataclass
 class Return(Stmt):
-    arg: Exp
-    __match_args__ = ("arg",)
-    def __str__(self):
-        return "return " + str(self.arg) + ";"
-    def __repr__(self):
-        return str(self)
-    def free_vars(self):
-        return self.arg.free_vars()
-    def step(self, runner, machine):
-      if runner.state == 0:
-        if runner.return_mode == 'value':
-          context = ValueCtx()
-        elif runner.return_mode == 'address':
-          context = AddressCtx()
-        machine.schedule(self.arg, runner.env, context)
-      else:
-        runner.return_value = \
-          runner.results[0].value.duplicate(1, self.location)
-        machine.finish_statement(self.location)
+  arg: Exp
+  __match_args__ = ("arg",)
+  def __str__(self):
+      return "return " + str(self.arg) + ";"
+  def __repr__(self):
+      return str(self)
+  def free_vars(self):
+      return self.arg.free_vars()
+  def step(self, runner, machine):
+    if runner.state == 0:
+      if runner.return_mode == 'value':
+        context = ValueCtx()
+      elif runner.return_mode == 'address':
+        context = AddressCtx()
+      machine.schedule(self.arg, runner.env, context)
+    else:
+      runner.return_value = \
+        runner.results[0].value.duplicate(1, self.location)
+      machine.finish_statement(self.location)
+
+  def type_check(self, env):
+    return self.arg.type_check(env)
+
     
 @dataclass
 class Write(Stmt):
-    lhs: Exp
-    rhs: Initializer
-    __match_args__ = ("lhs", "rhs")
-    def __str__(self):
-        return str(self.lhs) + " = " + str(self.rhs) + ";"
-    def __repr__(self):
-        return str(self)
-    def free_vars(self):
-        return self.lhs.free_vars() | self.rhs.free_vars()
-    def step(self, runner, machine):
-      # TODO: switch the ordering back to lhs then rhs?
-      if runner.state == 0:
-        machine.schedule(self.rhs, runner.env)
-      elif runner.state == 1:
-        machine.schedule(self.lhs, runner.env, AddressCtx())
-      else:
-        val_ptr = runner.results[0].value
-        ptr = runner.results[1].value
-        machine.memory.write(ptr, val_ptr, self.location)
-        machine.finish_statement(self.location)
+  lhs: Exp
+  rhs: Initializer
+  __match_args__ = ("lhs", "rhs")
 
-@dataclass
-class Transfer(Stmt):
-    lhs: Exp
-    percent: Exp
-    rhs: Exp
-    __match_args__ = ("lhs", "percent", "rhs")
-    def __str__(self):
-        return str(self.lhs) + " <- " + str(self.percent) + " of " \
-            + str(self.rhs) + ";"
-    def __repr__(self):
-        return str(self)
-    def free_vars(self):
-        return self.lhs.free_vars() | self.percent.free_vars() \
-            | self.rhs.free_vars()
-    def step(self, runner, machine):
-      if runner.state == 0:
-        machine.schedule(self.lhs, runner.env, ValueCtx(duplicate=False))
-      elif runner.state == 1:
-        machine.schedule(self.percent, runner.env)
-      elif runner.state == 2:
-        machine.schedule(self.rhs, runner.env, ValueCtx(duplicate=False))
-      else:
-        dest_ptr = runner.results[0].value
-        amount = runner.results[1].value
-        src_ptr = runner.results[2].value
-        percent = to_number(amount, self.location)
-        dest_ptr.transfer(percent, src_ptr, self.location)
-        machine.finish_statement(self.location)
-    
-@dataclass
-class Delete(Stmt):
-    arg: Exp
-    __match_args__ = ("arg",)
-    def __str__(self):
-        return "delete " + str(self.arg) + ";"
-    def __repr__(self):
-        return str(self)
-    def free_vars(self):
-        return self.arg.free_vars()
-    def step(self, runner, machine):
-      if runner.state == 0:
-        machine.schedule(self.arg, runner.env)
-      else:
-        ptr = runner.results[0].value
-        if not isinstance(ptr, Pointer):
-          error(self.location, 'in delete, expected a pointer, not ' + str(ptr))
-        if not writable(ptr.get_permission()):
-            error(self.location, 'delete needs writable pointer, not '
-                  + str(ptr))
-        machine.memory.deallocate(ptr.get_address(), self.location, set())
-        ptr.address = None
-        ptr.permission = Fraction(0,1)
-        machine.finish_statement(self.location)
-    
-@dataclass
-class Expr(Stmt):
-    exp: Exp
-    __match_args__ = ("exp",)
-    def __str__(self):
-        return "! " + str(self.exp) + ";"
-    def __repr__(self):
-        return str(self)
-    def free_vars(self):
-        return self.exp.free_vars()
-    def step(self, runner, machine):
-      if runner.state == 0:
-        machine.schedule(self.exp, runner.env)
-      else:
-        machine.finish_statement(self.location)
+  def __str__(self):
+      return str(self.lhs) + " = " + str(self.rhs) + ";"
 
-@dataclass
-class Assert(Stmt):
-    exp: Exp
-    __match_args__ = ("exp",)
-    def __str__(self):
-        return "assert " + str(self.exp) + ";"
-    def __repr__(self):
-        return str(self)
-    def free_vars(self):
-        return self.exp.free_vars()
-    def step(self, runner, machine):
-      if runner.state == 0:
-        machine.schedule(self.exp, runner.env)
-      else:
-        val = to_boolean(runner.results[0].value, self.location)
-        if not val:
-          error(self.location, "assertion failed: " + str(self.exp))
-        machine.finish_statement(self.location)
+  def __repr__(self):
+      return str(self)
 
-@dataclass
-class IfStmt(Stmt):
-    cond: Exp
-    thn: Stmt
-    els: Stmt
-    __match_args__ = ("cond", "thn", "els")
-    def __str__(self):
-      if verbose():
-        return "if " + "(" + str(self.cond) + ") " + str(self.thn) \
-            + " else " + str(self.els)
-      else:
-        return "if " + "(" + str(self.cond) + ") ..."
-    def __repr__(self):
-        return str(self)
-    def free_vars(self):
-        return self.cond.free_vars() | self.thn.free_vars() \
-            | self.els.free_vars()
-    def step(self, runner, machine):
-      if runner.state == 0:
-        machine.schedule(self.cond, runner.env)
-      elif runner.state == 1:
-        if to_boolean(runner.results[0].value, self.location):
-          machine.schedule(self.thn, runner.env)
-        else:
-          machine.schedule(self.els, runner.env)
-      else:
-        machine.finish_statement(self.location)
+  def free_vars(self):
+      return self.lhs.free_vars() | self.rhs.free_vars()
 
-@dataclass
-class While(Stmt):
-    cond: Exp
-    body: Stmt
-    __match_args__ = ("cond", "body")
-    def __str__(self):
-        return "while " + "(" + str(self.cond) + ")\n" + str(self.body) 
-    def __repr__(self):
-        return str(self)
-    def free_vars(self):
-        return self.cond.free_vars() | self.body.free_vars()
-    def step(self, runner, machine):
-      if runner.state == 0:
-        machine.schedule(self.cond, runner.env)
-      elif runner.state == 1:
-        if to_boolean(runner.results[0].value, self.cond.location):
-          machine.schedule(self, runner.env)
-          machine.schedule(self.body, runner.env)
-        else:
-          machine.finish_statement(self.location)
-      else:
-        machine.finish_statement(self.location)
-    
-@dataclass
-class Pass(Stmt):
-    def __str__(self):
-        return "pass"
-    def __repr__(self):
-        return str(self)
-    def free_vars(self):
-        return set()
-    def step(self, runner, machine):
+  def step(self, runner, machine):
+    # TODO: switch the ordering back to lhs then rhs?
+    if runner.state == 0:
+      machine.schedule(self.rhs, runner.env)
+    elif runner.state == 1:
+      machine.schedule(self.lhs, runner.env, AddressCtx())
+    else:
+      val_ptr = runner.results[0].value
+      ptr = runner.results[1].value
+      machine.memory.write(ptr, val_ptr, self.location)
       machine.finish_statement(self.location)
 
+  def type_check(self, env):
+    lhs_type = self.lhs.type_check(env)
+    rhs_type = self.rhs.type_check(env)
+    require_consistent(lhs_type, rhs_type, 'in assignment', self.location)
+    return None
+    
+      
 @dataclass
-class Block(Stmt):
-    body: Exp
-    __match_args__ = ("body",)
+class Transfer(Stmt):
+  lhs: Exp
+  percent: Exp
+  rhs: Exp
+  __match_args__ = ("lhs", "percent", "rhs")
+
+  def __str__(self):
+      return str(self.lhs) + " <- " + str(self.percent) + " of " \
+          + str(self.rhs) + ";"
+
+  def __repr__(self):
+      return str(self)
+
+  def free_vars(self):
+      return self.lhs.free_vars() | self.percent.free_vars() \
+          | self.rhs.free_vars()
+
+  def step(self, runner, machine):
+    if runner.state == 0:
+      machine.schedule(self.lhs, runner.env, ValueCtx(duplicate=False))
+    elif runner.state == 1:
+      machine.schedule(self.percent, runner.env)
+    elif runner.state == 2:
+      machine.schedule(self.rhs, runner.env, ValueCtx(duplicate=False))
+    else:
+      dest_ptr = runner.results[0].value
+      amount = runner.results[1].value
+      src_ptr = runner.results[2].value
+      percent = to_number(amount, self.location)
+      dest_ptr.transfer(percent, src_ptr, self.location)
+      machine.finish_statement(self.location)
+
+  def type_check(self, env):
+    lhs_type = self.lhs.type_check(env)
+    lhs_type = unfold(lhs_type)
+    percent_type = self.percent.type_check(env)
+    rhs_type = self.rhs.type_check(env)
+    rhs_type = unfold(rhs_type)
+    if not (isinstance(lhs_type, PointerType) or isinstance(lhs_type, AnyType)):
+      error(self.location, 'in transfer LHS, expected a pointer, not '
+            + str(lhs_type))
+    if not (isinstance(rhs_type, PointerType) or isinstance(rhs_type, AnyType)):
+      error(self.location, 'in transfer RHS, expected a pointer, not '
+            + str(rhs_type))
+    return None
+      
+@dataclass
+class Delete(Stmt):
+  arg: Exp
+  __match_args__ = ("arg",)
+
+  def __str__(self):
+      return "delete " + str(self.arg) + ";"
+
+  def __repr__(self):
+      return str(self)
+
+  def free_vars(self):
+      return self.arg.free_vars()
+
+  def step(self, runner, machine):
+    if runner.state == 0:
+      machine.schedule(self.arg, runner.env)
+    else:
+      ptr = runner.results[0].value
+      if not isinstance(ptr, Pointer):
+        error(self.location, 'in delete, expected a pointer, not ' + str(ptr))
+      if not writable(ptr.get_permission()):
+          error(self.location, 'delete needs writable pointer, not '
+                + str(ptr))
+      machine.memory.deallocate(ptr.get_address(), self.location, set())
+      ptr.address = None
+      ptr.permission = Fraction(0,1)
+      machine.finish_statement(self.location)
+
+  def type_check(self, env):
+    arg_type = self.arg.type_check(env)
+    arg_type = unfold(arg_type)
+    if not (isinstance(arg_type, PointerType) or isinstance(arg_type, AnyType)):
+      error(self.location, 'in delete, expected a pointer, not '
+            + str(arg_type))
+    return None
+
+@dataclass
+class Expr(Stmt):
+  exp: Exp
+  __match_args__ = ("exp",)
+
+  def __str__(self):
+      return "! " + str(self.exp) + ";"
+
+  def __repr__(self):
+      return str(self)
+
+  def free_vars(self):
+      return self.exp.free_vars()
+
+  def step(self, runner, machine):
+    if runner.state == 0:
+      machine.schedule(self.exp, runner.env)
+    else:
+      machine.finish_statement(self.location)
+
+  def type_check(self, env):
+    self.exp.type_check(env)
+    return None
     
-    def __str__(self):
-        return "{\n" + str(self.body) + "\n}"
+      
+@dataclass
+class Assert(Stmt):
+  exp: Exp
+  __match_args__ = ("exp",)
+  
+  def __str__(self):
+      return "assert " + str(self.exp) + ";"
     
-    def __repr__(self):
-        return str(self)
+  def __repr__(self):
+      return str(self)
     
-    def free_vars(self):
-        return self.body.free_vars()
+  def free_vars(self):
+      return self.exp.free_vars()
     
-    def step(self, runner, machine):
-      if runner.state == 0:
+  def step(self, runner, machine):
+    if runner.state == 0:
+      machine.schedule(self.exp, runner.env)
+    else:
+      val = to_boolean(runner.results[0].value, self.location)
+      if not val:
+        error(self.location, "assertion failed: " + str(self.exp))
+      machine.finish_statement(self.location)
+
+  def type_check(self, env):
+    arg_type = self.exp.type_check(env)
+    if not isinstance(arg_type, BoolType):
+      error(self.location, "in assert, expected a Boolean, not "
+            + str(arg_type))
+    return None
+    
+      
+@dataclass
+class IfStmt(Stmt):
+  cond: Exp
+  thn: Stmt
+  els: Stmt
+  __match_args__ = ("cond", "thn", "els")
+  
+  def __str__(self):
+    if verbose():
+      return "if " + "(" + str(self.cond) + ") " + str(self.thn) \
+          + " else " + str(self.els)
+    else:
+      return "if " + "(" + str(self.cond) + ") ..."
+    
+  def __repr__(self):
+      return str(self)
+    
+  def free_vars(self):
+      return self.cond.free_vars() | self.thn.free_vars() \
+          | self.els.free_vars()
+    
+  def step(self, runner, machine):
+    if runner.state == 0:
+      machine.schedule(self.cond, runner.env)
+    elif runner.state == 1:
+      if to_boolean(runner.results[0].value, self.location):
+        machine.schedule(self.thn, runner.env)
+      else:
+        machine.schedule(self.els, runner.env)
+    else:
+      machine.finish_statement(self.location)
+
+  def type_check(self, env):
+    cond_type = self.cond.type_check(env)
+    thn_type = self.thn.type_check(env)
+    els_type = self.els.type_check(env)
+    return join(thn_type, els_type)
+    
+      
+@dataclass
+class While(Stmt):
+  cond: Exp
+  body: Stmt
+  __match_args__ = ("cond", "body")
+  
+  def __str__(self):
+      return "while " + "(" + str(self.cond) + ")\n" + str(self.body)
+    
+  def __repr__(self):
+      return str(self)
+    
+  def free_vars(self):
+      return self.cond.free_vars() | self.body.free_vars()
+    
+  def step(self, runner, machine):
+    if runner.state == 0:
+      machine.schedule(self.cond, runner.env)
+    elif runner.state == 1:
+      if to_boolean(runner.results[0].value, self.cond.location):
+        machine.schedule(self, runner.env)
         machine.schedule(self.body, runner.env)
       else:
         machine.finish_statement(self.location)
+    else:
+      machine.finish_statement(self.location)
 
-    def debug_skip(self):
-      return True
+  def type_check(self, env):
+    cond_type = self.cond.type_check(env)
+    body_type = self.body.type_check(env)
+    return body_type
+
+    
+@dataclass
+class Pass(Stmt):
+  def __str__(self):
+      return "pass"
+    
+  def __repr__(self):
+      return str(self)
+    
+  def free_vars(self):
+      return set()
+    
+  def step(self, runner, machine):
+    machine.finish_statement(self.location)
+    
+  def type_check(self, env):
+    return None
+    
+@dataclass
+class Block(Stmt):
+  body: Stmt
+  __match_args__ = ("body",)
+
+  def __str__(self):
+      return "{\n" + str(self.body) + "\n}"
+
+  def __repr__(self):
+      return str(self)
+
+  def free_vars(self):
+      return self.body.free_vars()
+
+  def step(self, runner, machine):
+    if runner.state == 0:
+      machine.schedule(self.body, runner.env)
+    else:
+      machine.finish_statement(self.location)
+
+  def type_check(self, env):
+    return self.body.type_check(env)
+    
+  def debug_skip(self):
+    return True
         
 # Declarations
     
@@ -1173,6 +1377,18 @@ class Global(Decl):
                            self.location)
       machine.finish_definition(self.location)
 
+  def declare_type(self, env, output):
+    env[self.name] = simplify(self.type_annot, env)
+    output[self.name] = env[self.name]
+
+  def type_check(self, env):
+    rhs_type = self.rhs.type_check(env)
+    type_annot = simplify(self.type_annot, env)
+    if not consistent(rhs_type, type_annot):
+      error(self.location, 'type of initializer ' + str(rhs_type) + '\n'
+            + ' is inconsistent with declared type ' + str(type_annot))
+    
+    
 @dataclass
 class ConstantDef(Exp):
   name: str
@@ -1198,55 +1414,89 @@ class TypeAlias(Decl):
     return "type " + str(self.name) + " = " + str(self.type) + ";"
   def __repr__(self):
     return str(self)
+  
   def step(self, runner, machine):
     machine.finish_definition(self.location)
 
+  def declare_type(self, env, output):
+    env[self.name] = simplify(self.type, env)
+
+  def type_check(self, env):
+    pass
   
 @dataclass
 class Function(Decl):
-    name: str
-    type_params: list[str]
-    params: list[Param]
-    return_type: Type
-    return_mode: str    # 'value' or 'address'
-    body: Exp
-    __match_args__ = ("name", "type_params", "params", "return_type",
-                      "return_mode", "body")
-    def __str__(self):
-        return "function " + self.name \
-            + ("<" + ", ".join(self.type_params) + ">" \
-               if len(self.type_params) > 0 \
-               else "") \
-            + "(" + ", ".join([str(p) for p in self.params]) + ")" \
-            + " -> " + str(self.return_type) \
-            + " " + str(self.body)
-    def __repr__(self):
-        return str(self)
-    def free_vars(self):
-        return body.free_vars() - set([p.ident for p in self.params])
-    def step(self, runner, machine):
-      if runner.state == 0:
-        lam = Lambda(self.location, self.params, self.return_mode, self.body,
-                     self.name)
-        machine.schedule(lam, runner.env)
-      else:
-        machine.memory.unchecked_write(runner.env[self.name],
-                                       runner.results[0].value,
-                                       self.location)
-        machine.finish_definition(self.location)
+  name: str
+  type_params: list[str]
+  params: list[Param]
+  return_type: Type
+  return_mode: str    # 'value' or 'address'
+  body: Exp
+  __match_args__ = ("name", "type_params", "params", "return_type",
+                    "return_mode", "body")
+  
+  def __str__(self):
+      return "function " + self.name \
+          + ("<" + ", ".join(self.type_params) + ">" \
+             if len(self.type_params) > 0 \
+             else "") \
+          + "(" + ", ".join([str(p) for p in self.params]) + ")" \
+          + " -> " + str(self.return_type) \
+          + " " + str(self.body)
+    
+  def __repr__(self):
+      return str(self)
+    
+  def free_vars(self):
+      return body.free_vars() - set([p.ident for p in self.params])
+    
+  def step(self, runner, machine):
+    if runner.state == 0:
+      lam = Lambda(self.location, self.params, self.return_mode, self.body,
+                   self.name)
+      machine.schedule(lam, runner.env)
+    else:
+      machine.memory.unchecked_write(runner.env[self.name],
+                                     runner.results[0].value,
+                                     self.location)
+      machine.finish_definition(self.location)
 
+  def declare_type(self, env, output):
+    ty = FunctionType(self.location,
+                      self.type_params,
+                      tuple(p.type_annot for p in self.params),
+                      self.return_type)
+    env[self.name] = simplify(ty, env)
+    output[self.name] = env[self.name]
+    
+  def type_check(self, env):
+    body_env = env.copy()
+    for t in self.type_params:
+      body_env[t] = TypeVar(self.location, t)
+    ret_ty = simplify(self.return_type, body_env)
+    for p in self.params:
+        body_env[p.ident] = simplify(p.type_annot, body_env)
+    body_type = self.body.type_check(body_env)
+    if not consistent(body_type, ret_ty):
+      error(decl.location, 'return type mismatch:\n' + str(ret_ty)
+            + ' inconsistent with ' + str(body_type))
+    
+    
 @dataclass
 class ModuleDef(Decl):
   name: str
   exports: List[str]
   body: List[Decl]
   __match_args__ = ("name", "exports", "body")
+  
   def __str__(self):
     return 'module ' + self.name + '\n'\
         + '  exports ' + ", ".join(ex for ex in self.exports) + ' {\n' \
         + '\n'.join([str(d) for d in self.body]) + '\n}\n'
+  
   def __repr__(self):
     return str(self)
+  
   def step(self, runner, machine):
     if runner.state == 0:
       runner.body_env = {}
@@ -1264,6 +1514,25 @@ class ModuleDef(Decl):
       machine.memory.memory[runner.env[self.name].address] = mod
       machine.finish_definition(self.location)
 
+  def declare_type(self, env, output):
+    member_types = {}
+    for d in self.body:
+      d.declare_type(env, member_types)
+    for ex in self.exports:
+      if not ex in member_types:
+        error(self.location, 'export ' + ex + ' not defined in module')
+    env[self.name] = ModuleType(self.location, member_types)
+    output[self.name] = env[self.name]
+    
+  def type_check(self, env):
+    body_env = env.copy()
+    members = {}
+    for d in self.body:
+      d.declare_type(body_env, members)
+    for d in self.body:
+      d.type_check(body_env)
+    
+    
 @dataclass
 class Import(Decl):
   module: Exp
@@ -1303,3 +1572,18 @@ class Import(Decl):
       if tracing_on():
           print('** finish import is complete')
       
+  def declare_type(self, env, output):
+    mod = self.module.type_check(env)
+    mod = unfold(mod)
+    if isinstance(mod, ModuleType):
+      for x in self.imports:
+          if not x in mod.member_types.keys():
+            error(decl.location, "in import, no " + x
+                  + " in " + str(module))
+          env[x] = mod.member_types[x]
+          output[x] = env[x]
+    else:
+      error(self.location, "in import, expected a module, not " + str(mod))
+    
+  def type_check(self, env):
+    pass
