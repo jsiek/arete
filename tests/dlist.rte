@@ -10,7 +10,7 @@ const next = 2;
 const head = 0;
 const tail = 1;
 
-type option = variant some: ? | empty: ⟨⟩;
+type option = (some: ? | empty: ⟨⟩);
 fun empty() { return tag empty(⟨⟩) as option; }
 fun some(var x) { return tag some(x) as option; }
 

@@ -15,7 +15,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "[" type "]"                               -> array_type
     | type "*"                                   -> ptr_type
     | "⟨" type_list "⟩"                          -> tuple_type
-    | "variant" alternative_list                 -> variant_type
+    | alternative_list                           -> variant_type
     | "(" type_list ")" "->" type                -> function_type
     | "rec" IDENT "in" type                      -> recursive_type
     | IDENT                                      -> type_var

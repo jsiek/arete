@@ -1,31 +1,31 @@
-type opt_ptr = variant ptr: ?* | null: ⟨⟩;
+type pointer = (some: ?* | null: ⟨⟩);
 
-fun null() -> opt_ptr { return tag null(⟨⟩) as opt_ptr; }
-fun is_null(let p : opt_ptr) {
+fun null() -> pointer { return tag null(⟨⟩) as pointer; }
+fun is_null(let p : pointer) {
   match (p) {
     case null(t):
       return true;
-    case ptr(q):
+    case some(q):
       return false;
   }
 }
-fun ptr(var p : ?*) -> opt_ptr { return tag ptr(p) as opt_ptr; }
+fun some(var p : ?*) -> pointer { return tag some(p) as pointer; }
 
-type list_t = rec X in (variant ptr: ⟨int, X⟩* | null:⟨⟩);
+type list_t = rec X in (some: ⟨int, X⟩* | null:⟨⟩);
 
 fun listof(let data: int) -> list_t {
-  return ptr(&⟨data, null()⟩);
+  return some(&⟨data, null()⟩);
 }
 
 fun push(let data: int, var lst: list_t) -> list_t {
-  return ptr(&⟨data, lst⟩);
+  return some(&⟨data, lst⟩);
 }
 
 fun data(let node: list_t) -> int & {
   match (node) {
   case null(w):
     return 0; // raise an exception
-  case ptr(n):
+  case some(n):
     return (*n)[0];
   }
 }
@@ -38,7 +38,7 @@ fun is_last(let node: list_t) -> bool {
   match (node) {
   case null(w):
     return false;
-  case ptr(n):
+  case some(n):
     return is_null(next(n));
   }
 }
@@ -49,7 +49,7 @@ fun remove_last(inout n : list_t) -> list_t {
   match (n) {
   case null(q):
     return null;
-  case ptr(inout node: ⟨int, list_t⟩*):
+  case some(inout node: ⟨int, list_t⟩*):
     if (is_last(next(node))) {
       var q = copy((*node)[1]); // want all permissions to next(n)
       (*node)[1] = null();

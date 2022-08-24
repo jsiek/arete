@@ -8,7 +8,7 @@ const right = 2;
 const parent = 3;
 const height = 4;
 
-typeop option(T) = variant some: T | empty: ⟨⟩;
+typeop option(T) = (some: T | empty: ⟨⟩);
 fun empty() -> option(?) { return tag empty(⟨⟩) as option(?); }
 fun some<T>(ref x : T) -> option(T) { return tag some(x) as option(T); }
 

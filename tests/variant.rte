@@ -1,28 +1,28 @@
-type opt_ptr = variant ptr: ?* | nul: ⟨⟩;
+type pointer = (some: ?* | none: ⟨⟩);
 
-fun null() -> opt_ptr { return tag nul(⟨⟩) as opt_ptr; }
-fun is_null(let p : opt_ptr) {
+fun null() -> pointer { return tag none(⟨⟩) as pointer; }
+fun is_null(let p : pointer) {
   match (p) {
-    case nul(t):
+    case none(t):
       return true;
-    case ptr(q):
+    case some(q):
       return false;
   }
 }
-fun ptr(var p : int*) -> opt_ptr { return tag ptr(p) as opt_ptr; }
+fun some(var p : int*) -> pointer { return tag some(p) as pointer; }
 
-fun deref(x : opt_ptr, default: int) -> int {
+fun deref(x : pointer, default: int) -> int {
   match (x) {
-    case nul(t):
+    case none(t):
       return default;
-    case ptr(p):
+    case some(p):
       return *p;
   }
 }
 
 fun main() {
-  var x : opt_ptr = null();
-  var y : opt_ptr = ptr(&42);
+  var x : pointer = null();
+  var y : pointer = some(&42);
   if (is_null(x)) {
     return deref(x, -42) + deref(y, 0);
   } else {

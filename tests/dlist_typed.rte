@@ -10,10 +10,10 @@ const next : int = 2;
 const head : int = 0;
 const tail : int = 1;
 
-type node_t = rec X in (variant some:⟨int, X, X⟩ | empty: ⟨⟩)*;
+type node_t = rec X in (some:⟨int, X, X⟩ | empty: ⟨⟩)*;
 type list_t = ⟨node_t, node_t⟩;
 
-type option = variant some: ? | empty: ⟨⟩;
+type option = (some: ? | empty: ⟨⟩);
 fun empty() -> option { return tag empty(⟨⟩) as option; }
 fun some(var x : ?) -> option { return tag some(x) as option; }
 
