@@ -150,7 +150,7 @@ class Import(Decl):
     pass
 
 @dataclass
-class Member(Exp):
+class ModuleMember(Exp):
   arg: Exp
   field: str
   __match_args__ = ("arg", "field")
@@ -171,7 +171,7 @@ class Member(Exp):
       mod_ptr = runner.results[0].value
       mod = machine.memory.read(mod_ptr, self.location)
       if not isinstance(mod, Module):
-        error(self.location, "expected a module, not " + str(val))
+        error(self.location, "expected a module, not " + str(mod))
       if self.field in mod.exports.keys():
         ptr = mod.exports[self.field]
         if isinstance(runner.context, ValueCtx):
@@ -188,7 +188,8 @@ class Member(Exp):
   def type_check(self, env):
     mod_type = self.arg.type_check(env)
     mod_type = unfold(mod_type)
-    if not isinstance(mod_type, ModuleType):
+    if not (isinstance(mod_type, ModuleType) \
+            or isinstance(mod_type, AnyType)):
         error(self.location, "expected a module, not " + str(mod_type))
     if not self.field in mod_type.member_types.keys():
         error(self.location, "module " + str(self.arg) + " does not contain "

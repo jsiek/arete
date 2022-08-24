@@ -73,9 +73,12 @@ def const_eval_exp(e, env):
       case PrimitiveCall(op, args):
         new_args = [const_eval_exp(arg, env) for arg in args]
         return const_eval_prim(e.location, op, new_args)
-      case Member(arg, field):
+      case ModuleMember(arg, field):
         new_arg = const_eval_exp(arg, env)
-        return Member(e.location, new_arg, field)
+        return ModuleMember(e.location, new_arg, field)
+      case VariantMember(arg, field):
+        new_arg = const_eval_exp(arg, env)
+        return VariantMember(e.location, new_arg, field)
       case Array(size, arg):
         new_size = const_eval_exp(size, env)
         new_arg = const_eval_exp(arg, env)
@@ -197,6 +200,8 @@ def const_eval_decl(decl, env):
         return []
       case TypeAlias(name, type):
         return [TypeAlias(decl.location, name, type)]
+      case TypeOperator(name, params, body):
+        return [TypeOperator(decl.location, name, params, body)]
       case Global(name, type_annot, rhs):
         new_rhs = const_eval_exp(rhs, env)
         return [Global(decl.location, name, type_annot, new_rhs)]

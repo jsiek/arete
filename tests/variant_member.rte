@@ -1,0 +1,4 @@
+fun main() {
+  var x = tag some(42) as (variant some: int | none: ⟨⟩);
+  return x#some - 42;
+}

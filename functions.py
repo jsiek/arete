@@ -220,8 +220,9 @@ class Call(Exp):
           if not match_types(fun_type.type_params, pt, arg_ty, matches,
                              set()):
               error(self.location, 'in call, '
-                    + 'expected type ' + str(param_ty)
-                    + ' not ' + str(arg_ty))
+                    + str(self) + '\n'
+                    + 'argument type:\n\t' + str(arg_ty)
+                    + '\ndoes not match parameter type:\n\t' + str(param_ty))
       if tracing_on():
         print('deduced: ' + str(matches))
       rt = simplify(fun_type.return_type, fun_env)

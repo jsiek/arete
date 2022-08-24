@@ -24,7 +24,7 @@ fun main() {
   var x : opt_ptr = null();
   var y : opt_ptr = ptr(&42);
   if (is_null(x)) {
-    return deref(x, -42) + deref(y, -42);
+    return deref(x, -42) + deref(y, 0);
   } else {
     return 1;
   }

@@ -249,8 +249,7 @@ class Index(Exp):
           error(self.location, 'expected a tuple, not ' + str(tup))
         val = tup.elts[int(i)]
         if runner.results[0].temporary:
-            percent = tup_ptr.permission
-            val = val.duplicate(percent, self.location)
+            val = val.duplicate(tup_ptr.permission, self.location)
         result = Result(runner.results[0].temporary, val)
       elif isinstance(runner.context, AddressCtx):
         if tracing_on():

@@ -19,6 +19,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "(" type_list ")" "->" type                -> function_type
     | "rec" IDENT "in" type                      -> recursive_type
     | IDENT                                      -> type_var
+    | type "(" type_list ")"                     -> type_application
     | "(" type ")"
     
 ?type_list:                                     -> empty
@@ -77,7 +78,8 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "exit" "(" expression ")"                         -> exit
     | IDENT                                             -> var
     | expression_hi "[" expression "]"                  -> index
-    | expression_hi "." IDENT                           -> member
+    | expression_hi "::" IDENT                          -> module_member
+    | expression_hi "#" IDENT                           -> variant_member
     | "-" expression_hi                                 -> neg
     | "not" expression_hi                               -> not
     | "(" expression ")"                                -> paren
@@ -159,6 +161,7 @@ parameter: binding_kind IDENT type_opt                  -> binding
     | "module" IDENT "exports" ident_list "{" definition_list "}" -> module
     | "from" expression "import" ident_list ";"                   -> import
     | "type" IDENT "=" type ";"                                   -> type_definition
+    | "typeop" IDENT "(" ident_list ")" "=" type ";"              -> type_operator
 
 ?definition_list:                                                 -> empty
     | definition definition_list                                  -> push

@@ -2,8 +2,9 @@
 # This file defines the language features related to variants in Arete,
 # which includes
 # * variant values,
-# * variant creation (tagging), and
-# * match statement.
+# * variant creation (tagging), 
+# * match statement, and
+# * variant member access.
 
 from dataclasses import dataclass
 from abstract_syntax import Param
@@ -189,3 +190,59 @@ class Match(Stmt):
     return return_type
     # TODO: check for completeness of the cases wrt the cond_ty
     
+@dataclass
+class VariantMember(Exp):
+  arg: Exp
+  field: str
+  __match_args__ = ("arg", "field")
+  
+  def __str__(self):
+      return str(self.arg) + "." + self.field
+    
+  def __repr__(self):
+      return str(self)
+    
+  def free_vars(self):
+      return self.arg.free_vars()
+    
+  def step(self, runner, machine):
+    if runner.state == 0:
+      machine.schedule(self.arg, runner.env,
+                       AddressCtx(runner.context.duplicate))
+    else:
+      variant_ptr = runner.results[0].value
+      variant = machine.memory.read(variant_ptr, self.location)
+      if self.field == variant.tag:
+        if isinstance(runner.context, ValueCtx):
+          if not isinstance(variant, Variant):
+            error(self.location, "expected a variant, not " + str(variant))
+          val = variant.value
+          if runner.results[0].temporary:
+            val = val.duplicate(variant_ptr.permission, self.location)
+          result = Result(runner.results[0].temporary, val)
+        elif isinstance(runner.context, AddressCtx):
+          res = duplicate_if_temporary(runner.results[0], self.location)
+          ptr = res.value
+          ptr_offset = PointerOffset(ptr, self.field)
+          result = Result(runner.results[0].temporary, ptr_offset)
+        else:
+          error(self.location, 'unrecognized context ' + repr(runner.context))
+        machine.finish_expression(result, self.location)
+      else:
+        error(self.location, self.field + ' is not present in variant '
+              + str(variant))
+        
+  def type_check(self, env):
+    variant_type = self.arg.type_check(env)
+    variant_type = unfold(variant_type)
+    if not (isinstance(variant_type, VariantType) \
+            or isinstance(variant_type, AnyType)):
+        error(self.location, "expected a variant, not " + str(variant_type))
+    if isinstance(variant_type, VariantType):
+      alts = {x:t for x,t in variant_type.alternative_types}
+      if not self.field in alts.keys():
+          error(self.location, "variant " + str(self.arg) + " does not contain "
+                + self.field)
+      return alts[self.field]
+    else:
+      return AnyType(self.location)

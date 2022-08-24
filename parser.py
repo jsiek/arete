@@ -49,12 +49,12 @@ def parse_tree_to_str_list(e):
     else:
         raise Exception('parse_tree_to_str_list, unexpected ' + str(e))
 
-def parse_tree_to_type_annot(e):
+def parse_tree_to_type(e):
     e.meta.filename = filename
     if e.data == 'nothing' or e.data == 'any_type':
         return AnyType(e.meta)
     elif e.data == 'just':
-        return parse_tree_to_type_annot(e.children[0])
+        return parse_tree_to_type(e.children[0])
     elif e.data == 'int_type':
         return IntType(e.meta)
     elif e.data == 'rational_type':
@@ -62,10 +62,10 @@ def parse_tree_to_type_annot(e):
     elif e.data == 'bool_type':
         return BoolType(e.meta)
     elif e.data == 'array_type':
-        return ArrayType(e.meta, parse_tree_to_type_annot(e.children[0]))
+        return ArrayType(e.meta, parse_tree_to_type(e.children[0]))
     elif e.data == 'ptr_type':
         return PointerType(e.meta,
-                           parse_tree_to_type_annot(e.children[0]))
+                           parse_tree_to_type(e.children[0]))
     elif e.data == 'tuple_type':
         return TupleType(e.meta,
                          parse_tree_to_type_list(e.children[0]))
@@ -75,9 +75,13 @@ def parse_tree_to_type_annot(e):
     elif e.data == 'recursive_type':
         return RecursiveType(e.meta,
                              str(e.children[0].value),
-                             parse_tree_to_type_annot(e.children[1]))
+                             parse_tree_to_type(e.children[1]))
     elif e.data == 'type_var':
         return TypeVar(e.meta, str(e.children[0].value))
+    elif e.data == 'type_application':
+        return TypeApplication(e.meta,
+                               parse_tree_to_type(e.children[0]),
+                               parse_tree_to_type_list(e.children[1]))
     else:
         raise Exception('unrecognized type annotation ' + repr(e))
     
@@ -86,16 +90,16 @@ def parse_tree_to_type_list(e):
     if e.data == 'empty':
         return ()
     elif e.data == 'single':
-        return (parse_tree_to_type_annot(e.children[0]),)
+        return (parse_tree_to_type(e.children[0]),)
     elif e.data == 'push':
-        return (parse_tree_to_type_annot(e.children[0]),) \
+        return (parse_tree_to_type(e.children[0]),) \
             + parse_tree_to_type_list(e.children[1])
     else:
         raise Exception('unrecognized as a type list ' + repr(e))
 
 def parse_tree_to_alt(e):
     return (str(e.children[0].value),
-            parse_tree_to_type_annot(e.children[1]))
+            parse_tree_to_type(e.children[1]))
     
 def parse_tree_to_alt_list(e):
     if e.data == 'empty':
@@ -119,7 +123,7 @@ def parse_tree_to_param(e):
       + parse_tree_to_param(e.children[1])
   elif e.data == 'binding':
     return Param(e.meta, e.children[0].data, None, e.children[1].value,
-                 parse_tree_to_type_annot(e.children[2]))
+                 parse_tree_to_type(e.children[2]))
   else:    
     raise Exception('unrecognized parameter' + repr(e))
 
@@ -184,10 +188,14 @@ def parse_tree_to_ast(e):
         return AddressOf(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'paren':
         return parse_tree_to_ast(e.children[0])
-    elif e.data == 'member':
-        return Member(e.meta,
-                      parse_tree_to_ast(e.children[0]),
-                      str(e.children[1].value))
+    elif e.data == 'module_member':
+        return ModuleMember(e.meta,
+                            parse_tree_to_ast(e.children[0]),
+                            str(e.children[1].value))
+    elif e.data == 'variant_member':
+        return VariantMember(e.meta,
+                             parse_tree_to_ast(e.children[0]),
+                             str(e.children[1].value))
     elif e.data == 'condition':
         return IfExp(e.meta,
                      parse_tree_to_ast(e.children[0]),
@@ -197,7 +205,7 @@ def parse_tree_to_ast(e):
         return BindingExp(e.meta,
                           Param(e.meta, e.children[0].data,
                                 None, e.children[1].value,
-                                parse_tree_to_type_annot(e.children[2])),
+                                parse_tree_to_type(e.children[2])),
                           parse_tree_to_ast(e.children[3]),
                           parse_tree_to_ast(e.children[4]))
     elif e.data == 'future':
@@ -208,14 +216,14 @@ def parse_tree_to_ast(e):
         return TagVariant(e.meta,
                           str(e.children[0].value),
                           parse_tree_to_ast(e.children[1]),
-                          parse_tree_to_type_annot(e.children[2]))
+                          parse_tree_to_type(e.children[2]))
     
     # statements
     elif e.data == 'binding_stmt':
         return BindingStmt(e.meta,
                            Param(e.meta, e.children[0].data,
                                  None, e.children[1].value,
-                                 parse_tree_to_type_annot(e.children[2])),
+                                 parse_tree_to_type(e.children[2])),
                            parse_tree_to_ast(e.children[3]),
                            parse_tree_to_ast(e.children[4]))
     elif e.data == 'return':
@@ -273,23 +281,28 @@ def parse_tree_to_ast(e):
     elif e.data == 'global':
         return Global(e.meta,
                       str(e.children[0].value),
-                      parse_tree_to_type_annot(e.children[1]),
+                      parse_tree_to_type(e.children[1]),
                       parse_tree_to_ast(e.children[2]))
     elif e.data == 'constant':
         return ConstantDef(e.meta,
                             str(e.children[0].value),
-                            parse_tree_to_type_annot(e.children[1]),
+                            parse_tree_to_type(e.children[1]),
                             parse_tree_to_ast(e.children[2]))
     elif e.data == 'type_definition':
         return TypeAlias(e.meta,
                          str(e.children[0].value),
-                         parse_tree_to_type_annot(e.children[1]))
+                         parse_tree_to_type(e.children[1]))
+    elif e.data == 'type_operator':
+        return TypeOperator(e.meta,
+                            str(e.children[0].value),
+                            parse_tree_to_str_list(e.children[1]),
+                            parse_tree_to_type(e.children[2]))
     elif e.data == 'function':
         return Function(e.meta,
                         str(e.children[0].value),
                         parse_tree_to_str_list(e.children[1]),
                         parse_tree_to_param(e.children[2]),
-                        parse_tree_to_type_annot(e.children[3]),
+                        parse_tree_to_type(e.children[3]),
                         str(e.children[4].data),
                         parse_tree_to_ast(e.children[5]))
     elif e.data == 'module':

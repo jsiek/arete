@@ -8,77 +8,110 @@ const right = 2;
 const parent = 3;
 const height = 4;
 
-type node_t = rec X in ⟨int, X, X, X, int⟩*;
-type tree_t = node_t*;
+typeop option(T) = variant some: T | empty: ⟨⟩;
+fun empty() -> option(?) { return tag empty(⟨⟩) as option(?); }
+fun some<T>(var x : T) -> option(T) { return tag some(x) as option(T); }
+
+type node_opt = rec X in option(⟨int, X, X, X, int⟩*);
+type node_t = ⟨int, node_opt, node_opt, node_opt, int⟩;
+type tree_t = node_opt*;
 
 // Common fractions
 const none = 0/1;
 const half = 1/2;
 const all = 1/1;
 
-fun find(let key: int, ref node: node_t, ref p: node_t) -> node_t {
-  if (is_null(node)) {
-    return p;
-  }
+fun find(let key: int, ref node: node_t*) -> node_t* {
   if (key < (*node)[data]) {
-    return find(key, copy((*node)[left]), node);
+    match ((*node)[left]) {
+    case empty(w):
+      return node;
+    case some(ref l):
+      return find(key, copy(l), node);
+    }	
+  } else if ((*node)[data] < key) {
+    match ((*node)[right]) {
+    case empty(w):
+      return node;
+    case some(ref r):
+      return find(key, copy(r), node);
+    }	
+  } else {
+    return node;
   }
-  if ((*node)[data] < key) {
-    return find(key, copy((*node)[right]), node);
-  }
-  return node;
 }
 
-fun gather_permission(inout node: node_t) {
-  if (not is_null((*node)[left])) {
-    node <- all of (*((*node)[left]))[parent];
+fun gather_permission(inout node: node_t*) {
+  match ((*node)[left]) {
+  case empty(w): {}
+  case some(inout l):
+    match ((*l)[parent]) {
+    case empty(w): {}
+    case some(ref p):
+      node <- all of p;
+    }
   }
-  if (not is_null((*node)[right])) {
-    node <- all of (*((*node)[right]))[parent];
+  match ((*node)[right]) {
+  case empty(w): {}
+  case some(inout r):
+    match ((*r)[parent]) {
+    case empty(w): {}
+    case some(ref p):
+      node <- all of p;
+    }
   }
   assert permission(node) == 1/1;
 }
 
-fun scatter_permission(inout node: node_t) {
-  if (not is_null((*node)[left])) {
-    (*((*node)[left]))[parent] <- half of node;
+fun scatter_permission(inout node: node_t*) {
+  match ((*node)[left]) {
+  case empty(w): {}
+  case some(inout l):
+    match ((*l)[parent]) {
+    case empty(w): {}
+    case some(inout p):
+      p <- half of node;
+    }
   }
-  if (not is_null((*node)[right])) {
-    (*((*node)[right]))[parent] <- half of node;
+  match ((*node)[right]) {
+  case empty(w): {}
+  case some(inout r):
+    match ((*r)[parent]) {
+    case empty(w): {}
+    case some(inout p):
+      p <- half of node;
+    }
   }
 }
 
-fun set_left(inout node: node_t, var new_left: node_t) {
-  if (not is_null(new_left)) {
-    (*new_left)[parent] = none of node;
-  }
-  (*node)[left] = 1/2 of new_left;
-  (*new_left)[parent] <- 1/2 of node;
-  (*node)[left] <- all of new_left;  
+fun set_left(inout node: node_t*, var new_left: node_t*) {
+  (*new_left)[parent] = some(none of node);
+  (*node)[left] = some(1/2 of new_left);
+  (*new_left)[parent]#some <- 1/2 of node;
+  (*node)[left]#some <- all of new_left;  
 }
 
-fun set_right(inout node: node_t, var new_right: node_t) {
-  if (not is_null(new_right)) {
-    (*new_right)[parent] = none of node;
-  }
-  (*node)[right] = 1/2 of new_right;
-  (*new_right)[parent] <- 1/2 of node;
-  (*node)[right] <- all of new_right;
+fun set_right(inout node: node_t*, var new_right: node_t*) {
+  (*new_right)[parent] = some(none of node);
+  (*node)[right] = some(1/2 of new_right);
+  (*new_right)[parent]#some <- 1/2 of node;
+  (*node)[right]#some <- all of new_right;
 }
 
 fun insert(let key: int, inout tree: tree_t) {
-  if (is_null(*tree)) {
-    *tree = &⟨key, null, null, null, 0⟩;
-  } else {
-    var node: node_t = find(key, *tree, null);
+  match (*tree) {
+  case empty(w):
+    *tree = some(&⟨key, empty(), empty(), empty(), 0⟩);
+  case some(inout top_node):
+    var node: node_t* = find(key, top_node);
     if (key < (*node)[data]) {
-      var new_node = &⟨key, null, null, null, 0⟩;
+      var new_node: node_t* = &⟨key, empty(), empty(), empty(), 0⟩;
       ! gather_permission(node);
       ! set_left(node, new_node);
       ! scatter_permission(node);
     }
     if ((*node)[data] < key) {
-      var new_node = &⟨key, null, null, null, 0⟩;
+      var new_node: node_t* = &⟨key, empty(), empty(), empty(), 0⟩;
       ! gather_permission(node);
       ! set_right(node, new_node);
       ! scatter_permission(node);
@@ -86,12 +119,14 @@ fun insert(let key: int, inout tree: tree_t) {
   }
 }
 
-fun delete_node(var node: node_t) {
-  if (not is_null(node)) {
-    ! gather_permission(node);
-    ! delete_node((*node)[left]);
-    ! delete_node((*node)[right]);
-    delete node;
+fun delete_node(var node: node_opt) {
+  match (node) {
+  case empty(w): {}
+  case some(var n): 
+    ! gather_permission(n);
+    ! delete_node((*n)[left]);
+    ! delete_node((*n)[right]);
+    delete n;
   }
 }
 
@@ -101,11 +136,11 @@ fun delete_tree(var tree: tree_t) {
 }
 
 fun main() {
-  var tree : tree_t = &null;
+  var tree : tree_t = &empty();
   ! insert(5, tree);
   ! insert(10, tree);
   ! insert(1, tree);
-  let ten = (let n: node_t = find(10, *tree, null)
+  let ten = (let n: node_t* = find(10, (*tree)#some)
              in copy((*n)[data]));
   ! delete_tree(tree);
   return ten - 10;

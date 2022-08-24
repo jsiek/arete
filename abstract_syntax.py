@@ -488,8 +488,10 @@ class TypeAlias(Decl):
   name: str
   type: Type
   __match_args__ = ("name", "type")
+  
   def __str__(self):
     return "type " + str(self.name) + " = " + str(self.type) + ";"
+  
   def __repr__(self):
     return str(self)
   
@@ -502,4 +504,26 @@ class TypeAlias(Decl):
   def type_check(self, env):
     pass
   
-    
+@dataclass
+class TypeOperator(Decl):
+  name: str
+  params: list[str]
+  body: Type
+  __match_args__ = ("name", "params", "body")
+  
+  def __str__(self):
+    return "typeop " + str(self.name) + "(" + ', '.join(self.params) + ")" \
+      + " = " + str(self.body) + ";"
+  
+  def __repr__(self):
+    return str(self)
+
+  def step(self, runner, machine):
+    machine.finish_definition(self.location)
+
+  def declare_type(self, env, output):
+    env[self.name] = TypeOp(self.location, self.params, self.body)
+
+  def type_check(self, env):
+    pass
+  

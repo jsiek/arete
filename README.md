@@ -1615,6 +1615,8 @@ blocks until the future's thread is finished. The result of this
 
 [/] Add variants. (safe unions)
 [/] Remove null pointers.
+[ ] Explicit type arguments for generic functions.
+[ ] Make the `as T` part of the `tag` expression optional.
 [ ] debugger: command to display the stack (like backtrace in gdb)
 [ ] Refactor desugar, const_eval, and type_check into AST methods
 [ ] Test cases for type checking failures.

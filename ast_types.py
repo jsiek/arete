@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from ast_base import Type
 from lark.tree import Meta
-from utilities import tracing_on
+from utilities import tracing_on, error
 
 # Types
 
@@ -133,7 +133,26 @@ class TypeVar(Type):
     def __repr__(self):
         return str(self)
   
+@dataclass(eq=True, frozen=True)
+class TypeApplication(Type):
+  typeop: Type
+  args: tuple[Type]
+  __match_args__ = ("typeop", "args")
 
+  def __str__(self):
+      return str(self.typeop) + \
+          "(" + ", ".join([str(arg) for arg in self.args]) + ")"
+
+  def __repr__(self):
+      return str(self)
+
+@dataclass(eq=True, frozen=True)
+class TypeOp(Type):
+  params: list[str]
+  type: Type
+  __match_args__ = ("params", "type")
+  
+    
 def unfold(ty: Type) -> Type:
   if isinstance(ty, RecursiveType):
     ret = substitute({ty.name: ty}, ty.type)
@@ -148,7 +167,10 @@ def require_consistent(ty1 : Type, ty2 : Type, msg: str, location: Meta):
 def simplify(type: Type, env) -> Type:
   match type:
     case TypeVar(name):
-      ret = env[name]
+      if name in env.keys():
+        ret = env[name]
+      else:
+        error(type.location, "use of undefined type variable " + name)
     case TupleType(ts2):
       ret = TupleType(type.location,
                        tuple(simplify(elt_ty, env) for elt_ty in ts2))
@@ -179,6 +201,17 @@ def simplify(type: Type, env) -> Type:
     case VariantType(alts):
       ret = VariantType(type.location,
                         tuple((x, simplify(t, env)) for x,t in alts))
+    case TypeApplication(tyop, args):
+      type_op = simplify(tyop, env)
+      match type_op:
+        case TypeOp(params, body):
+          subst = {x:t for x,t in zip(params,
+                                      [simplify(arg, env) for arg in args])}
+          return simplify(substitute(subst, body), env)
+        case _:
+          error(type.location, "in simplify, expected type operator, not "
+                + str(type_op))
+      
     case _:
       error(type.location, "in simplify, unrecognized type " + str(type))
   return ret
