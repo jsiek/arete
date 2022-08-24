@@ -319,8 +319,8 @@ class Machine:
     elif param.kind == 'var' or param.kind == 'inout':
       success = val.upgrade(loc)
       if not success:
-        error(loc, param.kind + ' binding requires permission 1/1, not '
-              + str(val))
+        error(param.location,
+              param.kind + ' binding requires permission 1/1, not ' + str(val))
       if not res.temporary:
         env[param.ident] = val.duplicate(Fraction(1,1), loc)
         if param.kind == 'var':
@@ -350,10 +350,11 @@ class Machine:
       ptr.transfer(Fraction(1,1), source, loc)
 
   def dealloc_param(self, param, arg, env, loc):
-    ptr = env[param.ident]
-    if param.kind == 'inout':
-      self.inout_end_of_life(ptr, arg.value, loc)
-    ptr.kill(self.memory, loc)
+    if isinstance(param, Param):
+      ptr = env[param.ident]
+      if param.kind == 'inout':
+        self.inout_end_of_life(ptr, arg.value, loc)
+      ptr.kill(self.memory, loc)
 
   def print_env(self, env, loc):
     for (k,ptr) in env.items():

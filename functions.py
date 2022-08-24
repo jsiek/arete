@@ -213,6 +213,10 @@ class Call(Exp):
       fun_env = env.copy()
       for t in fun_type.type_params:
         fun_env[t] = TypeVar(self.location, t)
+      if len(fun_type.param_types) != len(arg_types):
+        error(self.location, 'incorrect number of arguments: '
+              + str(len(arg_types))
+              + '\nexpected: ' + str(len(fun_type.param_types)))
       # perform type argument deduction
       matches = {}
       for (param_ty, arg_ty) in zip(fun_type.param_types, arg_types):

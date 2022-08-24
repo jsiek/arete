@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from abstract_syntax import Param, NoParam
 from ast_base import *
 from ast_types import *
-from values import Result, PointerOffset
+from values import Result, PointerOffset, duplicate_if_temporary
 from utilities import *
 
 @dataclass
@@ -162,6 +162,11 @@ class Match(Stmt):
         runner.arg = Result(False, variant_val_addr)
         machine.bind_param(runner.param, runner.arg, runner.body_env,
                            self.location)
+        if isinstance(runner.param, NoParam) \
+           and runner.results[0].temporary:
+          # kill the result early
+          ptr.kill(machine.memory, self.location)
+          runner.results[0].temporary = False # don't kill twice
         machine.schedule(current_case[2], runner.body_env)
         runner.matched = True
     else:

@@ -10,7 +10,7 @@ const height = 4;
 
 typeop option(T) = variant some: T | empty: ⟨⟩;
 fun empty() -> option(?) { return tag empty(⟨⟩) as option(?); }
-fun some<T>(var x : T) -> option(T) { return tag some(x) as option(T); }
+fun some<T>(ref x : T) -> option(T) { return tag some(x) as option(T); }
 
 type node_opt = rec X in option(⟨int, X, X, X, int⟩*);
 type node_t = ⟨int, node_opt, node_opt, node_opt, int⟩;
@@ -27,14 +27,14 @@ fun find(let key: int, ref node: node_t*) -> node_t* {
     case empty(_):
       return node;
     case some(ref l):
-      return find(key, copy(l), node);
+      return find(key, copy(l));
     }	
   } else if ((*node)[data] < key) {
     match ((*node)[right]) {
     case empty(_):
       return node;
     case some(ref r):
-      return find(key, copy(r), node);
+      return find(key, copy(r));
     }	
   } else {
     return node;
@@ -44,7 +44,7 @@ fun find(let key: int, ref node: node_t*) -> node_t* {
 fun gather_permission(inout node: node_t*) {
   match ((*node)[left]) {
   case empty(_): {}
-  case some(inout l):
+  case some(ref l):
     match ((*l)[parent]) {
     case empty(_): {}
     case some(ref p):
@@ -53,7 +53,7 @@ fun gather_permission(inout node: node_t*) {
   }
   match ((*node)[right]) {
   case empty(_): {}
-  case some(inout r):
+  case some(ref r):
     match ((*r)[parent]) {
     case empty(_): {}
     case some(ref p):
@@ -66,7 +66,7 @@ fun gather_permission(inout node: node_t*) {
 fun scatter_permission(inout node: node_t*) {
   match ((*node)[left]) {
   case empty(_): {}
-  case some(inout l):
+  case some(ref l):
     match ((*l)[parent]) {
     case empty(_): {}
     case some(inout p):
@@ -75,7 +75,7 @@ fun scatter_permission(inout node: node_t*) {
   }
   match ((*node)[right]) {
   case empty(_): {}
-  case some(inout r):
+  case some(ref r):
     match ((*r)[parent]) {
     case empty(_): {}
     case some(inout p):
@@ -84,16 +84,20 @@ fun scatter_permission(inout node: node_t*) {
   }
 }
 
-fun set_left(inout node: node_t*, var new_left: node_t*) {
-  (*new_left)[parent] = some(none of node);
-  (*node)[left] = some(1/2 of new_left);
+fun set_left(ref node: node_t*, var new_left: node_t*) {
+  (*new_left)[parent] = some(node);
+  node <- all of (*new_left)[parent]#some;
+  (*node)[left] = some(new_left);
+  new_left <- half of (*node)[left]#some;
   (*new_left)[parent]#some <- 1/2 of node;
   (*node)[left]#some <- all of new_left;  
 }
 
 fun set_right(inout node: node_t*, var new_right: node_t*) {
-  (*new_right)[parent] = some(none of node);
-  (*node)[right] = some(1/2 of new_right);
+  (*new_right)[parent] = some(node);
+  node <- all of (*new_right)[parent]#some;
+  (*node)[right] = some(new_right);
+  new_right <- half of (*node)[right]#some;
   (*new_right)[parent]#some <- 1/2 of node;
   (*node)[right]#some <- all of new_right;
 }
@@ -124,8 +128,8 @@ fun delete_node(var node: node_opt) {
   case empty(_): {}
   case some(var n): 
     ! gather_permission(n);
-    ! delete_node((*n)[left]);
-    ! delete_node((*n)[right]);
+    ! delete_node(copy((*n)[left]));
+    ! delete_node(copy((*n)[right]));
     delete n;
   }
 }
