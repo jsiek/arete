@@ -280,6 +280,8 @@ class Lambda(Exp):
   def step(self, runner, machine):
       clos_env = {}
       free = self.body.free_vars() - set([p.ident for p in self.params])
+      if tracing_on():
+        print('free vars of ' + self.name + ': ' + str(free))
       for x in free:
           if not x in runner.env.keys():
             error(self.location, 'in closure, undefined variable ' + x)

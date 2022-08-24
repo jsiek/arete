@@ -24,14 +24,14 @@ const all = 1/1;
 fun find(let key: int, ref node: node_t*) -> node_t* {
   if (key < (*node)[data]) {
     match ((*node)[left]) {
-    case empty(w):
+    case empty(_):
       return node;
     case some(ref l):
       return find(key, copy(l), node);
     }	
   } else if ((*node)[data] < key) {
     match ((*node)[right]) {
-    case empty(w):
+    case empty(_):
       return node;
     case some(ref r):
       return find(key, copy(r), node);
@@ -43,19 +43,19 @@ fun find(let key: int, ref node: node_t*) -> node_t* {
 
 fun gather_permission(inout node: node_t*) {
   match ((*node)[left]) {
-  case empty(w): {}
+  case empty(_): {}
   case some(inout l):
     match ((*l)[parent]) {
-    case empty(w): {}
+    case empty(_): {}
     case some(ref p):
       node <- all of p;
     }
   }
   match ((*node)[right]) {
-  case empty(w): {}
+  case empty(_): {}
   case some(inout r):
     match ((*r)[parent]) {
-    case empty(w): {}
+    case empty(_): {}
     case some(ref p):
       node <- all of p;
     }
@@ -65,19 +65,19 @@ fun gather_permission(inout node: node_t*) {
 
 fun scatter_permission(inout node: node_t*) {
   match ((*node)[left]) {
-  case empty(w): {}
+  case empty(_): {}
   case some(inout l):
     match ((*l)[parent]) {
-    case empty(w): {}
+    case empty(_): {}
     case some(inout p):
       p <- half of node;
     }
   }
   match ((*node)[right]) {
-  case empty(w): {}
+  case empty(_): {}
   case some(inout r):
     match ((*r)[parent]) {
-    case empty(w): {}
+    case empty(_): {}
     case some(inout p):
       p <- half of node;
     }
@@ -100,7 +100,7 @@ fun set_right(inout node: node_t*, var new_right: node_t*) {
 
 fun insert(let key: int, inout tree: tree_t) {
   match (*tree) {
-  case empty(w):
+  case empty(_):
     *tree = some(&⟨key, empty(), empty(), empty(), 0⟩);
   case some(inout top_node):
     var node: node_t* = find(key, top_node);
@@ -121,7 +121,7 @@ fun insert(let key: int, inout tree: tree_t) {
 
 fun delete_node(var node: node_opt) {
   match (node) {
-  case empty(w): {}
+  case empty(_): {}
   case some(var n): 
     ! gather_permission(n);
     ! delete_node((*n)[left]);

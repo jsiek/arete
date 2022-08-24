@@ -140,6 +140,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "ref"                                             -> ref
 
 parameter: binding_kind IDENT type_opt                  -> binding
+    | "_"                                               -> no_binding
 				                 
 ?parameter_list:                                     -> empty
     | parameter                                      -> single

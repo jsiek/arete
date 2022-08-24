@@ -27,6 +27,10 @@ class Param:
     def __repr__(self):
         return str(self)
 
+@dataclass(frozen=True)
+class NoParam:
+    location: Meta
+    
 # Expressions
 
 
@@ -239,7 +243,12 @@ class Write(Stmt):
       return str(self)
 
   def free_vars(self):
-      return self.lhs.free_vars() | self.rhs.free_vars()
+      lhs_fvs = self.lhs.free_vars()
+      rhs_fvs = self.rhs.free_vars()
+      if tracing_on():
+        print('free variables of write lhs: ' + str(lhs_fvs))
+        print('free variables of write rhs: ' + str(rhs_fvs))
+      return lhs_fvs | rhs_fvs
 
   def step(self, runner, machine):
     if runner.state == 0:

@@ -295,6 +295,8 @@ class Machine:
       return thread
 
   def bind_param(self, param, res : Result, env, loc):
+    if isinstance(param, NoParam):
+      return
     val = res.value
     if not (isinstance(val, Pointer) or isinstance(val, PointerOffset)):
       error(loc, 'for binding, expected a pointer, not ' + str(val))

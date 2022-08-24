@@ -7,7 +7,7 @@
 # * variant member access.
 
 from dataclasses import dataclass
-from abstract_syntax import Param
+from abstract_syntax import Param, NoParam
 from ast_base import *
 from ast_types import *
 from values import Result, PointerOffset
@@ -135,8 +135,14 @@ class Match(Stmt):
   def free_vars(self):
     case_fvs = set()
     for (tag, param, stmt) in self.cases:
-      case_fvs |= stmt.free_vars() - set([param.ident])
-    return self.condition.free_vars() | case_fvs
+      if isinstance(param, Param):
+        case_fvs = case_fvs | (stmt.free_vars() - set([param.ident]))
+      else:
+        case_fvs = case_fvs | stmt.free_vars()
+    fvs =  self.condition.free_vars() | case_fvs
+    if tracing_on():
+      print('free vars of match: ' + str(fvs))
+    return fvs
 
   def step(self, runner, machine):
     if runner.state == 0:
@@ -172,6 +178,8 @@ class Match(Stmt):
             + str(cond_ty))
     return_type = None
     for (tag, param, body) in self.cases:
+      if isinstance(param, NoParam):
+        continue
       # tag in the variant type?
       if isinstance(cond_ty, VariantType):
         found = False

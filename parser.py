@@ -124,6 +124,8 @@ def parse_tree_to_param(e):
   elif e.data == 'binding':
     return Param(e.meta, e.children[0].data, None, e.children[1].value,
                  parse_tree_to_type(e.children[2]))
+  elif e.data == 'no_binding':
+    return NoParam(e.meta)
   else:    
     raise Exception('unrecognized parameter' + repr(e))
 
