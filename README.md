@@ -1613,10 +1613,14 @@ blocks until the future's thread is finished. The result of this
 
 # TODO
 
-[/] Add variants. (safe unions)
-[/] Remove null pointers.
+[X] Add variants. (safe unions)
+[X] Remove null pointers.
+[X] Refactor type-check into AST methods
+[ ] interfaces, impls, and constraints
+[ ] adding type checking descriptions to the spec
+[ ] add variants to the spec
 [ ] Explicit type arguments for generic functions.
 [ ] Make the `as T` part of the `tag` expression optional.
 [ ] debugger: command to display the stack (like backtrace in gdb)
-[ ] Refactor desugar, const_eval, and type_check into AST methods
+[ ] Refactor desugar, const-eval into AST methods
 [ ] Test cases for type checking failures.

@@ -64,9 +64,10 @@ class Function(Decl):
   params: list[Param]
   return_type: Type
   return_mode: str    # 'value' or 'address'
+  requirements: list[AST]
   body: Exp
   __match_args__ = ("name", "type_params", "params", "return_type",
-                    "return_mode", "body")
+                    "return_mode", "requirements", "body")
   
   def __str__(self):
       return "function " + self.name \

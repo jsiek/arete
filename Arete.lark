@@ -156,17 +156,30 @@ parameter: binding_kind IDENT type_opt                  -> binding
 ?type_params_opt:                                -> nothing
     | "<" ident_list ">"                         -> just
 
+?req: IDENT "(" type_list ")"             -> impl_req
+
+?req_list:                                -> empty
+    | req                                 -> single
+    | req "," req_list             -> push
+
 ?definition: "let" IDENT type_opt "=" expression ";"              -> global
     | "const" IDENT type_opt "=" expression ";"                   -> constant
-    | "fun" IDENT type_params_opt "(" parameter_list ")" ret_type return_mode block  -> function
+    | "fun" IDENT type_params_opt "(" parameter_list ")" ret_type return_mode req_list block  -> function
     | "module" IDENT "exports" ident_list "{" definition_list "}" -> module
     | "from" expression "import" ident_list ";"                   -> import
     | "type" IDENT "=" type ";"                                   -> type_definition
     | "typeop" IDENT "(" ident_list ")" "=" type ";"              -> type_operator
+    | "interface" IDENT "(" ident_list ")" "{" declaration_list "}" -> interface
+    | "impl" IDENT "(" type_list ")" ";"                          -> implementation
 
 ?definition_list:                                                 -> empty
     | definition definition_list                                  -> push
-    
+
+?declaration: IDENT ":" type                                      -> declaration
+
+?declaration_list:                                                -> empty
+    | declaration declaration_list                                -> push
+
 arete: definition_list
 
 %ignore COMMENT

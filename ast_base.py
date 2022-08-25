@@ -55,6 +55,7 @@ class Exp(AST):
 class Stmt(AST):
     pass
 
+# TODO: change name of Decl to Definition
 @dataclass
 class Decl(AST):
   def declare(self, env, mem):

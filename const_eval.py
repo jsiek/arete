@@ -205,14 +205,14 @@ def const_eval_decl(decl, env):
       case Global(name, type_annot, rhs):
         new_rhs = const_eval_exp(rhs, env)
         return [Global(decl.location, name, type_annot, new_rhs)]
-      case Function(name, ty_params, params, return_ty, return_mode, body):
+      case Function(name, ty_params, params, return_ty, return_mode, reqs, body):
         body_env = env.copy()
         for p in params:
           if p.ident in body_env.keys():
             del body_env[p.ident]
         new_body = const_eval_statement(body, body_env)
         return [Function(decl.location, name, ty_params, params, return_ty,
-                         return_mode, new_body)]
+                         return_mode, reqs, new_body)]
       case ModuleDef(name, exports, body):
         body_env = env.copy()
         new_body = const_eval_decls(body, body_env)

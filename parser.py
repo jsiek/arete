@@ -49,6 +49,14 @@ def parse_tree_to_str_list(e):
     else:
         raise Exception('parse_tree_to_str_list, unexpected ' + str(e))
 
+def parse_tree_to_req(e):
+    e.meta.filename = filename
+    if e.data == 'impl_req':
+        return ImplReq(str(e.children[0].value),
+                       parse_tree_to_type_list(e.children[1]))
+    else:
+        raise Exception('unrecognized requirement ' + str(e))
+    
 def parse_tree_to_type(e):
     e.meta.filename = filename
     if e.data == 'nothing' or e.data == 'any_type':
@@ -97,6 +105,18 @@ def parse_tree_to_type_list(e):
     else:
         raise Exception('unrecognized as a type list ' + repr(e))
 
+def parse_tree_to_req_list(e):
+    e.meta.filename = filename
+    if e.data == 'empty':
+        return ()
+    elif e.data == 'single':
+        return (parse_tree_to_req(e.children[0]),)
+    elif e.data == 'push':
+        return (parse_tree_to_req(e.children[0]),) \
+            + parse_tree_to_req_list(e.children[1])
+    else:
+        raise Exception('unrecognized as a req list ' + repr(e))
+    
 def parse_tree_to_alt(e):
     return (str(e.children[0].value),
             parse_tree_to_type(e.children[1]))
@@ -306,14 +326,28 @@ def parse_tree_to_ast(e):
                         parse_tree_to_param(e.children[2]),
                         parse_tree_to_type(e.children[3]),
                         str(e.children[4].data),
-                        parse_tree_to_ast(e.children[5]))
+                        parse_tree_to_req_list(e.children[5]),
+                        parse_tree_to_ast(e.children[6]))
     elif e.data == 'module':
         return ModuleDef(e.meta,
                           str(e.children[0].value),
                           parse_tree_to_str_list(e.children[1]),
                           parse_tree_to_ast(e.children[2]))
+    elif e.data == 'interface':
+        return Interface(e.meta,
+                         str(e.children[0].value),
+                         parse_tree_to_str_list(e.children[1]),
+                         parse_tree_to_ast(e.children[2]))
+    elif e.data == 'implementation':
+        return Impl(e.meta,
+                    str(e.children[0].value),
+                    parse_tree_to_type_list(e.children[1]))
     
     # miscelaneous
+    elif e.data == 'impl_req':
+        return ImplReq(e.meta,
+                       str(e.children[0].value),
+                       parse_tree_to_type_list(e.children[1]))
     elif e.data == 'default_initializer':
         return parse_tree_to_ast(e.children[0])
     elif e.data == 'frac_initializer':

@@ -119,7 +119,6 @@ class Import(Decl):
       # we don't duplicate modules, so we shouldn't kill them on finish
       runner.results[0].temporary = False
       mod = machine.memory.read(mod_ptr, self.location)
-      # mod = machine.memory.read(mod_ptr, self.location)      
       for x in self.imports:
         if x in mod.exports.keys():
           val = machine.memory.read(mod.exports[x], self.location)
