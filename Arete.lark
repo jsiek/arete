@@ -170,12 +170,17 @@ parameter: binding_kind IDENT type_opt                  -> binding
     | "type" IDENT "=" type ";"                                   -> type_definition
     | "typeop" IDENT "(" ident_list ")" "=" type ";"              -> type_operator
     | "interface" IDENT "(" ident_list ")" "{" declaration_list "}" -> interface
-    | "impl" IDENT "(" type_list ")" ";"                          -> implementation
+    | "impl" IDENT "(" type_list ")" "{" assign_list "}"          -> implementation
 
+?assign: IDENT "=" expression ";"                                 -> assign
+
+?assign_list:                                                     -> empty
+    | assign assign_list                                          -> push
+    
 ?definition_list:                                                 -> empty
     | definition definition_list                                  -> push
 
-?declaration: IDENT ":" type                                      -> declaration
+?declaration: IDENT ":" type ";"                                  -> declaration
 
 ?declaration_list:                                                -> empty
     | declaration declaration_list                                -> push

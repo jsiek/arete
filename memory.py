@@ -29,7 +29,10 @@ class Memory:
     addr = self.next_address
     self.next_address += 1
     self.memory[addr] = val
-    return Pointer(addr, [], Fraction(1,1), None)
+    ptr = Pointer(addr, [], Fraction(1,1), None)
+    if tracing_on():
+      print('allocating ' + str(val) + ' at address ' + str(ptr))
+    return ptr
 
   def deallocate(self, addr, location, progress):
     if not self.valid_address(addr):

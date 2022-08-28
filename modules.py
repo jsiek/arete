@@ -25,21 +25,27 @@ class Module(Value):
         #                 for x,val in self.members.items()}
         # exports_copy = {x: members_copy[x] for x in self.exports.keys()}
         # return Module(self.name, exports_copy, self.members)
+        
     def __str__(self):
-      return self.name + '(' + str(id(self)) + ')' + '{' + ','.join([x + '=' + str(v) for x,v in self.exports.items()]) + '}'
+      return 'module ' + self.name + '(' + str(id(self)) + ')' + '{' + ','.join([x + '=' + str(v) for x,v in self.exports.items()]) + '}'
+    
     def __repr__(self):
         return str(self)
+      
     def kill(self, mem, location, progress=set()):
         if tracing_on():
           print('*** killing module ' + self.name + ' (' + str(id(self)) + ')')
         delete_env(self.name, self.members, mem, location)
         if tracing_on():
           print('*** finished killing module ' + self.name + ' (' + str(id(self)) + ')')
+          
     def clear(self, mem, location, progress=set()):
         for val in self.members.values():
           val.clear(mem, location, progress)
+          
     def node_name(self):
         return str(self.name)
+      
     def node_label(self):
         return str(self.name)
 

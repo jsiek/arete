@@ -9,6 +9,7 @@ from tuples_and_arrays import *
 from modules import *
 from pointers import *
 from futures import *
+from interfaces_and_impls import *
 from dataclasses import dataclass
 from parser import parse, set_filename
 from typing import List, Set, Dict, Tuple, Any
@@ -47,6 +48,8 @@ def const_eval_prim(loc, op, args):
         left = to_number(eval_constant(args[0]), loc)
         right = to_number(eval_constant(args[1]), loc)
         return Frac(loc, Fraction(left, right))
+      else:
+        return PrimitiveCall(loc, op, args)
     case _:
         return PrimitiveCall(loc, op, args)
   
@@ -88,13 +91,13 @@ def const_eval_exp(e, env):
         return TupleExp(e.location, new_inits)
       case TagVariant(tag, arg, ty):
         return TagVariant(e.location, tag, const_eval_exp(arg, env), ty)
-      case Lambda(params, ret_mode, body, name):
+      case Lambda(params, ret_mode, reqs, body, name):
         body_env = env.copy()
         for p in params:
           if p.ident in body_env.keys():
             del body_env[p.ident]
         new_body = const_eval_statement(body, body_env)
-        return Lambda(e.location, params, ret_mode, new_body, name)
+        return Lambda(e.location, params, ret_mode, reqs, new_body, name)
       case Call(fun, args):
         new_fun = const_eval_exp(fun, env)
         new_args = [const_eval_exp(arg, env) for arg in args]
@@ -220,6 +223,10 @@ def const_eval_decl(decl, env):
       case Import(module, imports):
         new_module = const_eval_exp(module, env)
         return [Import(decl.location, module, imports)]
+      case Interface(name, type_params, members):
+        return [Interface(decl.location, name, type_params, members)]
+      case Impl(name, iface_name, impl_types, assgn):
+        return [Impl(decl.location, name, iface_name, impl_types, assgn)]
       case _:
         error(decl.location, "in const_eval_decl, unhandled: " + str(decl))
 

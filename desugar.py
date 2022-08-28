@@ -8,6 +8,7 @@ from variables_and_binding import *
 from tuples_and_arrays import *
 from variants import *
 from modules import *
+from interfaces_and_impls import *
 from pointers import *
 from futures import *
 from utilities import *
@@ -15,10 +16,7 @@ from utilities import *
 def desugar_exp(e, env):
     match e:
       case PercentOf(loc, percent, arg):
-        if percent == 'default':
-            new_percent = 'default'
-        else:
-            new_percent = desugar_exp(percent, env)
+        new_percent = desugar_exp(percent, env)
         new_arg = desugar_exp(arg, env)
         return PercentOf(loc, new_percent, new_arg)
       case Var(x):
@@ -47,12 +45,12 @@ def desugar_exp(e, env):
         return TupleExp(e.location, new_inits)
       case TagVariant(tag, arg, ty):
         return TagVariant(e.location, tag, desugar_exp(arg, env), ty)
-      case Lambda(params, ret_mode, body, name):
+      case Lambda(params, ret_mode, reqs, body, name):
         body_env = env.copy()
         for p in params:
             body_env[p.ident] = False
         new_body = desugar_statement(body, body_env)
-        return Lambda(e.location, params, ret_mode, new_body, name)
+        return Lambda(e.location, params, ret_mode, reqs, new_body, name)
       case Call(fun, inits):
         new_fun = desugar_exp(fun, env)
         new_inits = [desugar_exp(init, env) for init in inits]
@@ -178,6 +176,10 @@ def desugar_decl(decl, env):
       case Import(module, imports):
         new_module = desugar_exp(module, env)
         return Import(decl.location, new_module, imports)
+      case Interface(name, type_params, members):
+        return Interface(decl.location, name, type_params, members)
+      case Impl(name, iface_name, impl_types, assgn):
+        return Impl(decl.location, name, iface_name, impl_types, assgn)
       case _:
         error(decl.location, "in desugar_decl, unhandled: " + str(decl))
 

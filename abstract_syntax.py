@@ -68,8 +68,16 @@ class PrimitiveCall(Exp):
       machine.finish_expression(Result(True, result), self.location)
 
   def type_check(self, env):
+    if tracing_on():
+      print("starting to type checking " + str(self))
     arg_types = [arg.type_check(env) for arg in self.args]
-    return type_check_prim(self.location, self.op, arg_types)
+    if tracing_on():
+      print("checking primitive " + str(self.op))
+    ret = type_check_prim(self.location, self.op, arg_types)
+    if tracing_on():
+      print("finished type checking " + str(self))
+      print("type: " + str(ret))
+    return ret
 
 @dataclass
 class Int(Exp):

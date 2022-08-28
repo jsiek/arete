@@ -89,7 +89,7 @@ class BindingExp(Exp):
     rhs_type = self.arg.type_check(env)
     type_annot = simplify(self.param.type_annot, env)
     if not consistent(rhs_type, type_annot):
-      error(e.location, 'type of initializer ' + str(rhs_type) + '\n'
+      error(self.arg.location, 'type of initializer ' + str(rhs_type) + '\n'
             + ' is inconsistent with declared type ' + str(type_annot))
     body_env = env.copy()
     body_env[self.param.ident] = rhs_type
@@ -141,7 +141,7 @@ class BindingStmt(Exp):
     arg_type = self.arg.type_check(env)
     type_annot = simplify(self.param.type_annot, env)
     if not consistent(arg_type, type_annot):
-      error(self.location, 'type of initializer ' + str(arg_type) + '\n'
+      error(self.arg.location, 'type of initializer ' + str(arg_type) + '\n'
             + ' is inconsistent with declared type ' + str(type_annot))
     body_env = env.copy()
     body_env[self.param.ident] = type_annot

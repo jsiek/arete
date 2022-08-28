@@ -68,6 +68,8 @@ def set_primitive_type_check(op, fun):
   type_check_prim[op] = fun
 
 def get_primitive_type_check(op):
+  if not op in type_check_prim.keys():
+    raise Exception('unrecognized primitive operation ' + op)
   return type_check_prim[op]
   
 # Context information:

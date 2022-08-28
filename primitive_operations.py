@@ -35,7 +35,7 @@ def eval_prim(op, vals, machine, location):
         return Number(left - right)
       case 'mul':
         left = to_number(vals[0], location)
-        right = to_number(vals[0], location)
+        right = to_number(vals[1], location)
         return Number(left * right)
       case 'div':
         left = to_number(vals[0], location)

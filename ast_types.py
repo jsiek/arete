@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from ast_base import Type
+from ast_base import Type, AST
 from lark.tree import Meta
 from utilities import tracing_on, error
 
@@ -21,6 +21,8 @@ class IntType(Type):
     return 'int'
   def __repr__(self):
     return str(self)
+  def __eq__(self, other):
+    return isinstance(other, IntType)
 
 @dataclass(eq=True, frozen=True)
 class RationalType(Type):
@@ -95,13 +97,16 @@ class FunctionType(Type):
   type_params: tuple[str]
   param_types: tuple[Type]
   return_type: Type
-  __match_args__ = ("type_params", "param_types", "return_type")
+  requirements: list[AST]
+  __match_args__ = ("type_params", "param_types", "return_type", "requirements")
+  
   def __str__(self):
     return ('<' + ', '.join(self.type_params) + '>'
             if len(self.type_params) > 0\
             else '') \
            + '(' + ', '.join([str(t) for t in self.param_types]) + ')' \
-           + '->' + str(self.return_type)
+           + '->' + str(self.return_type) \
+           + ' ' + ', '.join(str(req) for req in self.requirements)
   def __repr__(self):
     return str(self)
     
@@ -176,18 +181,21 @@ def simplify(type: Type, env) -> Type:
                        tuple(simplify(elt_ty, env) for elt_ty in ts2))
     case PointerType(elt_ty):
       ret = PointerType(type.location, simplify(elt_ty, env))
+    case ArrayType(elt_ty):
+      ret = ArrayType(type.location, simplify(elt_ty, env))
     case RecursiveType(name, elt_ty):
       body_env = env.copy()
       body_env[name] = TypeVar(type.location, name)
       ret = RecursiveType(type.location, name, simplify(elt_ty, body_env))
-    case FunctionType(ty_params, param_tys, ret_ty):
+    case FunctionType(ty_params, param_tys, ret_ty, requirements):
       body_env = env.copy()
       for t in ty_params:
         body_env[t] = TypeVar(type.location, t)
       ret = FunctionType(type.location,
                          ty_params,
                          tuple(simplify(ty, body_env) for ty in param_tys),
-                         simplify(ret_ty, body_env))
+                         simplify(ret_ty, body_env),
+                         requirements) # TODO: simplify requirements
     case IntType():
       ret = type
     case RationalType():
@@ -243,7 +251,8 @@ def substitute(subst: dict[str, Type], ty2: Type) -> Type:
         subst2[t] = TypeVar(ty2.location, t)
       params = tuple(substitute(subst2, pt) for pt in param_types)
       ret = substitute(subst2, return_type)
-      return FunctionType(ty2.location, type_params, params, ret)
+      return FunctionType(ty2.location, type_params, params, ret,
+                          tuple()) # TODO: handle requirements
     case IntType():
       return ty2
     case BoolType():

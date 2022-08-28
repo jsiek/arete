@@ -118,6 +118,8 @@ class Machine:
         log_graphviz('top', env, self.memory.memory)
 
       if self.memory.size() > 0:
+          print('result:')
+          print(self.return_value)
           if tracing_on():
               print('final memory:')
               print(self.memory)

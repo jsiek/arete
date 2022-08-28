@@ -6,6 +6,7 @@ from variants import *
 from modules import *
 from pointers import *
 from futures import *
+from interfaces_and_impls import *
 from ast_types import *
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -52,8 +53,10 @@ def parse_tree_to_str_list(e):
 def parse_tree_to_req(e):
     e.meta.filename = filename
     if e.data == 'impl_req':
-        return ImplReq(str(e.children[0].value),
-                       parse_tree_to_type_list(e.children[1]))
+        return ImplReq(e.meta,
+                       str(e.children[0].value),
+                       parse_tree_to_type_list(e.children[1]),
+                       None)
     else:
         raise Exception('unrecognized requirement ' + str(e))
     
@@ -77,6 +80,12 @@ def parse_tree_to_type(e):
     elif e.data == 'tuple_type':
         return TupleType(e.meta,
                          parse_tree_to_type_list(e.children[0]))
+    elif e.data == 'function_type':
+       return FunctionType(e.meta,
+                           tuple(), # TODO: add type parameters
+                           parse_tree_to_type_list(e.children[0]),
+                           parse_tree_to_type(e.children[1]),
+                           tuple()) # TODO: add requirements
     elif e.data == 'variant_type':
         return VariantType(e.meta,
                            parse_tree_to_alt_list(e.children[0]))
@@ -171,6 +180,13 @@ primitive_ops = {'add', 'sub', 'mul', 'div', 'int_div', 'neg',
                  'equal', 'not_equal',
                  'less', 'greater', 'less_equal', 'greater_equal',
                  'permission', 'upgrade', 'breakpoint', 'exit'}
+
+impl_num = 0
+def next_impl_num():
+    global impl_num
+    ret = impl_num
+    impl_num += 1
+    return ret
     
 def parse_tree_to_ast(e):
     e.meta.filename = filename
@@ -196,6 +212,7 @@ def parse_tree_to_ast(e):
         return Lambda(e.meta,
                       parse_tree_to_param(e.children[0]),
                       str(e.children[1].data),
+                      [],
                       parse_tree_to_ast(e.children[2]),
                       'lambda')
     elif e.data == 'call':
@@ -338,16 +355,23 @@ def parse_tree_to_ast(e):
                          str(e.children[0].value),
                          parse_tree_to_str_list(e.children[1]),
                          parse_tree_to_ast(e.children[2]))
+    elif e.data == 'declaration':
+        return (str(e.children[0].value), parse_tree_to_type(e.children[1]))
     elif e.data == 'implementation':
         return Impl(e.meta,
+                    str(e.children[0].value) + str(next_impl_num()),
                     str(e.children[0].value),
-                    parse_tree_to_type_list(e.children[1]))
+                    parse_tree_to_type_list(e.children[1]),
+                    parse_tree_to_ast(e.children[2]))
+    elif e.data == 'assign':
+        return (str(e.children[0].value), parse_tree_to_ast(e.children[1]))
     
     # miscelaneous
     elif e.data == 'impl_req':
         return ImplReq(e.meta,
                        str(e.children[0].value),
-                       parse_tree_to_type_list(e.children[1]))
+                       parse_tree_to_type_list(e.children[1]),
+                       None)
     elif e.data == 'default_initializer':
         return parse_tree_to_ast(e.children[0])
     elif e.data == 'frac_initializer':
