@@ -144,7 +144,7 @@ class Function(Decl):
 class Call(Exp):
   fun: Exp
   args: list[Exp]
-  witnesses: tuple[tuple[str, tuple[Type], Exp]] = ()
+  witnesses: tuple[Exp] = ()
   
   __match_args__ = ("fun", "args")
   
@@ -159,7 +159,7 @@ class Call(Exp):
   def free_vars(self):
       return self.fun.free_vars() \
           | set().union(*[arg.free_vars() for arg in self.args]) \
-          | set().union(*[wit[2].free_vars() for wit in self.witnesses])
+          | set().union(*[wit.free_vars() for wit in self.witnesses])
   
   def type_check(self, env):
     fun_type = self.fun.type_check(env)
@@ -213,7 +213,7 @@ class Call(Exp):
                 + ' for ' + str(req_impl_types)
                 + '\nin impls:\n'
                 + str(iface_impl_info.impls))
-        self.witnesses.append((req.iface_name, req_impl_types, witness_exp))
+        self.witnesses.append(witness_exp)
       
       rt = simplify(fun_type.return_type, fun_env)
       ret = substitute(matches, rt)
@@ -249,10 +249,7 @@ class Call(Exp):
     elif runner.state <= len(self.args) + len(self.witnesses):
       # evaluate the witness subexpressions
       i = runner.state - 1 - len(self.args)
-      if tracing_on():
-        print('for call, evaluating witness expression: '
-              + str(self.witnesses[i][2]))
-      machine.schedule(self.witnesses[i][2], runner.env, AddressCtx())
+      machine.schedule(self.witnesses[i], runner.env, AddressCtx())
     elif runner.state == 1 + len(self.args) + len(self.witnesses):
       self.set_closure(runner, machine)
       # call the function
@@ -272,18 +269,11 @@ class Call(Exp):
           # Bind the parameters to their arguments.
           for param, arg in zip(params, runner.args):
             machine.bind_param(param, arg, runner.body_env, self.location)
-            
-          # Bind impl member names to their values.
-          for witness_ptr in runner.witnesses:
-            witness = machine.memory.read(witness_ptr, self.location)
-            for x,val in witness.fields.items():
-              dup = val.duplicate(Fraction(1,2), self.location)
-              runner.body_env[x] = machine.memory.allocate(dup)
 
-          # Bind impls to their witnesses.
+          # Bind required impls to their witnesses.
           for req, witness_ptr in zip(reqs, runner.witnesses):
-            runner.body_env[req.name] = witness_ptr
-
+            req.bind_impl(witness_ptr, runner.body_env, machine)
+            
           machine.push_frame()
           if machine.current_thread.pause_on_call:
               machine.pause = True
@@ -299,13 +289,13 @@ class Call(Exp):
           error(self.location, 'expected function in call, not '
                 + str(runner.clos))
     else:
-      # return from the function
-      # * deallocate the parameters
+      # return from the function:
+      # deallocate the parameters
       for (param, arg) in zip(runner.params, runner.args):
         machine.dealloc_param(param, arg, runner.body_env,
                               runner.clos.body.location)
 
-      # * deallocate the witness member bindings
+      # deallocate the witness member bindings:
       for witness_ptr in runner.witnesses:
         witness = machine.memory.read(witness_ptr, self.location)
         for x in witness.fields.keys():

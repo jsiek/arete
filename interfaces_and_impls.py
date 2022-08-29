@@ -189,9 +189,6 @@ class ImplReq(Type):
   def free_vars(self):
     pass
   
-  def step(self, runner, machine):
-    pass
-
   def declare_type(self, env, output):
     if not self.iface_name in env.keys():
       error(self.location, "undefined interface " + self.iface_name)
@@ -207,6 +204,14 @@ class ImplReq(Type):
     return ImplReq(self.location, self.name, self.iface_name, self.impl_types,
                    iface_impl_info.iface)
 
-  def type_check(self, env):
-    pass
-  
+  def bind_impl(self, witness_ptr, env, machine):
+    # Bind impl name to its witness.
+    env[self.name] = witness_ptr
+
+    # Bind impl member names to their values.
+    witness = machine.memory.read(witness_ptr, self.location)
+    for x,val in witness.fields.items():
+      dup = val.duplicate(Fraction(1,2), self.location)
+      env[x] = machine.memory.allocate(dup)
+
+    
