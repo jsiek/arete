@@ -1,6 +1,18 @@
+// basic test of interface/impl/generic features.
+
 interface Monoid(T) {
   combine : (T,T) -> T;
   identity : T;
+}
+
+fun accumulate<T>(A: [T]) -> T Monoid(T) {
+  var total:T = copy(identity);
+  var i:int = 0;
+  while (i != len(A)) {
+    total = combine(total, A[i]);
+    i = i + 1;
+  }
+  return total;
 }
 
 fun add(x:int, y:int) -> int {
@@ -8,16 +20,6 @@ fun add(x:int, y:int) -> int {
 }
 
 let zero: int = 0;
-
-fun sum<T>(A: [T]) -> T Monoid(T) {
-  var i:int = 0;
-  var total:T = copy(identity);
-  while (i != len(A)) {
-    total = combine(total, A[i]);
-    i = i + 1;
-  }
-  return total;
-}
 
 impl Monoid(int) {
   combine = add;
@@ -32,6 +34,6 @@ fun main() {
     A[i] = i; 
     i = i + 1;
   }
-  return sum(A) - n*(n - 1)/2;
+  return accumulate(A) - n*(n - 1)/2;
 }
 

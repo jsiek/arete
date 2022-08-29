@@ -65,3 +65,5 @@ class Decl(AST):
 @dataclass(frozen=True)
 class Type:
     location: Meta
+    def copy(self):
+      return self

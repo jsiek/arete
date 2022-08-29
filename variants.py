@@ -190,7 +190,7 @@ class Match(Stmt):
         found = False
         for (alt_tag,alt_ty) in cond_ty.alternative_types:
           if tag == alt_tag:
-            body_env = env.copy()
+            body_env = {x: t.copy() for x,t in env.items()}
             body_env[param.ident] = alt_ty
             retty = body.type_check(body_env)
             if return_type is None:

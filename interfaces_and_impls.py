@@ -21,9 +21,12 @@ class InterfaceInfo:
   params: list[str]
   members: dict[str,Type]
 
+  def copy(self):
+    return self
+  
   def duplicate(self, percent, loc):
     return self
-
+  
   def kill(self, mem, loc, progress=set()):
     pass
   
@@ -41,6 +44,13 @@ class InterfaceImplInfo:
   iface: InterfaceInfo
   impls: list[tuple[list[Type], Exp]]
 
+  def copy(self):
+    return InterfaceImplInfo(self.iface,
+                             [(tys, e) for tys, e in self.impls])
+
+  def duplicate(self, percent, loc):
+    return self.copy()
+  
 @dataclass
 class Interface(Decl):
   name: str
@@ -67,7 +77,7 @@ class Interface(Decl):
     machine.finish_definition(self.location)
 
   def declare_type(self, env, output):
-    body_env = env.copy()
+    body_env = {x: t.copy()  for x, t in env.items()}
     for x in self.type_params:
       body_env[x] = TypeVar(self.location, x)
     mems = {x: simplify(t, body_env) for x,t in self.members}
@@ -89,7 +99,7 @@ class Impl(Decl):
   
   def __str__(self):
     return 'impl ' + self.name + ': ' + self.iface_name \
-      + '(' + ', '.join(str(self.impl_types)) + ');'
+      + '(' + ', '.join(str(ty) for ty in self.impl_types) + ');'
     
   def __repr__(self):
     return str(self)
@@ -107,7 +117,8 @@ class Impl(Decl):
         
   def type_check(self, env):
     if tracing_on():
-      print('type checking ' + str(self))
+      print('type checking ' + str(self) + '\n'
+            'in environment: ' + str(env))
     iface_impl_info = env[self.iface_name]
     member_types = {}
     for x,e in self.assignments:
@@ -119,7 +130,8 @@ class Impl(Decl):
       req_ty = substitute(subst, ty)
       if not x in member_types.keys():
         error(self.location, "missing requirement " + x + " for impl of "
-              + self.iface_name + ' for ' + ', '.join([str(ty) for ty in self.impl_types]))
+              + self.iface_name
+              + ' for ' + ', '.join([str(ty) for ty in self.impl_types]))
       if tracing_on():
         print('impl requirement ' + x + ' : ' + str(req_ty))
         print('has type ' + str(member_types[x]))
@@ -153,22 +165,23 @@ class Impl(Decl):
         if not x in members.keys():
           error(self.location, "requirement " + x
                  + " was not provided by the implementation")
-      mod = Record(members)
-      mod_ptr = machine.memory.allocate(mod)
-      machine.memory.unchecked_write(runner.env[self.name], mod_ptr,
+      witness = Record(members)
+      #witness_ptr = machine.memory.allocate(witness)
+      machine.memory.unchecked_write(runner.env[self.name], witness,
                                      self.location)
-      mod_ptr.kill(machine.memory, self.location) # because write duplicates
+      #witness_ptr.kill(machine.memory, self.location) # because write duplicates
       machine.finish_definition(self.location)
 
 @dataclass(eq=True, frozen=True)
 class ImplReq(Type):
+  name: str
   iface_name: str
   impl_types: tuple[Type]  # implementing type(s)
   iface: Type
   
   def __str__(self):
-    return self.iface_name + '(' + \
-      ', '.join([str(ty) for ty in self.impl_types]) + ');'
+    return self.name + ': ' + self.iface_name + '(' + \
+      ', '.join([str(ty) for ty in self.impl_types]) + ')'
     
   def __repr__(self):
     return str(self)
@@ -185,10 +198,14 @@ class ImplReq(Type):
     iface_impl_info = env[self.iface_name]
     subst = { x:ty for x, ty in zip(iface_impl_info.iface.params,
                                     self.impl_types)}
+    # Bring the impl into scope
+    iface_impl_info.impls += [(self.impl_types, Var(self.location, self.name))]
+    
+    # Bring the impl members into scope
     for x, ty in iface_impl_info.iface.members.items():
       env[x] = substitute(subst, ty)
-    return ImplReq(self.location,
-                   self.iface_name, self.impl_types, iface_impl_info.iface)
+    return ImplReq(self.location, self.name, self.iface_name, self.impl_types,
+                   iface_impl_info.iface)
 
   def type_check(self, env):
     pass

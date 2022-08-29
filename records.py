@@ -17,7 +17,7 @@ class Record(Value):
     
     def duplicate(self, percentage, loc):
       return Record({f: elt.duplicate(percentage, loc) \
-                     for f,elt in self.fields.items})
+                     for f,elt in self.fields.items()})
     
     def kill(self, mem, location, progress=set()):
       for elt in self.fields.values():

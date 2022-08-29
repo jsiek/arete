@@ -14,6 +14,8 @@ class AnyType(Type):
     return '?'
   def __repr__(self):
     return str(self)
+  def __eq__(self, other):
+    return isinstance(other, AnyType)
 
 @dataclass(eq=True, frozen=True)
 class IntType(Type):
@@ -30,6 +32,8 @@ class RationalType(Type):
     return 'rational'
   def __repr__(self):
     return str(self)
+  def __eq__(self, other):
+    return isinstance(other, RationalType)
 
 @dataclass(eq=True, frozen=True)
 class BoolType(Type):
@@ -37,6 +41,8 @@ class BoolType(Type):
     return 'bool'
   def __repr__(self):
     return str(self)
+  def __eq__(self, other):
+    return isinstance(other, BoolType)
 
 @dataclass(eq=True, frozen=True)
 class VoidType(Type):
@@ -44,6 +50,8 @@ class VoidType(Type):
     return 'void'
   def __repr__(self):
     return str(self)
+  def __eq__(self, other):
+    return isinstance(other, VoidType)
 
 @dataclass(eq=True, frozen=True)
 class PointerType(Type):
@@ -53,6 +61,8 @@ class PointerType(Type):
     return str(self.type) + '*'
   def __repr__(self):
     return str(self)
+  def __eq__(self, other):
+    return isinstance(other, PointerType) and self.type == other.type
 
 @dataclass(eq=True, frozen=True)
 class RecursiveType(Type):
@@ -72,6 +82,9 @@ class ArrayType(Type):
     return 'array[' + str(self.element_type) + ']'
   def __repr__(self):
     return str(self)
+  def __eq__(self, other):
+    return isinstance(other, ArrayType) \
+      and self.element_type == other.element_type
   
 @dataclass(eq=True, frozen=True)
 class TupleType(Type):
@@ -81,6 +94,10 @@ class TupleType(Type):
     return '⟨' + ', '.join([str(t) for t in self.member_types]) + '⟩'
   def __repr__(self):
     return str(self)
+  def __eq__(self, other):
+    return isinstance(other, TupleType) \
+      and all([t1 == t2 for t1,t2 in zip(self.member_types,
+                                         other.member_types)])
 
 @dataclass(eq=True, frozen=True)
 class VariantType(Type):
@@ -91,6 +108,10 @@ class VariantType(Type):
                             for x,t in self.alternative_types]) + ')'
   def __repr__(self):
     return str(self)
+  def __eq__(self, other):
+    return isinstance(other, TupleType) \
+      and all([t1 == t2 for t1,t2 in zip(self.alternative_types,
+                                         other.alternative_types)])
 
 @dataclass(eq=True, frozen=True)
 class FunctionType(Type):
@@ -131,12 +152,15 @@ class FutureType(Type):
 
 @dataclass(eq=True, frozen=True)
 class TypeVar(Type):
-    ident: str
-    __match_args__ = ("ident",)
-    def __str__(self):
-        return '`' + self.ident
-    def __repr__(self):
-        return str(self)
+  ident: str
+  __match_args__ = ("ident",)
+  def __str__(self):
+    return '`' + self.ident
+  def __repr__(self):
+    return str(self)
+  def __eq__(self, other):
+    return isinstance(other, TypeVar) and self.ident == other.ident
+              
   
 @dataclass(eq=True, frozen=True)
 class TypeApplication(Type):
@@ -343,7 +367,8 @@ def match_types(vars: tuple[str],
                 assumed_consistent):
   if tracing_on():
     print('match\t' + str(pat_ty) + '\nwith\t' + str(match_ty)
-          + '\nin\t' + str(assumed_consistent))
+          + '\nassuming\t' + str(assumed_consistent)
+          + '\nmatches:\t' + str(matches))
   if (pat_ty, match_ty) in assumed_consistent:
     return True
   match (pat_ty, match_ty):
@@ -352,17 +377,16 @@ def match_types(vars: tuple[str],
     case (_, AnyType()):
       return True
     case (TypeVar(name), _):
-      if name in matches.keys():
-        return match_types(vars, matches[name], match_ty, assumed_consistent)
+      if isinstance(match_ty, TypeVar) and name == match_ty.ident:
+        return True
+      elif name in matches.keys():
+        return match_types(vars, matches[name], match_ty, matches,
+                           assumed_consistent)
       elif name in vars:
         matches[name] = match_ty
         return True
       else:
-        match match_ty:
-          case TypeVar(other_name):
-            return name == other_name
-          case _:
-            return False
+        return False
     case (TupleType(pat_ts), TupleType(match_ts)):
       return all([match_types(vars, pt, mt, matches, assumed_consistent) \
                   for (pt,mt) in zip(pat_ts, match_ts)])

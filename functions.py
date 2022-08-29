@@ -20,16 +20,18 @@ class Closure(Value):
     name: str
     params: list[Any]
     return_mode: str    # 'value' or 'address'
+    requirements: list[AST]
     body: Stmt
     env: dict[str,Pointer]
-    __match_args__ = ("name", "params", "return_mode", "body", "env")
+    __match_args__ = ("name", "params", "return_mode", "requirements", "body", "env")
     
     def duplicate(self, percentage, loc):
       if tracing_on():
         print('duplicating closure ' + str(self))
-      env_copy = {x: v.duplicate(Fraction(1,2), loc) for x,v in self.env.items()}
-      return Closure(self.name, self.params, self.return_mode, self.body,
-                       env_copy)
+      env_copy = {x: v.duplicate(Fraction(1,2), loc) \
+                  for x,v in self.env.items()}
+      return Closure(self.name, self.params, self.return_mode, self.requirements,
+                     self.body, env_copy)
     
     def kill(self, mem, location, progress=set()):
       if tracing_on():
@@ -70,24 +72,26 @@ class Function(Decl):
                     "return_mode", "requirements", "body")
   
   def __str__(self):
-      return "function " + self.name \
+      return "fun " + self.name \
           + ("<" + ", ".join(self.type_params) + ">" \
              if len(self.type_params) > 0 \
              else "") \
           + "(" + ", ".join([str(p) for p in self.params]) + ")" \
-          + " -> " + str(self.return_type) \
+          + " -> " + str(self.return_type) + " " \
+          + ", ".join([str(req) for req in self.requirements]) \
           + " " + str(self.body)
     
   def __repr__(self):
       return str(self)
     
   def free_vars(self):
-    req_vars = set([req.iface.members.keys() for req in self.requirements])
+    req_vars = set([req.name for req in self.requirements])
+    req_mem_vars = set([req.iface.members.keys() for req in self.requirements])
     params = set([p.ident for p in self.params])
-    fvars = body.free_vars() - params - req_vars
+    fvars = body.free_vars() - params - req_mem_vars - req_vars
     if tracing_on():
       print('function ' + self.name + ' free variables: ' + str(fvars)
-            + '\nrequirements: ' + str(req_vars))
+            + '\nrequirements: ' + str(req_mem_vars))
     return fvars
     
   def declare_type(self, env, output):
@@ -101,17 +105,22 @@ class Function(Decl):
     
   def type_check(self, env):
     if tracing_on():
-      print('type checking function ' + self.name)
-    body_env = env.copy()
+      print('type checking function ' + str(self))
+    body_env = {x: t.copy() for x,t in env.items()}
     for t in self.type_params:
       body_env[t] = TypeVar(self.location, t)
     ret_ty = simplify(self.return_type, body_env)
+    # Bind parameters to their types
     for p in self.params:
         body_env[p.ident] = simplify(p.type_annot, body_env)
+        
+    # Bring the impls and their members into scope.
     new_reqs = []
     for req in self.requirements:
       new_reqs.append(req.declare_type(body_env, {}))
     self.requirements = new_reqs
+    
+    # type check the body of the function
     body_type = self.body.type_check(body_env)
     if not consistent(body_type, ret_ty):
       error(self.location, 'return type mismatch:\n' + str(ret_ty)
@@ -135,13 +144,14 @@ class Function(Decl):
 class Call(Exp):
   fun: Exp
   args: list[Exp]
-  witnesses: tuple[Exp] = ()
+  witnesses: tuple[tuple[str, tuple[Type], Exp]] = ()
   
   __match_args__ = ("fun", "args")
   
   def __str__(self):
       return str(self.fun) \
-          + "(" + ", ".join([str(arg) for arg in self.args]) + ")"
+          + "(" + ", ".join([str(arg) for arg in self.args]) + ")" \
+          + ", ".join([str(wit) for wit in self.witnesses])
   
   def __repr__(self):
       return str(self)
@@ -149,16 +159,19 @@ class Call(Exp):
   def free_vars(self):
       return self.fun.free_vars() \
           | set().union(*[arg.free_vars() for arg in self.args]) \
-          | set().union(*[wit.free_vars() for wit in self.witnesses])
+          | set().union(*[wit[2].free_vars() for wit in self.witnesses])
   
   def type_check(self, env):
     fun_type = self.fun.type_check(env)
     arg_types = [arg.type_check(env) for arg in self.args]
     fun_type = unfold(fun_type)
     if tracing_on():
-      print('call to function of type ' + str(fun_type))
+      print('type checking call ' + str(self))
+      print('function type: ' + str(fun_type))
+      print('in environment: ' + str(env))
     if isinstance(fun_type, FunctionType):
-      fun_env = env.copy()
+      fun_env = {x: t.copy()  for x, t in env.items()}
+
       for t in fun_type.type_params:
         fun_env[t] = TypeVar(self.location, t)
       if len(fun_type.param_types) != len(arg_types):
@@ -184,19 +197,23 @@ class Call(Exp):
       for req in fun_type.requirements:
         iface_impl_info = env[req.iface_name]
         req_impl_types = [substitute(matches, simplify(ty, fun_env)) \
-                      for ty in req.impl_types]
+                          for ty in req.impl_types]
         if tracing_on():
           print('searching for impl of ' + req.iface_name
                 + ' for ' + str(req_impl_types))
         witness_exp = None
         for impl_tys, wit_exp in iface_impl_info.impls:
           if all([t1 == t2 for t1, t2 in zip(req_impl_types, impl_tys)]):
+            if tracing_on():
+              print('found ' + str(wit_exp))
             witness_exp = wit_exp
             break
         if witness_exp is None:
           error(self.location, 'could not find impl of ' + req.iface_name
-                + ' for ' + str(req_impl_types))
-        self.witnesses.append(witness_exp)
+                + ' for ' + str(req_impl_types)
+                + '\nin impls:\n'
+                + str(iface_impl_info.impls))
+        self.witnesses.append((req.iface_name, req_impl_types, witness_exp))
       
       rt = simplify(fun_type.return_type, fun_env)
       ret = substitute(matches, rt)
@@ -234,23 +251,21 @@ class Call(Exp):
       i = runner.state - 1 - len(self.args)
       if tracing_on():
         print('for call, evaluating witness expression: '
-              + str(self.witnesses[i]))
-      machine.schedule(self.witnesses[i], runner.env, ValueCtx())
+              + str(self.witnesses[i][2]))
+      machine.schedule(self.witnesses[i][2], runner.env, AddressCtx())
     elif runner.state == 1 + len(self.args) + len(self.witnesses):
       self.set_closure(runner, machine)
       # call the function
       match runner.clos:
-        case Closure(name, params, ret_mode, body, clos_env):
+        case Closure(name, params, ret_mode, reqs, body, clos_env):
           if len(params) != len(self.args):
             error(self.location, 'wrong number of arguments, expected '
                   + str(len(params)) + ' not ' + str(len(self.args)))
           runner.params = params
           runner.body_env = clos_env.copy()
-          runner.args = [res for res in runner.results[1:1+len(self.args)]]
-          runner.witnesses = []
-          for res in runner.results[1+len(self.args):]:
-            witness = machine.memory.read(res.value, self.location)
-            runner.witnesses.append(witness)
+          runner.args = runner.results[1:1+len(self.args)]
+          witness_res = runner.results[1+len(self.args):]
+          runner.witnesses = [res.value for res in witness_res]
           if tracing_on():
             print('call with len(witnesses): ' + str(len(runner.witnesses)))
             
@@ -258,13 +273,17 @@ class Call(Exp):
           for param, arg in zip(params, runner.args):
             machine.bind_param(param, arg, runner.body_env, self.location)
             
-          # Bind impl member names to their values  .
-          for witness in runner.witnesses:
+          # Bind impl member names to their values.
+          for witness_ptr in runner.witnesses:
+            witness = machine.memory.read(witness_ptr, self.location)
             for x,val in witness.fields.items():
               dup = val.duplicate(Fraction(1,2), self.location)
-              addr = machine.memory.allocate(dup)
-              runner.body_env[x] = addr
-          
+              runner.body_env[x] = machine.memory.allocate(dup)
+
+          # Bind impls to their witnesses.
+          for req, witness_ptr in zip(reqs, runner.witnesses):
+            runner.body_env[req.name] = witness_ptr
+
           machine.push_frame()
           if machine.current_thread.pause_on_call:
               machine.pause = True
@@ -287,7 +306,8 @@ class Call(Exp):
                               runner.clos.body.location)
 
       # * deallocate the witness member bindings
-      for witness in runner.witnesses:
+      for witness_ptr in runner.witnesses:
+        witness = machine.memory.read(witness_ptr, self.location)
         for x in witness.fields.keys():
           runner.body_env[x].kill(machine.memory, self.location)
       
@@ -352,19 +372,21 @@ class Lambda(Exp):
   __match_args__ = ("params", "return_mode", "requirements", "body", "name")
 
   def __str__(self):
-      return "function " \
-          + "(" + ", ".join([str(p) for p in self.params]) + ")" \
-          + " { " + str(self.body) + " }"
+      return "lambda " \
+          + "(" + ", ".join([str(p) for p in self.params]) + ") " \
+          + ", ".join(str(req) for req in self.requirements) \
+          + " " + str(self.body)
 
   def __repr__(self):
       return str(self)
 
   def free_vars(self):
-    req_vars = set()
+    req_vars = set([req.name for req in self.requirements])
+    req_mem_vars = set()
     for req in self.requirements:
-      req_vars = req_vars | set(req.iface.members.keys())
+      req_mem_vars = req_mem_vars | set(req.iface.members.keys())
     params = set([p.ident for p in self.params])
-    return self.body.free_vars() - params - req_vars
+    return self.body.free_vars() - params - req_mem_vars - req_vars
 
   def step(self, runner, machine):
       clos_env = {}
@@ -373,11 +395,11 @@ class Lambda(Exp):
         print('free vars of ' + self.name + ': ' + str(free))
       for x in free:
           if not x in runner.env.keys():
-            error(self.location, 'in closure, undefined variable ' + x)
+            error(self.location, 'in lambda, undefined free variable ' + x)
           v = runner.env[x]
           clos_env[x] = v.duplicate(Fraction(1,2), self.location)            
-      clos = Closure(self.name, self.params, self.return_mode, self.body,
-                     clos_env)
+      clos = Closure(self.name, self.params, self.return_mode, self.requirements,
+                     self.body, clos_env)
       if isinstance(runner.context, ValueCtx):
           result = clos
       elif isinstance(runner.context, AddressCtx):
@@ -387,7 +409,7 @@ class Lambda(Exp):
       machine.finish_expression(Result(True, result), self.location)
 
   def type_check(self, env):
-    body_env = env.copy()
+    body_env = {x: t.copy() for x,t in env.items()}
     for p in self.params:
         body_env[p.ident] = p.type_annot
     new_reqs = []

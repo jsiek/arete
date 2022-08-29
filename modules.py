@@ -92,7 +92,7 @@ class ModuleDef(Decl):
     output[self.name] = env[self.name]
     
   def type_check(self, env):
-    body_env = env.copy()
+    body_env = {x: t.copy() for x,t in env.items()}
     members = {}
     for d in self.body:
       d.declare_type(body_env, members)

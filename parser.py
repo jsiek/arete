@@ -54,6 +54,7 @@ def parse_tree_to_req(e):
     e.meta.filename = filename
     if e.data == 'impl_req':
         return ImplReq(e.meta,
+                       str(e.children[0].value) + str(next_impl_num()),
                        str(e.children[0].value),
                        parse_tree_to_type_list(e.children[1]),
                        None)
@@ -367,8 +368,11 @@ def parse_tree_to_ast(e):
         return (str(e.children[0].value), parse_tree_to_ast(e.children[1]))
     
     # miscelaneous
+    
+    # is impl_req needed?
     elif e.data == 'impl_req':
         return ImplReq(e.meta,
+                       str(e.children[0].value) + str(next_impl_num()),
                        str(e.children[0].value),
                        parse_tree_to_type_list(e.children[1]),
                        None)
