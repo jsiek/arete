@@ -160,16 +160,22 @@ parameter: binding_kind IDENT type_opt                  -> binding
 
 ?req_list:                                -> empty
     | req                                 -> single
-    | req "," req_list             -> push
+    | req "," req_list                    -> push
+
+?where_clause:                            -> empty
+    | "where" req_list
+
+?extends_clause:                          -> empty
+    | "extends" req_list
 
 ?definition: "let" IDENT type_opt "=" expression ";"              -> global
     | "const" IDENT type_opt "=" expression ";"                   -> constant
-    | "fun" IDENT type_params_opt "(" parameter_list ")" ret_type return_mode req_list block  -> function
+    | "fun" IDENT type_params_opt "(" parameter_list ")" ret_type return_mode where_clause block  -> function
     | "module" IDENT "exports" ident_list "{" definition_list "}" -> module
     | "from" expression "import" ident_list ";"                   -> import
     | "type" IDENT "=" type ";"                                   -> type_definition
     | "typeop" IDENT "(" ident_list ")" "=" type ";"              -> type_operator
-    | "interface" IDENT "(" ident_list ")" "{" declaration_list "}" -> interface
+    | "interface" IDENT "(" ident_list ")" extends_clause  "{" declaration_list "}" -> interface
     | "impl" IDENT "(" type_list ")" "{" assign_list "}"          -> implementation
 
 ?assign: IDENT "=" expression ";"                                 -> assign

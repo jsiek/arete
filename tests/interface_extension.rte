@@ -1,12 +1,9 @@
-// basic test of interface/impl/generic features.
-
-interface Monoid(T) {
+interface Semigroup(T) {
   combine : (T,T) -> T;
-  identity : T;
 }
 
-fun accumulate<T>(A: [T]) -> T where Monoid(T) {
-  var total:T = copy(identity);
+fun accumulate<T>(A: [T], let init: T) -> T where Semigroup(T) {
+  var total:T = copy(init);
   var i:int = 0;
   while (i != len(A)) {
     total = combine(total, A[i]);
@@ -15,14 +12,25 @@ fun accumulate<T>(A: [T]) -> T where Monoid(T) {
   return total;
 }
 
+interface Monoid(T) extends Semigroup(T) {
+  identity : T;
+}
+
+fun sum<T>(A: [T]) -> T where Monoid(T) {
+  return accumulate(A, identity);
+}
+
 fun add(x:int, y:int) -> int {
   return x + y;
+}
+
+impl Semigroup(int) {
+  combine = add;
 }
 
 let zero: int = 0;
 
 impl Monoid(int) {
-  combine = add;
   identity = zero;
 }
 
@@ -34,6 +42,6 @@ fun main() {
     A[i] = i; 
     i = i + 1;
   }
-  return accumulate(A) - n*(n - 1)/2;
+  return sum(A) - n*(n - 1)/2;
 }
 

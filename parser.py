@@ -355,7 +355,8 @@ def parse_tree_to_ast(e):
         return Interface(e.meta,
                          str(e.children[0].value),
                          parse_tree_to_str_list(e.children[1]),
-                         parse_tree_to_ast(e.children[2]))
+                         parse_tree_to_req_list(e.children[2]),
+                         parse_tree_to_ast(e.children[3]))
     elif e.data == 'declaration':
         return (str(e.children[0].value), parse_tree_to_type(e.children[1]))
     elif e.data == 'implementation':

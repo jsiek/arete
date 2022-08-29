@@ -160,7 +160,17 @@ class Call(Exp):
       return self.fun.free_vars() \
           | set().union(*[arg.free_vars() for arg in self.args]) \
           | set().union(*[wit.free_vars() for wit in self.witnesses])
-  
+
+  def type_argument_deduction(self, type_params, param_types, arg_types):
+      deduced_types = {}    
+      for (param_ty, arg_ty) in zip(param_types, arg_types):
+          if not match_types(type_params, param_ty, arg_ty, deduced_types, set()):
+              error(self.location, 'in call, '
+                    + str(self) + '\n'
+                    + 'argument type:\n\t' + str(arg_ty)
+                    + '\ndoes not match parameter type:\n\t' + str(param_ty))
+      return deduced_types
+    
   def type_check(self, env):
     fun_type = self.fun.type_check(env)
     arg_types = [arg.type_check(env) for arg in self.args]
@@ -174,49 +184,26 @@ class Call(Exp):
 
       for t in fun_type.type_params:
         fun_env[t] = TypeVar(self.location, t)
+      
       if len(fun_type.param_types) != len(arg_types):
         error(self.location, 'incorrect number of arguments: '
               + str(len(arg_types))
               + '\nexpected: ' + str(len(fun_type.param_types)))
-      # perform type argument deduction
-      matches = {}
-      for (param_ty, arg_ty) in zip(fun_type.param_types, arg_types):
-          pt = simplify(param_ty, fun_env)
-          if not match_types(fun_type.type_params, pt, arg_ty, matches,
-                             set()):
-              error(self.location, 'in call, '
-                    + str(self) + '\n'
-                    + 'argument type:\n\t' + str(arg_ty)
-                    + '\ndoes not match parameter type:\n\t' + str(param_ty))
-      if tracing_on():
-        print('deduced: ' + str(matches))
         
-      # check that the type requirements are satisfied and record them
-      # in self.witnesses
+      param_types = [simplify(ty, fun_env) for ty in fun_type.param_types]
+      rt = simplify(fun_type.return_type, fun_env)
+
+      deduced_types = self.type_argument_deduction(fun_type.type_params,
+                                                   param_types, arg_types)
+      if tracing_on():
+        print('deduced: ' + str(deduced_types))
+        
       self.witnesses = []
       for req in fun_type.requirements:
-        iface_impl_info = env[req.iface_name]
-        req_impl_types = [substitute(matches, simplify(ty, fun_env)) \
-                          for ty in req.impl_types]
-        if tracing_on():
-          print('searching for impl of ' + req.iface_name
-                + ' for ' + str(req_impl_types))
-        witness_exp = None
-        for impl_tys, wit_exp in iface_impl_info.impls:
-          if all([t1 == t2 for t1, t2 in zip(req_impl_types, impl_tys)]):
-            if tracing_on():
-              print('found ' + str(wit_exp))
-            witness_exp = wit_exp
-            break
-        if witness_exp is None:
-          error(self.location, 'could not find impl of ' + req.iface_name
-                + ' for ' + str(req_impl_types)
-                + '\nin impls:\n'
-                + str(iface_impl_info.impls))
-        self.witnesses.append(witness_exp)
-      
-      rt = simplify(fun_type.return_type, fun_env)
-      ret = substitute(matches, rt)
+        wit_exp = req.satisfy_impl(deduced_types, env, fun_env)
+        self.witnesses.append(wit_exp)
+        
+      ret = substitute(deduced_types, rt)
       if tracing_on():
         print('finished type checking: ' + str(self))
         print('type: ' + str(ret))

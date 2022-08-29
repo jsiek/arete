@@ -55,11 +55,13 @@ class InterfaceImplInfo:
 class Interface(Decl):
   name: str
   type_params: list[str]
+  extends: list[AST]
   members: list[tuple[str,Type]]
-  __match_args__ = ("name", "type_params", "members")
+  __match_args__ = ("name", "type_params", "extends", "members")
 
   def __str__(self):
     return 'interface ' + self.name + '(' + ', '.join(self.type_params) + ')' \
+      + ' extends ' + ', '.join([str(req) for req in self.extends]) \
       + ' {\n' \
       + '\n'.join(x + ': ' + str(t) for x,t in self.members) \
       + '}'
@@ -81,6 +83,14 @@ class Interface(Decl):
     for x in self.type_params:
       body_env[x] = TypeVar(self.location, x)
     mems = {x: simplify(t, body_env) for x,t in self.members}
+    # Add inherited members
+    for req in self.extends:
+      if not req.iface_name in env.keys():
+        error(self.location, 'interface ' + req.iface_name + ' is not defined')
+      iface_info = env[req.iface_name].iface
+      subst = {x:ty for x, ty in zip(iface_info.params, req.impl_types) }
+      for x, ty in iface_info.members.items():
+        mems[x] = substitute(subst, ty)
     self.iface_info = InterfaceInfo(self.name, self.type_params, mems)
     env[self.name] = InterfaceImplInfo(self.iface_info, [])
     output[self.name] = env[self.name]
@@ -204,6 +214,25 @@ class ImplReq(Type):
     return ImplReq(self.location, self.name, self.iface_name, self.impl_types,
                    iface_impl_info.iface)
 
+  def satisfy_impl(self, deduced_types, env, fun_env):
+    iface_impl_info = env[self.iface_name]
+    req_impl_types = [substitute(deduced_types, simplify(ty, fun_env)) \
+                      for ty in self.impl_types]
+    if tracing_on():
+      print('searching for impl of ' + self.iface_name
+            + ' for ' + str(req_impl_types))
+    witness_exp = None
+    for impl_tys, wit_exp in iface_impl_info.impls:
+      if all([t1 == t2 for t1, t2 in zip(req_impl_types, impl_tys)]):
+        witness_exp = wit_exp
+        break
+    if witness_exp is None:
+      error(self.location, 'could not find impl of ' + self.iface_name
+            + ' for ' + str(req_impl_types)
+            + '\nin impls:\n'
+            + str(iface_impl_info.impls))
+    return witness_exp    
+
   def bind_impl(self, witness_ptr, env, machine):
     # Bind impl name to its witness.
     env[self.name] = witness_ptr
@@ -214,4 +243,3 @@ class ImplReq(Type):
       dup = val.duplicate(Fraction(1,2), self.location)
       env[x] = machine.memory.allocate(dup)
 
-    

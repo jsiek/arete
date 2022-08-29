@@ -176,8 +176,8 @@ def desugar_decl(decl, env):
       case Import(module, imports):
         new_module = desugar_exp(module, env)
         return Import(decl.location, new_module, imports)
-      case Interface(name, type_params, members):
-        return Interface(decl.location, name, type_params, members)
+      case Interface(name, type_params, extends, members):
+        return Interface(decl.location, name, type_params, extends, members)
       case Impl(name, iface_name, impl_types, assgn):
         return Impl(decl.location, name, iface_name, impl_types, assgn)
       case _:
