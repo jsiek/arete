@@ -29,6 +29,11 @@ class Var(Exp):
   def free_vars(self):
       return set([self.ident])
 
+  def type_check(self, env):
+    if self.ident not in env:
+        error(self.location, 'use of undefined variable ' + self.ident)
+    return env[self.ident], self
+  
   def step(self, runner, machine):
       if self.ident not in runner.env:
           error(self.location, 'use of undefined variable ' + self.ident)
@@ -42,10 +47,6 @@ class Var(Exp):
         result = Result(False, ptr)
       machine.finish_expression(result, self.location)
 
-  def type_check(self, env):
-    if self.ident not in env:
-        error(self.location, 'use of undefined variable ' + self.ident)
-    return env[self.ident]
 
 #
 # aka. let-expressions in functional languages
@@ -71,6 +72,17 @@ class BindingExp(Exp):
       return self.arg.free_vars() \
           | (self.body.free_vars() - set([self.param.ident]))
 
+  def type_check(self, env):
+    rhs_type, new_arg = self.arg.type_check(env)
+    new_param = self.param.type_check(env)
+    if not consistent(rhs_type, new_param.type_annot):
+      error(self.arg.location, 'type of initializer ' + str(rhs_type) + '\n'
+            + ' is inconsistent with declared type ' + str(new_param.type_annot))
+    body_env = {x: t.copy() for x,t in env.items()}
+    body_env[self.param.ident] = rhs_type
+    body_type, new_body = self.body.type_check(body_env)
+    return body_type, BindingExp(self.location, new_param, new_arg, new_body)
+  
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.arg, runner.env, AddressCtx())
@@ -85,15 +97,6 @@ class BindingExp(Exp):
       result = duplicate_if_temporary(runner.results[1], self.location)
       machine.finish_expression(result, self.location)
 
-  def type_check(self, env):
-    rhs_type = self.arg.type_check(env)
-    type_annot = simplify(self.param.type_annot, env)
-    if not consistent(rhs_type, type_annot):
-      error(self.arg.location, 'type of initializer ' + str(rhs_type) + '\n'
-            + ' is inconsistent with declared type ' + str(type_annot))
-    body_env = {x: t.copy() for x,t in env.items()}
-    body_env[self.param.ident] = rhs_type
-    return self.body.type_check(body_env)
 
   
 # This is meant to have the same semantics as the `let`, `var`, and
@@ -119,6 +122,18 @@ class BindingStmt(Exp):
       return self.arg.free_vars() \
           | (self.body.free_vars() - set([self.param.ident]))
     
+  def type_check(self, env):
+    arg_type, new_arg = self.arg.type_check(env)
+    new_param = self.param.type_check(env)
+    if not consistent(arg_type, new_param.type_annot):
+      error(self.arg.location, 'type of initializer ' + str(arg_type) + '\n'
+            + ' is inconsistent with declared type '
+            + str(new_param.type_annot))
+    body_env = env.copy()
+    body_env[self.param.ident] = new_param.type_annot
+    body_type, new_body = self.body.type_check(body_env)
+    return body_type, BindingStmt(self.location, new_param, new_arg, new_body)
+    
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.arg, runner.env, AddressCtx())
@@ -137,14 +152,3 @@ class BindingStmt(Exp):
                             runner.body_env, self.location)
       machine.finish_statement(self.location)
 
-  def type_check(self, env):
-    arg_type = self.arg.type_check(env)
-    type_annot = simplify(self.param.type_annot, env)
-    if not consistent(arg_type, type_annot):
-      error(self.arg.location, 'type of initializer ' + str(arg_type) + '\n'
-            + ' is inconsistent with declared type ' + str(type_annot))
-    body_env = env.copy()
-    body_env[self.param.ident] = type_annot
-    body_type = self.body.type_check(body_env)
-    return body_type
-    

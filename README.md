@@ -56,8 +56,6 @@ implementation written in Python 3.10 that includes:
 * grammar and parser ([Arete.lark](Arete.lark) and [parser.py](parser.py))
   using the [Lark](https://github.com/lark-parser/lark) parser generater.
 
-* desugaring ([desugar.py](desugar.py))
-
 * constant evaluation ([const_eval.py](const_eval.py))
 
 * type checking ([type_check.py](type_check.py))

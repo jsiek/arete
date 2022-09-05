@@ -84,6 +84,24 @@ class TagVariant(Exp):
   def free_vars(self):
     return self.arg.free_vars()
   
+  def type_check(self, env):
+    new_type = simplify(self.type, env)
+    if not (isinstance(new_type, VariantType) or isinstance(ty, AnyType)):
+      error(self.location, 'expected variant type in tagging, not '
+            + str(self.type))
+    arg_ty, new_arg = self.arg.type_check(env)
+    if isinstance(new_type, VariantType):
+      found = False
+      for (alt_tag, alt_ty) in new_type.alternative_types:
+        if self.tag == alt_tag:
+          if not consistent(arg_ty, alt_ty):
+            error(self.location, 'expected ' + str(alt_ty) + '\nnot ' 
+                  + str(arg_ty))
+          found = True
+      if not found:
+        error(self.location, 'no tag ' + self.tag + ' in ' + str(new_type))
+    return new_type, TagVariant(self.location, self.tag, new_arg, new_type)
+  
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.arg, runner.env)
@@ -96,23 +114,6 @@ class TagVariant(Exp):
         result = machine.memory.allocate(variant)
       machine.finish_expression(Result(True, result), self.location)
 
-  def type_check(self, env):
-    ty = simplify(self.type, env)
-    if not (isinstance(ty, VariantType) or isinstance(ty, AnyType)):
-      error(self.location, 'expected variant type in tagging, not '
-            + str(self.type))
-    arg_ty = self.arg.type_check(env)
-    if isinstance(ty, VariantType):
-      found = False
-      for (alt_tag, alt_ty) in ty.alternative_types:
-        if self.tag == alt_tag:
-          if not consistent(arg_ty, alt_ty):
-            error(self.location, 'expected ' + str(alt_ty) + '\nnot ' 
-                  + str(arg_ty))
-          found = True
-      if not found:
-        error(self.location, 'no tag ' + self.tag + ' in ' + str(self.type))
-    return ty
     
 @dataclass
 class Match(Stmt):
@@ -143,14 +144,59 @@ class Match(Stmt):
     if tracing_on():
       print('free vars of match: ' + str(fvs))
     return fvs
+  
+  def type_check(self, env):
+    cond_ty, new_cond = self.condition.type_check(env)
+    cond_ty = unfold(cond_ty)
+    if not (isinstance(cond_ty, VariantType) \
+            or isinstance(cond_ty, AnyType)):
+      error(self.location, 'expected variant type in match, not '
+            + str(cond_ty))
+    return_type = None
+    new_cases = []
+    for (tag, param, body) in self.cases:
+      if isinstance(param, NoParam):
+        body_type, new_body = body.type_check(env)
+        new_cases.append((tag, param, new_body))
+        continue
+      if isinstance(cond_ty, VariantType):
+        found = False
+        for (alt_tag,alt_ty) in cond_ty.alternative_types:
+          if tag == alt_tag:
+            body_env = {x: t.copy() for x,t in env.items()}
+            body_env[param.ident] = alt_ty
+            retty, new_body = body.type_check(body_env)
+            new_cases.append((tag, param, new_body))
+            if return_type is None:
+              return_type = retty
+            elif not retty is None:
+              return_type = join(retty, return_type)
+            found = True
+        if found == False:
+          error(self.location, tag + ' is not a tag in ' + str(cond_ty))
+      elif isinstance(cond_ty, AnyType):
+          body_env = {x: t.copy() for x,t in env.items()}
+          body_env[param.ident] = AnyType(param.location)
+          retty, new_body = body.type_check(body_env)
+          new_cases.append((tag, param, new_body))
+          if return_type is None:
+            return_type = retty
+          elif not retty is None:
+            return_type = join(retty, return_type)
+    return return_type, Match(self.location, new_cond, new_cases)
+    # TODO: check for completeness of the cases wrt the cond_ty
 
   def step(self, runner, machine):
+    if tracing_on():
+      print('step Match\n\tcases: ' + str(self.cases)
+            + '\n\tstate: ' + str(runner.state))
     if runner.state == 0:
       machine.schedule(self.condition, runner.env, AddressCtx())
       runner.matched = False
     elif runner.state <= len(self.cases) and not runner.matched:
       ptr = runner.results[0].value
       variant = machine.memory.read(ptr, self.location)
+      runner.variant = variant
       if runner.state == 1 and not isinstance(variant, Variant):
           error(self.location, 'in match, expected a variant, not '
                 + str(variant))
@@ -170,39 +216,13 @@ class Match(Stmt):
         machine.schedule(current_case[2], runner.body_env)
         runner.matched = True
     else:
-      machine.dealloc_param(runner.param, runner.arg, runner.body_env,
-                            self.location)
+      if runner.matched:
+        machine.dealloc_param(runner.param, runner.arg, runner.body_env,
+                              self.location)
+      else:
+        error(self.location, 'failed to match a case with ' + str(runner.variant))
       machine.finish_statement(self.location)
-      
-  def type_check(self, env):
-    cond_ty = self.condition.type_check(env)
-    cond_ty = unfold(cond_ty)
-    if not (isinstance(cond_ty, VariantType) \
-            or isinstance(cond_ty, AnyType)):
-      error(self.location, 'expected variant type in match, not '
-            + str(cond_ty))
-    return_type = None
-    for (tag, param, body) in self.cases:
-      if isinstance(param, NoParam):
-        continue
-      # tag in the variant type?
-      if isinstance(cond_ty, VariantType):
-        found = False
-        for (alt_tag,alt_ty) in cond_ty.alternative_types:
-          if tag == alt_tag:
-            body_env = {x: t.copy() for x,t in env.items()}
-            body_env[param.ident] = alt_ty
-            retty = body.type_check(body_env)
-            if return_type is None:
-              return_type = retty
-            elif not retty is None:
-              return_type = join(retty, return_type)
-            found = True
-        if found == False:
-          error(self.location, tag + ' is not a tag in ' + str(cond_ty))
-    return return_type
-    # TODO: check for completeness of the cases wrt the cond_ty
-    
+          
 @dataclass
 class VariantMember(Exp):
   arg: Exp
@@ -217,6 +237,22 @@ class VariantMember(Exp):
     
   def free_vars(self):
       return self.arg.free_vars()
+    
+  def type_check(self, env):
+    variant_type, new_arg = self.arg.type_check(env)
+    variant_type = unfold(variant_type)
+    new_self = VariantMember(self.location, new_arg, self.field)
+    if not (isinstance(variant_type, VariantType) \
+            or isinstance(variant_type, AnyType)):
+        error(self.location, "expected a variant, not " + str(variant_type))
+    if isinstance(variant_type, VariantType):
+      alts = {x:t for x,t in variant_type.alternative_types}
+      if not self.field in alts.keys():
+          error(self.location, "variant " + str(self.arg) + " does not contain "
+                + self.field)
+      return alts[self.field], new_self
+    else:
+      return AnyType(self.location), new_self
     
   def step(self, runner, machine):
     if runner.state == 0:
@@ -245,17 +281,3 @@ class VariantMember(Exp):
         error(self.location, self.field + ' is not present in variant '
               + str(variant))
         
-  def type_check(self, env):
-    variant_type = self.arg.type_check(env)
-    variant_type = unfold(variant_type)
-    if not (isinstance(variant_type, VariantType) \
-            or isinstance(variant_type, AnyType)):
-        error(self.location, "expected a variant, not " + str(variant_type))
-    if isinstance(variant_type, VariantType):
-      alts = {x:t for x,t in variant_type.alternative_types}
-      if not self.field in alts.keys():
-          error(self.location, "variant " + str(self.arg) + " does not contain "
-                + self.field)
-      return alts[self.field]
-    else:
-      return AnyType(self.location)

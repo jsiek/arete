@@ -40,6 +40,11 @@ class FutureExp(Exp):
   def free_vars(self):
     return self.arg.free_vars()
   
+  def type_check(self, env):
+    arg_type, new_arg = self.arg.type_check(env)
+    return FutureType(self.location, arg_type), \
+           FutureExp(self.location, new_arg)
+
   def step(self, runner, machine):
     thread = machine.spawn(self.arg, runner.env)
     if isinstance(runner.context, ValueCtx):
@@ -49,10 +54,6 @@ class FutureExp(Exp):
       result = machine.memory.allocate(future)
     machine.finish_expression(Result(True, result), self.location)
 
-  def type_check(self, env):
-    arg_type = self.arg.type_check(env)
-    return FutureType(self.location, arg_type)
-    
     
 @dataclass
 class Wait(Exp):
@@ -85,12 +86,12 @@ class Wait(Exp):
         machine.finish_expression(result, self.location)
 
   def type_check(self, env):
-    arg_type = self.arg.type_check(env)
+    arg_type, new_arg = self.arg.type_check(env)
     arg_type = unfold(arg_type)
     if isinstance(arg_type, FutureType):
-      return arg_type.result_type
+      return arg_type.result_type, Wait(self.location, new_arg)
     elif isinstance(arg_type, AnyType):
-      return AnyType(self.location)
+      return AnyType(self.location), Wait(self.location, new_arg)
     else:
       error(self.arg.location, 'in wait, expected a future, not '
             + str(arg_type))

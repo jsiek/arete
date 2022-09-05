@@ -31,7 +31,6 @@ from tuples_and_arrays import *
 from variants import *
 from modules import *
 from pointers import *
-from desugar import desugar_decls
 from utilities import *
 from parser import parse, set_filename
 from type_check import type_check_program
@@ -390,20 +389,17 @@ if __name__ == "__main__":
       p = file.read()
       decls += parse(p, False)
       
-    decls = desugar_decls(decls, {})
-    if tracing_on():
-      print('**** after desugar ****')
-      print(decls)
-      print()
     decls = const_eval_decls(decls, {})
     if tracing_on():
       print('**** after const_eval ****')
       print(decls)
       print()
     try:
-      type_check_program(decls)
+      decls = type_check_program(decls)
       if tracing_on():
         print('**** finished type checking ****')
+        print(decls)
+        print()
 
       machine = Machine(Memory(), [], None, None, None)
       retval = machine.run(decls)

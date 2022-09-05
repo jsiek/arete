@@ -85,10 +85,14 @@ class Function(Decl):
       return str(self)
     
   def free_vars(self):
-    req_vars = set([req.name for req in self.requirements])
-    req_mem_vars = set([req.iface.members.keys() for req in self.requirements])
+    req_vars = set()
+    for req in self.requirements:
+      req_vars |= set([req.name]) | req.iface.members.keys()
+      for extend_req in req.iface.extends:
+        req_vars |= set([extend_req.name])
+    
     params = set([p.ident for p in self.params])
-    fvars = body.free_vars() - params - req_mem_vars - req_vars
+    fvars = body.free_vars() - params - req_vars
     if tracing_on():
       print('function ' + self.name + ' free variables: ' + str(fvars)
             + '\nrequirements: ' + str(req_mem_vars))
@@ -109,24 +113,29 @@ class Function(Decl):
     body_env = {x: t.copy() for x,t in env.items()}
     for t in self.type_params:
       body_env[t] = TypeVar(self.location, t)
-    ret_ty = simplify(self.return_type, body_env)
+    new_return_type = simplify(self.return_type, body_env)
+    new_params = [p.type_check(body_env) for p in self.params]
     # Bind parameters to their types
-    for p in self.params:
-        body_env[p.ident] = simplify(p.type_annot, body_env)
+    for p in new_params:
+        body_env[p.ident] = p.type_annot
         
     # Bring the impls and their members into scope.
     new_reqs = []
     for req in self.requirements:
-      new_reqs.append(req.declare_type(body_env, {}))
-    self.requirements = new_reqs
+      new_req = req.declare_type(body_env, {})
+      new_reqs.append(new_req)
     
     # type check the body of the function
-    body_type = self.body.type_check(body_env)
-    if not consistent(body_type, ret_ty):
-      error(self.location, 'return type mismatch:\n' + str(ret_ty)
+    body_type, new_body = self.body.type_check(body_env)
+    if not consistent(body_type, new_return_type):
+      error(self.location, 'return type mismatch:\n' + str(new_return_type)
             + ' inconsistent with ' + str(body_type))
     if tracing_on():
       print('finished type checking function ' + self.name)
+
+    return [Function(self.location, self.name, self.type_params,
+                     new_params, new_return_type,
+                     self.return_mode, new_reqs, new_body)]
       
   def step(self, runner, machine):
     if runner.state == 0:
@@ -151,7 +160,7 @@ class Call(Exp):
   def __str__(self):
       return str(self.fun) \
           + "(" + ", ".join([str(arg) for arg in self.args]) + ")" \
-          + ", ".join([str(wit) for wit in self.witnesses])
+          + "{{" + ", ".join([str(wit) for wit in self.witnesses]) + "}}"
   
   def __repr__(self):
       return str(self)
@@ -164,7 +173,8 @@ class Call(Exp):
   def type_argument_deduction(self, type_params, param_types, arg_types):
       deduced_types = {}    
       for (param_ty, arg_ty) in zip(param_types, arg_types):
-          if not match_types(type_params, param_ty, arg_ty, deduced_types, set()):
+          if not match_types(type_params, param_ty, arg_ty,
+                             deduced_types, set()):
               error(self.location, 'in call, '
                     + str(self) + '\n'
                     + 'argument type:\n\t' + str(arg_ty)
@@ -172,8 +182,13 @@ class Call(Exp):
       return deduced_types
     
   def type_check(self, env):
-    fun_type = self.fun.type_check(env)
-    arg_types = [arg.type_check(env) for arg in self.args]
+    fun_type, new_fun = self.fun.type_check(env)
+    arg_types = []
+    new_args = []
+    for arg in self.args:
+        arg_type, new_arg = arg.type_check(env)
+        arg_types.append(arg_type)
+        new_args.append(new_arg)
     fun_type = unfold(fun_type)
     if tracing_on():
       print('type checking call ' + str(self))
@@ -197,7 +212,9 @@ class Call(Exp):
                                                    param_types, arg_types)
       if tracing_on():
         print('deduced: ' + str(deduced_types))
-        
+
+      # TODO: handle interface inheritance, need to get witnesses
+      # for the inherited impls.
       self.witnesses = []
       for req in fun_type.requirements:
         wit_exp = req.satisfy_impl(deduced_types, env, fun_env)
@@ -207,9 +224,9 @@ class Call(Exp):
       if tracing_on():
         print('finished type checking: ' + str(self))
         print('type: ' + str(ret))
-      return ret
+      return ret, Call(self.location, new_fun, new_args)
     elif isinstance(fun_type, AnyType):
-      return AnyType(self.location)
+      return AnyType(self.location), Call(self.location, new_fun, new_args)
     else:
       error(self.location, "in call, expected a function, not "
             + str(fun_type))
@@ -260,6 +277,8 @@ class Call(Exp):
           # Bind required impls to their witnesses.
           for req, witness_ptr in zip(reqs, runner.witnesses):
             req.bind_impl(witness_ptr, runner.body_env, machine)
+
+          # what about the inherited impls?
             
           machine.push_frame()
           if machine.current_thread.pause_on_call:
@@ -282,6 +301,7 @@ class Call(Exp):
         machine.dealloc_param(param, arg, runner.body_env,
                               runner.clos.body.location)
 
+      # TODO: refactor the following into interfaces_and_impls.py
       # deallocate the witness member bindings:
       for witness_ptr in runner.witnesses:
         witness = machine.memory.read(witness_ptr, self.location)
@@ -337,7 +357,8 @@ class Return(Stmt):
       machine.finish_statement(self.location)
 
   def type_check(self, env):
-    return self.arg.type_check(env)
+    arg_type, new_arg = self.arg.type_check(env)
+    return arg_type, Return(self.location, new_arg)
 
 @dataclass
 class Lambda(Exp):
@@ -358,12 +379,35 @@ class Lambda(Exp):
       return str(self)
 
   def free_vars(self):
-    req_vars = set([req.name for req in self.requirements])
-    req_mem_vars = set()
+    req_vars = set()
     for req in self.requirements:
-      req_mem_vars = req_mem_vars | set(req.iface.members.keys())
+      req_vars |= set([req.name]) | req.iface.members.keys()
+      for extend_req in req.iface.extends:
+        req_vars |= set([extend_req.name])
+    
+    # req_vars = set([req.name for req in self.requirements])
+    # req_mem_vars = set()
+    # for req in self.requirements:
+    #   req_mem_vars = req_mem_vars | set(req.iface.members.keys())
     params = set([p.ident for p in self.params])
-    return self.body.free_vars() - params - req_mem_vars - req_vars
+    return self.body.free_vars() - params - req_vars
+
+  def type_check(self, env):
+    body_env = {x: t.copy() for x,t in env.items()}
+    for p in self.params:
+        body_env[p.ident] = p.type_annot
+    new_reqs = []
+    for req in self.requirements:
+      new_req = req.declare_type(body_env, {})
+      new_reqs.append(new_req)
+    ret_type, new_body = self.body.type_check(body_env)
+    return FunctionType(self.location,
+                        tuple(),
+                        tuple(p.type_annot for p in self.params),
+                        ret_type,
+                        tuple()), \
+           Lambda(self.location, self.params, self.return_mode, new_reqs,
+                  new_body, self.name)
 
   def step(self, runner, machine):
       clos_env = {}
@@ -385,17 +429,3 @@ class Lambda(Exp):
           error(self.location, 'function not allowed in this context')
       machine.finish_expression(Result(True, result), self.location)
 
-  def type_check(self, env):
-    body_env = {x: t.copy() for x,t in env.items()}
-    for p in self.params:
-        body_env[p.ident] = p.type_annot
-    new_reqs = []
-    for req in self.requirements:
-      new_reqs.append(req.declare_type(body_env, {}))
-    self.requirements = new_reqs
-    ret_type = self.body.type_check(body_env)
-    return FunctionType(self.location,
-                        tuple(),
-                        tuple(p.type_annot for p in self.params),
-                        ret_type,
-                        tuple())

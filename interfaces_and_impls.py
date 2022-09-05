@@ -19,7 +19,9 @@ from utilities import *
 class InterfaceInfo:
   name: str
   params: list[str]
-  members: dict[str,Type]
+  extends: list[AST]
+  immediate_members: dict[str,Type]
+  members: dict[str,Type]   # includes inherited members
 
   def copy(self):
     return self
@@ -82,7 +84,8 @@ class Interface(Decl):
     body_env = {x: t.copy()  for x, t in env.items()}
     for x in self.type_params:
       body_env[x] = TypeVar(self.location, x)
-    mems = {x: simplify(t, body_env) for x,t in self.members}
+    immediate_mems = {x: simplify(t, body_env) for x,t in self.members}
+    mems = immediate_mems.copy()
     # Add inherited members
     for req in self.extends:
       if not req.iface_name in env.keys():
@@ -91,7 +94,8 @@ class Interface(Decl):
       subst = {x:ty for x, ty in zip(iface_info.params, req.impl_types) }
       for x, ty in iface_info.members.items():
         mems[x] = substitute(subst, ty)
-    self.iface_info = InterfaceInfo(self.name, self.type_params, mems)
+    self.iface_info = InterfaceInfo(self.name, self.type_params, self.extends,
+                                    immediate_mems, mems)
     env[self.name] = InterfaceImplInfo(self.iface_info, [])
     output[self.name] = env[self.name]
   
@@ -133,23 +137,21 @@ class Impl(Decl):
     member_types = {}
     for x,e in self.assignments:
       member_types[x] = e.type_check(env)
-    
+
+    # check that the inherited interfaces are implemented
+    # TODO
+      
     # check that this Impl is satisfied
     subst = { x:t for x,t in zip(iface_impl_info.iface.params, self.impl_types)}
-    for x,ty in iface_impl_info.iface.members.items():
+    for x,ty in iface_impl_info.iface.immediate_members.items():
       req_ty = substitute(subst, ty)
       if not x in member_types.keys():
         error(self.location, "missing requirement " + x + " for impl of "
               + self.iface_name
               + ' for ' + ', '.join([str(ty) for ty in self.impl_types]))
-      if tracing_on():
-        print('impl requirement ' + x + ' : ' + str(req_ty))
-        print('has type ' + str(member_types[x]))
       if not consistent(req_ty, member_types[x]):
-        error(self.location, "type of " + x + ":\n"
-              + str(member_types[x])
-              + "\nis not consistent with the required type:\n"
-              + str(req_ty))
+        error(self.location, "type of " + x + ":\n" + str(member_types[x])
+              + "\nis not consistent with the required type:\n" + str(req_ty))
     if tracing_on():
       print('finished type checking ' + str(self))
   
@@ -171,7 +173,7 @@ class Impl(Decl):
       members = {}
       for (f,e),res in zip(self.assignments, runner.results):
         members[f] = res.value
-      for x in iface_impl_info.members.keys():
+      for x in iface_impl_info.immediate_members.keys():
         if not x in members.keys():
           error(self.location, "requirement " + x
                  + " was not provided by the implementation")
@@ -207,6 +209,14 @@ class ImplReq(Type):
                                     self.impl_types)}
     # Bring the impl into scope
     iface_impl_info.impls += [(self.impl_types, Var(self.location, self.name))]
+
+    # TODO: this needs to be recursive to handle deep inheritance chains.
+    # Bring the inherited impls into scope
+    for req in iface_impl_info.iface.extends:
+      subst = {x: ty for x, ty in zip(iface_impl_info.iface.params,
+                                      self.impl_types)}
+      impl_types = [substitute(subst, ty) for ty in req.impl_types]
+      env[req.iface_name].impls += [(impl_types, Var(self.location, req.name))]
     
     # Bring the impl members into scope
     for x, ty in iface_impl_info.iface.members.items():

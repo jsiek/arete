@@ -2,6 +2,8 @@
 # here to make it easier in the future to define some language
 # features by desugaring into other language features.
 
+# TODO: remove this pass, do desugaring in the type checker
+
 from abstract_syntax import *
 from functions import *
 from variables_and_binding import *

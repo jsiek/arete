@@ -19,13 +19,21 @@ class Param:
     ident: str
     type_annot: Type
     __match_args__ = ("privilege", "ident")
+    
     def __str__(self):
         if self.kind is None:
           return self.privilege + ' ' + self.ident + ': ' + str(self.type_annot)
         else:
           return self.kind + ' ' + self.ident + ': ' + str(self.type_annot)
+      
     def __repr__(self):
         return str(self)
+
+    def type_check(self, env):
+      type_annot = simplify(self.type_annot, env)
+      return Param(self.location, self.kind, self.privilege,
+                   self.ident, type_annot)
+        
 
 @dataclass(frozen=True)
 class NoParam:
@@ -70,14 +78,19 @@ class PrimitiveCall(Exp):
   def type_check(self, env):
     if tracing_on():
       print("starting to type checking " + str(self))
-    arg_types = [arg.type_check(env) for arg in self.args]
+    arg_types = []
+    new_args = []
+    for arg in self.args:
+        arg_type, new_arg = arg.type_check(env)
+        arg_types.append(arg_type)
+        new_args.append(new_arg)
     if tracing_on():
       print("checking primitive " + str(self.op))
     ret = type_check_prim(self.location, self.op, arg_types)
     if tracing_on():
       print("finished type checking " + str(self))
       print("type: " + str(ret))
-    return ret
+    return ret, PrimitiveCall(self.location, self.op, new_args)
 
 @dataclass
 class Int(Exp):
@@ -102,7 +115,7 @@ class Int(Exp):
       machine.finish_expression(Result(True, result), self.location)
 
   def type_check(self, env):
-    return IntType(self.location)
+    return IntType(self.location), self
     
     
 @dataclass
@@ -126,7 +139,7 @@ class Frac(Exp):
       machine.finish_expression(Result(True, result), self.location)
 
   def type_check(self, env):
-    return RationalType(self.location)
+    return RationalType(self.location), self
       
 @dataclass
 class Bool(Exp):
@@ -149,7 +162,7 @@ class Bool(Exp):
       machine.finish_expression(Result(True, result), self.location)
 
   def type_check(self, env):
-    return BoolType(self.location)
+    return BoolType(self.location), self
       
 
 @dataclass
@@ -185,9 +198,9 @@ class IfExp(Exp):
       machine.finish_expression(result, self.location)
 
   def type_check(self, env):
-    cond_type = self.cond.type_check(env)
-    thn_type = self.thn.type_check(env)
-    els_type = self.els.type_check(env)
+    cond_type, new_cond = self.cond.type_check(env)
+    thn_type, new_thn = self.thn.type_check(env)
+    els_type, new_els = self.els.type_check(env)
     if not (isinstance(cond_type, BoolType)
             or isinstance(cond_type, AnyType)):
       error(self.location, 'in conditional, expected a Boolean, not '
@@ -195,12 +208,11 @@ class IfExp(Exp):
     if not consistent(thn_type, els_type):
       error(self.location, 'in conditional, branches must be consistent, not '
             + str(cond_type))
-    return join(thn_type, els_type)
-    
+    return join(thn_type, els_type), \
+           IfExp(self.location, new_cond, new_thn, new_els)
     
     
 # Statements
-
       
 @dataclass
 class Seq(Stmt):
@@ -233,9 +245,10 @@ class Seq(Stmt):
       return True
 
   def type_check(self, env):
-    first_type = self.first.type_check(env)
-    rest_type = self.rest.type_check(env)
-    return join(first_type, rest_type) # ??
+    first_type, new_first = self.first.type_check(env)
+    rest_type, new_rest = self.rest.type_check(env)
+    return join(first_type, rest_type), \
+           Seq(self.location, new_first, new_rest)
     
     
 @dataclass
@@ -270,10 +283,10 @@ class Write(Stmt):
       machine.finish_statement(self.location)
 
   def type_check(self, env):
-    lhs_type = self.lhs.type_check(env)
-    rhs_type = self.rhs.type_check(env)
+    lhs_type, new_lhs = self.lhs.type_check(env)
+    rhs_type, new_rhs = self.rhs.type_check(env)
     require_consistent(lhs_type, rhs_type, 'in assignment', self.location)
-    return None
+    return None, Write(self.location, new_lhs, new_rhs)
     
       
 @dataclass
@@ -290,15 +303,15 @@ class Expr(Stmt):
   def free_vars(self):
       return self.exp.free_vars()
 
+  def type_check(self, env):
+    _, new_exp = self.exp.type_check(env)
+    return None, Expr(self.location, new_exp)
+
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.exp, runner.env)
     else:
       machine.finish_statement(self.location)
-
-  def type_check(self, env):
-    self.exp.type_check(env)
-    return None
     
       
 @dataclass
@@ -325,11 +338,11 @@ class Assert(Stmt):
       machine.finish_statement(self.location)
 
   def type_check(self, env):
-    arg_type = self.exp.type_check(env)
+    arg_type, new_arg = self.exp.type_check(env)
     if not isinstance(arg_type, BoolType):
       error(self.location, "in assert, expected a Boolean, not "
             + str(arg_type))
-    return None
+    return None, Assert(self.location, new_arg)
     
       
 @dataclass
@@ -365,10 +378,11 @@ class IfStmt(Stmt):
       machine.finish_statement(self.location)
 
   def type_check(self, env):
-    cond_type = self.cond.type_check(env)
-    thn_type = self.thn.type_check(env)
-    els_type = self.els.type_check(env)
-    return join(thn_type, els_type)
+    cond_type, new_cond = self.cond.type_check(env)
+    thn_type, new_thn = self.thn.type_check(env)
+    els_type, new_els = self.els.type_check(env)
+    return join(thn_type, els_type), \
+           IfStmt(self.location, new_cond, new_thn, new_els)
     
       
 @dataclass
@@ -386,6 +400,12 @@ class While(Stmt):
   def free_vars(self):
       return self.cond.free_vars() | self.body.free_vars()
     
+  def type_check(self, env):
+    cond_type, new_cond = self.cond.type_check(env)
+    body_type, new_body = self.body.type_check(env)
+    return body_type, \
+           While(self.location, new_cond, new_body)
+
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.cond, runner.env)
@@ -397,12 +417,6 @@ class While(Stmt):
         machine.finish_statement(self.location)
     else:
       machine.finish_statement(self.location)
-
-  def type_check(self, env):
-    cond_type = self.cond.type_check(env)
-    body_type = self.body.type_check(env)
-    return body_type
-
     
 @dataclass
 class Pass(Stmt):
@@ -415,12 +429,13 @@ class Pass(Stmt):
   def free_vars(self):
       return set()
     
+  def type_check(self, env):
+    return None, self
+
   def step(self, runner, machine):
     machine.finish_statement(self.location)
     
-  def type_check(self, env):
-    return None
-    
+
 @dataclass
 class Block(Stmt):
   body: Stmt
@@ -435,15 +450,16 @@ class Block(Stmt):
   def free_vars(self):
       return self.body.free_vars()
 
+  def type_check(self, env):
+    body_type, new_body = self.body.type_check(env)
+    return body_type, Block(self.location, new_body)
+    
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.body, runner.env)
     else:
       machine.finish_statement(self.location)
 
-  def type_check(self, env):
-    return self.body.type_check(env)
-    
   def debug_skip(self):
     return True
         
@@ -458,12 +474,28 @@ class Global(Decl):
   def __str__(self):
     return "var " + str(self.name) + " : " + str(self.type_annot) \
         + " = " + str(self.rhs) + ";"
+
   def __repr__(self):
     return str(self)
+
   def free_vars(self):
     return init.free_vars()
+
   def local_vars(self):
     return set([var.ident])
+
+  def declare_type(self, env, output):
+    env[self.name] = simplify(self.type_annot, env)
+    output[self.name] = env[self.name]
+
+  def type_check(self, env):
+    rhs_type, new_rhs = self.rhs.type_check(env)
+    type_annot = simplify(self.type_annot, env)
+    if not consistent(rhs_type, type_annot):
+      error(self.location, 'type of initializer ' + str(rhs_type) + '\n'
+            + ' is inconsistent with declared type ' + str(type_annot))
+    return [Global(self.location, self.name, type_annot, new_rhs)]
+    
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.rhs, runner.env)
@@ -472,31 +504,23 @@ class Global(Decl):
                            self.location)
       machine.finish_definition(self.location)
 
-  def declare_type(self, env, output):
-    env[self.name] = simplify(self.type_annot, env)
-    output[self.name] = env[self.name]
-
-  def type_check(self, env):
-    rhs_type = self.rhs.type_check(env)
-    type_annot = simplify(self.type_annot, env)
-    if not consistent(rhs_type, type_annot):
-      error(self.location, 'type of initializer ' + str(rhs_type) + '\n'
-            + ' is inconsistent with declared type ' + str(type_annot))
-    
-    
 @dataclass
 class ConstantDef(Exp):
   name: str
   type_annot: Type
   rhs: Exp
   __match_args__ = ("name", "type_annot", "rhs")
+  
   def __str__(self):
     return "const " + str(self.name) + " : " + str(self.type_annot) \
         + " = " + str(self.rhs) + ";"
+
   def __repr__(self):
     return str(self)
+
   def free_vars(self):
     return init.free_vars()
+
   def local_vars(self):
     return set([var.ident])
 
@@ -519,7 +543,7 @@ class TypeAlias(Decl):
     env[self.name] = simplify(self.type, env)
 
   def type_check(self, env):
-    pass
+    return []
   
 @dataclass
 class TypeOperator(Decl):
@@ -542,5 +566,5 @@ class TypeOperator(Decl):
     env[self.name] = TypeOp(self.location, self.params, self.body)
 
   def type_check(self, env):
-    pass
+    return []
   

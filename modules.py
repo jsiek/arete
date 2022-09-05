@@ -64,6 +64,26 @@ class ModuleDef(Decl):
   def __repr__(self):
     return str(self)
   
+  def declare_type(self, env, output):
+    member_types = {}
+    for d in self.body:
+      d.declare_type(env, member_types)
+    for ex in self.exports:
+      if not ex in member_types:
+        error(self.location, 'export ' + ex + ' not defined in module')
+    env[self.name] = ModuleType(self.location, member_types)
+    output[self.name] = env[self.name]
+    
+  def type_check(self, env):
+    body_env = {x: t.copy() for x,t in env.items()}
+    members = {}
+    for d in self.body:
+      d.declare_type(body_env, members)
+    new_body = []
+    for d in self.body:
+      new_body += d.type_check(body_env)
+    return [ModuleDef(self.location, self.name, self.exports, new_body)]
+    
   def step(self, runner, machine):
     if runner.state == 0:
       runner.body_env = {}
@@ -81,24 +101,6 @@ class ModuleDef(Decl):
       machine.memory.memory[runner.env[self.name].address] = mod
       machine.finish_definition(self.location)
 
-  def declare_type(self, env, output):
-    member_types = {}
-    for d in self.body:
-      d.declare_type(env, member_types)
-    for ex in self.exports:
-      if not ex in member_types:
-        error(self.location, 'export ' + ex + ' not defined in module')
-    env[self.name] = ModuleType(self.location, member_types)
-    output[self.name] = env[self.name]
-    
-  def type_check(self, env):
-    body_env = {x: t.copy() for x,t in env.items()}
-    members = {}
-    for d in self.body:
-      d.declare_type(body_env, members)
-    for d in self.body:
-      d.type_check(body_env)
-    
     
 @dataclass
 class Import(Decl):
@@ -117,6 +119,23 @@ class Import(Decl):
     for x in self.imports:
         env[x] = mem.allocate(Void())
       
+  def declare_type(self, env, output):
+    mod, new_mod = self.module.type_check(env)
+    mod = unfold(mod)
+    if isinstance(mod, ModuleType):
+      for x in self.imports:
+          if not x in mod.member_types.keys():
+            error(decl.location, "in import, no " + x
+                  + " in " + str(module))
+          env[x] = mod.member_types[x]
+          output[x] = env[x]
+    else:
+      error(self.location, "in import, expected a module, not " + str(mod))
+    
+  def type_check(self, env):
+    mod_type, new_module = self.module.type_check(env)
+    return [Import(self.location, new_module, self.imports)]
+
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.module, runner.env, AddressCtx())
@@ -138,22 +157,6 @@ class Import(Decl):
       if tracing_on():
           print('** finish import is complete')
       
-  def declare_type(self, env, output):
-    mod = self.module.type_check(env)
-    mod = unfold(mod)
-    if isinstance(mod, ModuleType):
-      for x in self.imports:
-          if not x in mod.member_types.keys():
-            error(decl.location, "in import, no " + x
-                  + " in " + str(module))
-          env[x] = mod.member_types[x]
-          output[x] = env[x]
-    else:
-      error(self.location, "in import, expected a module, not " + str(mod))
-    
-  def type_check(self, env):
-    pass
-
 @dataclass
 class ModuleMember(Exp):
   arg: Exp
@@ -169,6 +172,18 @@ class ModuleMember(Exp):
   def free_vars(self):
       return self.arg.free_vars()
     
+  def type_check(self, env):
+    mod_type, new_arg = self.arg.type_check(env)
+    mod_type = unfold(mod_type)
+    if not (isinstance(mod_type, ModuleType) \
+            or isinstance(mod_type, AnyType)):
+        error(self.location, "expected a module, not " + str(mod_type))
+    if not self.field in mod_type.member_types.keys():
+        error(self.location, "module " + str(self.arg) + " does not contain "
+              + self.field)
+    return mod_type.member_types[self.field], \
+        ModuleMember(self.location, new_arg, self.field)
+      
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.arg, runner.env, AddressCtx())
@@ -190,15 +205,3 @@ class ModuleMember(Exp):
         error(self.location, 'no member ' + self.field
               + ' in module ' + mod.name)
         
-  def type_check(self, env):
-    mod_type = self.arg.type_check(env)
-    mod_type = unfold(mod_type)
-    if not (isinstance(mod_type, ModuleType) \
-            or isinstance(mod_type, AnyType)):
-        error(self.location, "expected a module, not " + str(mod_type))
-    if not self.field in mod_type.member_types.keys():
-        error(self.location, "module " + str(self.arg) + " does not contain "
-              + self.field)
-    return mod_type.member_types[self.field]
-        
-      

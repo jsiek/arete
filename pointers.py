@@ -51,15 +51,17 @@ class PercentOf(Exp):
   def type_check(self, env):
     if self.percentage == 'default':
       percent_type = RationalType(self.location)
+      new_percent = 'default'
     else:
-      percent_type = self.percentage.type_check(env)
+      percent_type, new_percent = self.percentage.type_check(env)
+    arg_type, new_arg = self.arg.type_check(env)
     percent_type = unfold(percent_type)
     if isinstance(percent_type, RationalType) \
        or isinstance(percent_type, IntType):
-      arg_type = self.arg.type_check(env)
-      return arg_type
+      return arg_type, PercentOf(self.location, new_percent, new_arg)
     elif isinstance(percent_type, AnyType):
-      return AnyType(self.location)
+      return AnyType(self.location), \
+             PercentOf(self.location, new_percent, new_arg)
     else:
       error(self.location, 'in initializer, expected percentage '
             + 'not ' + str(percent_type))
@@ -78,6 +80,18 @@ class Deref(Exp):
   def free_vars(self):
       return self.arg.free_vars()
     
+  def type_check(self, env):
+    arg_type, new_arg = self.arg.type_check(env)
+    new_self = Deref(self.location, new_arg)
+    arg_type = unfold(arg_type)
+    if isinstance(arg_type, PointerType):
+      return arg_type.type, new_self
+    elif isinstance(arg_type, AnyType):
+      return AnyType(self.location), new_self
+    else:
+      error(self.location, 'in deref, expected a pointer, not '
+            + str(arg_type))
+      
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.arg, runner.env,
@@ -96,16 +110,6 @@ class Deref(Exp):
           result = duplicate_if_temporary(runner.results[0], self.location)
       machine.finish_expression(result, self.location)
 
-  def type_check(self, env):
-    arg_type = self.arg.type_check(env)
-    arg_type = unfold(arg_type)
-    if isinstance(arg_type, PointerType):
-      return arg_type.type
-    elif isinstance(arg_type, AnyType):
-      return AnyType(self.location)
-    else:
-      error(self.location, 'in deref, expected a pointer, not '
-            + str(arg_type))
     
       
 @dataclass
@@ -122,6 +126,11 @@ class AddressOf(Exp):
   def free_vars(self):
       return self.arg.free_vars()
     
+  def type_check(self, env):
+    arg_type, new_arg = self.arg.type_check(env)
+    return PointerType(self.location, arg_type), \
+           AddressOf(self.location, new_arg)
+        
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.arg, runner.env, AddressCtx())
@@ -133,10 +142,6 @@ class AddressOf(Exp):
         result = Result(True, machine.memory.allocate(res.value))
       machine.finish_expression(result, self.location)
 
-  def type_check(self, env):
-    arg_type = self.arg.type_check(env)
-    return PointerType(self.location, arg_type)
-        
 @dataclass
 class Transfer(Stmt):
   lhs: Exp
@@ -155,6 +160,20 @@ class Transfer(Stmt):
       return self.lhs.free_vars() | self.percent.free_vars() \
           | self.rhs.free_vars()
 
+  def type_check(self, env):
+    lhs_type, new_lhs = self.lhs.type_check(env)
+    lhs_type = unfold(lhs_type)
+    percent_type, new_percent = self.percent.type_check(env)
+    rhs_type, new_rhs = self.rhs.type_check(env)
+    rhs_type = unfold(rhs_type)
+    if not (isinstance(lhs_type, PointerType) or isinstance(lhs_type, AnyType)):
+      error(self.location, 'in transfer LHS, expected a pointer, not '
+            + str(lhs_type))
+    if not (isinstance(rhs_type, PointerType) or isinstance(rhs_type, AnyType)):
+      error(self.location, 'in transfer RHS, expected a pointer, not '
+            + str(rhs_type))
+    return None, Transfer(self.location, new_lhs, new_percent, new_rhs)
+
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.lhs, runner.env, ValueCtx(duplicate=False))
@@ -170,20 +189,6 @@ class Transfer(Stmt):
       dest_ptr.transfer(percent, src_ptr, self.location)
       machine.finish_statement(self.location)
 
-  def type_check(self, env):
-    lhs_type = self.lhs.type_check(env)
-    lhs_type = unfold(lhs_type)
-    percent_type = self.percent.type_check(env)
-    rhs_type = self.rhs.type_check(env)
-    rhs_type = unfold(rhs_type)
-    if not (isinstance(lhs_type, PointerType) or isinstance(lhs_type, AnyType)):
-      error(self.location, 'in transfer LHS, expected a pointer, not '
-            + str(lhs_type))
-    if not (isinstance(rhs_type, PointerType) or isinstance(rhs_type, AnyType)):
-      error(self.location, 'in transfer RHS, expected a pointer, not '
-            + str(rhs_type))
-    return None
-      
 @dataclass
 class Delete(Stmt):
   arg: Exp
@@ -197,6 +202,14 @@ class Delete(Stmt):
 
   def free_vars(self):
       return self.arg.free_vars()
+
+  def type_check(self, env):
+    arg_type, new_arg = self.arg.type_check(env)
+    arg_type = unfold(arg_type)
+    if not (isinstance(arg_type, PointerType) or isinstance(arg_type, AnyType)):
+      error(self.location, 'in delete, expected a pointer, not '
+            + str(arg_type))
+    return None, Delete(self.location, new_arg)
 
   def step(self, runner, machine):
     if runner.state == 0:
@@ -212,12 +225,3 @@ class Delete(Stmt):
       ptr.address = None
       ptr.permission = Fraction(0,1)
       machine.finish_statement(self.location)
-
-  def type_check(self, env):
-    arg_type = self.arg.type_check(env)
-    arg_type = unfold(arg_type)
-    if not (isinstance(arg_type, PointerType) or isinstance(arg_type, AnyType)):
-      error(self.location, 'in delete, expected a pointer, not '
-            + str(arg_type))
-    return None
-
