@@ -190,7 +190,7 @@ class TupleExp(Exp):
   __match_args__ = ("inits",)
 
   def __str__(self):
-      return '(new ' + ', '.join([str(e) for e in self.inits]) + ')'
+      return '⟨' + ', '.join([str(e) for e in self.inits]) + '⟩'
 
   def __repr__(self):
       return str(self)

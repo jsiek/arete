@@ -15,6 +15,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "[" type "]"                               -> array_type
     | type "*"                                   -> ptr_type
     | "⟨" type_list "⟩"                          -> tuple_type
+    | "{" field_type_list "}"                    -> record_type
     | alternative_list                           -> variant_type
     | "(" type_list ")" "->" type                -> function_type
     | "rec" IDENT "in" type                      -> recursive_type
@@ -31,6 +32,11 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     
 ?alternative_list: alternative                   -> single
     | alternative "|" alternative_list           -> push
+
+?field_type: IDENT ":" type                      -> field_type
+    
+?field_type_list: field_type                     -> single
+    | field_type "," field_type_list             -> push
 
 ?type_opt: ":" type                              -> just
     |                                            -> nothing
@@ -77,16 +83,18 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "breakpoint" "(" ")"                              -> breakpoint
     | "exit" "(" expression ")"                         -> exit
     | IDENT                                             -> var
-    | expression_hi "[" expression "]"                  -> index
     | expression_hi "::" IDENT                          -> module_member
     | expression_hi "#" IDENT                           -> variant_member
+    | expression_hi "." IDENT                           -> record_member
+    | "{" field_list "}"                                -> record
     | "-" expression_hi                                 -> neg
     | "not" expression_hi                               -> not
     | "(" expression ")"                                -> paren
-    | "fun" "(" parameter_list ")" return_mode block       -> lambda
     | "[" expression "of" expression "]"                -> array
     | "⟨" initializer_list "⟩"                          -> tuple
+    | expression_hi "[" expression "]"                  -> index
     | expression_hi "(" initializer_list ")"            -> call
+    | "fun" "(" parameter_list ")" return_mode block    -> lambda
     | "true"                                            -> true
     | "false"                                           -> false
     | "spawn" expression                                -> future
@@ -142,13 +150,19 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 parameter: binding_kind IDENT type_opt                  -> binding
     | "_"                                               -> no_binding
 				                 
-?parameter_list:                                     -> empty
-    | parameter                                      -> single
-    | parameter "," parameter_list                   -> push
+?parameter_list:                                        -> empty
+    | parameter                                         -> single
+    | parameter "," parameter_list                      -> push
 
-?ident_list:                                     -> empty
-    | IDENT                                      -> single
-    | IDENT "," ident_list                       -> push
+?ident_list:                                            -> empty
+    | IDENT                                             -> single
+    | IDENT "," ident_list                              -> push
+
+?field: IDENT "=" expression                            -> field
+
+?field_list:                                            -> empty
+    | field                                             -> single
+    | field "," field_list                              -> push
 
 ?ret_type: "->" type                             -> just
     |                                            -> nothing

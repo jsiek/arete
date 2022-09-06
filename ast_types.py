@@ -100,6 +100,22 @@ class TupleType(Type):
                                          other.member_types)])
 
 @dataclass(eq=True, frozen=True)
+class RecordType(Type):
+  field_types: tuple[tuple[str,Type]]  
+  __match_args__ = ("field_types",)
+  def __str__(self):
+    return '{' + ', '.join([x + ':' + str(t) \
+                            for x,t in self.field_types]) + '}'
+  def __repr__(self):
+    return str(self)
+  def __eq__(self, other):
+    # TODO: allow different orderings
+    return isinstance(other, RecordType) \
+      and all([t1 == t2 for t1,t2 in zip(self.field_types,
+                                         other.field_types)])
+
+  
+@dataclass(eq=True, frozen=True)
 class VariantType(Type):
   alternative_types: tuple[tuple[str,Type]]  
   __match_args__ = ("alternative_types",)

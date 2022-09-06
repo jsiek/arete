@@ -2,6 +2,7 @@ from abstract_syntax import *
 from functions import *
 from variables_and_binding import *
 from tuples_and_arrays import *
+from records import *
 from variants import *
 from modules import *
 from pointers import *
@@ -89,6 +90,9 @@ def parse_tree_to_type(e):
                            tuple()) # TODO: add requirements
     elif e.data == 'variant_type':
         return VariantType(e.meta,
+                           parse_tree_to_alt_list(e.children[0]))
+    elif e.data == 'record_type':
+        return RecordType(e.meta,
                            parse_tree_to_alt_list(e.children[0]))
     elif e.data == 'recursive_type':
         return RecursiveType(e.meta,
@@ -205,6 +209,9 @@ def parse_tree_to_ast(e):
                              [parse_tree_to_ast(c) for c in e.children])
     elif e.data == 'tuple':
         return TupleExp(e.meta, parse_tree_to_ast(e.children[0]))
+    elif e.data == 'record':
+        return RecordExp(e.meta,
+                         parse_tree_to_ast(e.children[0]))
     elif e.data == 'array':
         return Array(e.meta,
                      parse_tree_to_ast(e.children[0]),
@@ -236,6 +243,10 @@ def parse_tree_to_ast(e):
         return VariantMember(e.meta,
                              parse_tree_to_ast(e.children[0]),
                              str(e.children[1].value))
+    elif e.data == 'record_member':
+        return FieldAccess(e.meta,
+                           parse_tree_to_ast(e.children[0]),
+                           str(e.children[1].value))
     elif e.data == 'condition':
         return IfExp(e.meta,
                      parse_tree_to_ast(e.children[0]),
@@ -365,10 +376,12 @@ def parse_tree_to_ast(e):
                     str(e.children[0].value),
                     parse_tree_to_type_list(e.children[1]),
                     parse_tree_to_ast(e.children[2]))
-    elif e.data == 'assign':
-        return (str(e.children[0].value), parse_tree_to_ast(e.children[1]))
     
     # miscelaneous
+    elif e.data == 'assign':
+        return (str(e.children[0].value), parse_tree_to_ast(e.children[1]))
+    elif e.data == 'field':
+        return (str(e.children[0].value), parse_tree_to_ast(e.children[1]))
     
     # is impl_req needed?
     elif e.data == 'impl_req':

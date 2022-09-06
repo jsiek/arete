@@ -6,6 +6,7 @@ from functions import *
 from variables_and_binding import *
 from variants import *
 from tuples_and_arrays import *
+from records import *
 from modules import *
 from pointers import *
 from futures import *
@@ -79,6 +80,9 @@ def const_eval_exp(e, env):
       case ModuleMember(arg, field):
         new_arg = const_eval_exp(arg, env)
         return ModuleMember(e.location, new_arg, field)
+      case FieldAccess(arg, field):
+        new_arg = const_eval_exp(arg, env)
+        return FieldAccess(e.location, new_arg, field)
       case VariantMember(arg, field):
         new_arg = const_eval_exp(arg, env)
         return VariantMember(e.location, new_arg, field)
@@ -89,6 +93,9 @@ def const_eval_exp(e, env):
       case TupleExp(inits):
         new_inits = [const_eval_exp(init, env) for init in inits]
         return TupleExp(e.location, new_inits)
+      case RecordExp(fields):
+        new_fields = [(f, const_eval_exp(e, env)) for f,e in fields]
+        return RecordExp(e.location, new_fields)
       case TagVariant(tag, arg, ty):
         return TagVariant(e.location, tag, const_eval_exp(arg, env), ty)
       case Lambda(params, ret_mode, reqs, body, name):
