@@ -1,5 +1,8 @@
 # Propagate constants.
+# TODO: split these functions into AST methods.
 # TODO: more partial evaluation.
+
+
 
 from abstract_syntax import *
 from functions import *
@@ -19,6 +22,7 @@ import numbers
 import sys
 import copy
 from utilities import *
+from ast_types import *
 
 def is_constant(e):
   match e:
@@ -97,14 +101,17 @@ def const_eval_exp(e, env):
         new_fields = [(f, const_eval_exp(e, env)) for f,e in fields]
         return RecordExp(e.location, new_fields)
       case TagVariant(tag, arg, ty):
-        return TagVariant(e.location, tag, const_eval_exp(arg, env), ty)
+        new_arg = const_eval_exp(arg, env)
+        new_ty = simplify(ty, env)
+        return TagVariant(e.location, tag, new_arg, new_ty)
       case Lambda(params, ret_mode, reqs, body, name):
+        new_params = [p.with_type(simplify(p.type_annot, env)) for p in params]
         body_env = env.copy()
-        for p in params:
+        for p in new_params:
           if p.ident in body_env.keys():
             del body_env[p.ident]
         new_body = const_eval_statement(body, body_env)
-        return Lambda(e.location, params, ret_mode, reqs, new_body, name)
+        return Lambda(e.location, new_params, ret_mode, reqs, new_body, name)
       case Call(fun, args):
         new_fun = const_eval_exp(fun, env)
         new_args = [const_eval_exp(arg, env) for arg in args]
@@ -125,12 +132,13 @@ def const_eval_exp(e, env):
         new_els = const_eval_exp(els, env)
         return IfExp(e.location, new_cond, new_thn, new_els)
       case BindingExp(param, rhs, body):
+        new_param = param.with_type(simplify(param.type_annot, env))
         new_rhs = const_eval_exp(rhs, env)
         body_env = env.copy()
-        if param.ident in body_env.keys():
-          del body_env[param.ident]
+        if new_param.ident in body_env.keys():
+          del body_env[new_param.ident]
         new_body = const_eval_exp(body, body_env)
-        return BindingExp(e.location, param, new_rhs, new_body)
+        return BindingExp(e.location, new_param, new_rhs, new_body)
       case FutureExp(arg):
         new_arg = const_eval_exp(arg, env)
         return FutureExp(e.location, new_arg)
@@ -143,12 +151,13 @@ def const_eval_exp(e, env):
 def const_eval_statement(s, env):
     match s:
       case BindingStmt(param, rhs, body):
+        new_param = param.with_type(simplify(param.type_annot, env))
         new_rhs = const_eval_exp(rhs, env)
         body_env = env.copy()
-        if param.ident in body_env.keys():
-          del body_env[param.ident]
+        if new_param.ident in body_env.keys():
+          del body_env[new_param.ident]
         new_body = const_eval_statement(body, body_env)
-        return BindingStmt(s.location, param, new_rhs, new_body)
+        return BindingStmt(s.location, new_param, new_rhs, new_body)
       case Seq(first, rest):
         new_first = const_eval_statement(first, env)
         new_rest = const_eval_statement(rest, env)
@@ -201,6 +210,7 @@ def const_eval_statement(s, env):
 def const_eval_decl(decl, env):
     match decl:
       case ConstantDef(name, type_annot, rhs):
+        new_ty = simplify(type_annot, env)
         new_rhs = const_eval_exp(rhs, env)
         if is_constant(new_rhs):
           env[name] = new_rhs
@@ -208,32 +218,56 @@ def const_eval_decl(decl, env):
           error(decl.location, 'right-hand side must be a constant, not '
                 + str(rhs))
         return []
-      case TypeAlias(name, type):
-        return [TypeAlias(decl.location, name, type)]
+      
+      case TypeAlias(name, ty):
+        #return [TypeAlias(decl.location, name, type)]
+        env[name] = simplify(ty, env)
+        return []
+        
       case TypeOperator(name, params, body):
-        return [TypeOperator(decl.location, name, params, body)]
+        #return [TypeOperator(decl.location, name, params, body)]
+        env[name] = TypeOp(decl.location, params, body)
+        return []
+        
       case Global(name, type_annot, rhs):
         new_rhs = const_eval_exp(rhs, env)
         return [Global(decl.location, name, type_annot, new_rhs)]
+      
       case Function(name, ty_params, params, return_ty, return_mode, reqs, body):
         body_env = env.copy()
-        for p in params:
+        for t in ty_params:
+          body_env[t] = TypeVar(decl.location, t)
+        new_params = [p.with_type(simplify(p.type_annot, body_env)) for p in params]
+        new_return_ty = simplify(return_ty, body_env)
+        for p in new_params:
           if p.ident in body_env.keys():
             del body_env[p.ident]
         new_body = const_eval_statement(body, body_env)
-        return [Function(decl.location, name, ty_params, params, return_ty,
+        return [Function(decl.location, name, ty_params, new_params, new_return_ty,
                          return_mode, reqs, new_body)]
       case ModuleDef(name, exports, body):
         body_env = env.copy()
         new_body = const_eval_decls(body, body_env)
         return [ModuleDef(decl.location, name, exports, new_body)]
+      
       case Import(module, imports):
         new_module = const_eval_exp(module, env)
         return [Import(decl.location, module, imports)]
+      
       case Interface(name, type_params, extends, members):
-        return [Interface(decl.location, name, type_params, extends, members)]
+        body_env = {x: t.copy()  for x, t in env.items()}
+        for x in self.type_params:
+          body_env[x] = TypeVar(self.location, x)
+        new_members = []
+        for x, t in members:
+          new_members.append(x, simplify(t, body_env))
+        return [Interface(decl.location, name, type_params, extends, new_members)]
+      
       case Impl(name, iface_name, impl_types, assgn):
-        return [Impl(decl.location, name, iface_name, impl_types, assgn)]
+        new_impl_types = [simplify(ty, env) for ty in impl_types]
+        new_assign = [(x, const_eval_exp(e, env)) for x,e in assign]
+        return [Impl(decl.location, name, iface_name, new_impl_types, new_assgn)]
+      
       case _:
         error(decl.location, "in const_eval_decl, unhandled: " + str(decl))
 

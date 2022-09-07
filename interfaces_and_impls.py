@@ -5,7 +5,65 @@
 # * impl definitions, 
 # * impl requirements.
 
-# Use Module values for witness tables?
+# We take a "dictionary-passing" approach to implementing interfaces and impls.
+# That means impls are represented by records at runtime.
+# During type checking we translate impls into records and
+# we translate impl requirements on a function into extra parameters of the function.
+#
+# We translate interfaces into record types. For example
+#
+# interface Monoid(T) {
+#   combine : (T,T) -> T;
+#   identity : T;
+# }
+#
+# translates to
+#
+# typeop Monoid(T) = { combine : (T,T) -> T, identity : T };
+#
+# We translate impls into records. For example
+#
+# impl Monoid(int) {
+#   combine = add;
+#   identity = zero;
+# }
+#
+# translates to
+#
+# let Monoid1 = { combine = add, identity = zero };
+
+# A function with an impl requirement is translated to a function with
+# an extra parameter (a record). Also, all uses of the impl operations are translated
+# into field access on the record. For example
+#
+# fun accumulate<T>(A: [T]) -> T where Monoid(T) {
+#   var total:T = copy(identity);
+#   var i:int = 0;
+#   while (i != len(A)) {
+#     total = combine(total, A[i]);
+#     i = i + 1;
+#   }
+#   return total;
+# }
+#
+# translates to
+#
+# fun accumulate<T>(A: [T], Monoid0: Monoid(T)) {
+#   var total:T = copy(Monoid0.identity);
+#   var i:int = 0;
+#   while (i != len(A)) {
+#     total = Monoid0.combine(total, A[i]);
+#     i = i + 1;
+#   }
+#   return total;
+# }
+
+# TODO: describe how we implement interface inheritance
+
+
+
+
+
 
 from dataclasses import dataclass
 from ast_base import *

@@ -246,6 +246,9 @@ def simplify(type: Type, env) -> Type:
       ret = type
     case VoidType():
       ret = type
+    case RecordType(alts):
+      ret = RecordType(type.location,
+                        tuple((x, simplify(t, env)) for x,t in alts))
     case VariantType(alts):
       ret = VariantType(type.location,
                         tuple((x, simplify(t, env)) for x,t in alts))
@@ -274,6 +277,9 @@ def substitute(subst: dict[str, Type], ty2: Type) -> Type:
     case TupleType(ts2):
       return TupleType(ty2.location,
                        tuple(substitute(subst, elt_ty) for elt_ty in ts2))
+    case RecordType(alts):
+      return RecordType(ty2.location,
+                         tuple((x, substitute(subst, t)) for x,t in alts))
     case VariantType(alts):
       return VariantType(ty2.location,
                          tuple((x, substitute(subst, t)) for x,t in alts))

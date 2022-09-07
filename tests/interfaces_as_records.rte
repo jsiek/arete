@@ -1,0 +1,32 @@
+
+typeop Monoid(T) = { combine : (T,T) -> T, identity : T };
+
+fun accumulate<T>(A: [T], Monoid0: Monoid(T)) {
+  var total:T = copy(Monoid0.identity);
+  var i:int = 0;
+  while (i != len(A)) {
+    total = Monoid0.combine(total, A[i]);
+    i = i + 1;
+  }
+  return total;
+}
+
+fun add(x:int, y:int) -> int {
+  return x + y;
+}
+
+let zero: int = 0;
+
+let Monoid1 = { combine = add, identity = zero };
+
+fun main() {
+  let n:int = 5;
+  var A: [int] = [n of 0];
+  var i:int = 0;
+  while (i != n) {
+    A[i] = i; 
+    i = i + 1;
+  }
+  return accumulate(A, Monoid1) - n*(n - 1)/2;
+}
+

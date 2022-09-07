@@ -19,6 +19,10 @@ class Param:
     ident: str
     type_annot: Type
     __match_args__ = ("privilege", "ident")
+
+    # Return a Param that's the same except for the type annotation.
+    def with_type(self, ty):
+        return Param(self.location, self.kind, self.privilege, self.ident, ty)
     
     def __str__(self):
         if self.kind is None:
@@ -536,15 +540,6 @@ class TypeAlias(Decl):
   def __repr__(self):
     return str(self)
   
-  def step(self, runner, machine):
-    machine.finish_definition(self.location)
-
-  def declare_type(self, env, output):
-    env[self.name] = simplify(self.type, env)
-
-  def type_check(self, env):
-    return []
-  
 @dataclass
 class TypeOperator(Decl):
   name: str
@@ -559,12 +554,6 @@ class TypeOperator(Decl):
   def __repr__(self):
     return str(self)
 
-  def step(self, runner, machine):
-    machine.finish_definition(self.location)
 
-  def declare_type(self, env, output):
-    env[self.name] = TypeOp(self.location, self.params, self.body)
 
-  def type_check(self, env):
-    return []
   
