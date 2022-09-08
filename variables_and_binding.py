@@ -29,6 +29,12 @@ class Var(Exp):
   def free_vars(self):
       return set([self.ident])
 
+  def const_eval(self, env):
+    if self.ident in env:
+      return env[self.ident]
+    else:
+      return self
+    
   def type_check(self, env):
     if self.ident not in env:
         error(self.location, 'use of undefined variable ' + self.ident)
@@ -72,6 +78,18 @@ class BindingExp(Exp):
       return self.arg.free_vars() \
           | (self.body.free_vars() - set([self.param.ident]))
 
+  def const_eval(self, env):
+    param = self.param
+    rhs = self.arg
+    body = self.body
+    new_param = param.with_type(simplify(param.type_annot, env))
+    new_rhs = rhs.const_eval( env)
+    body_env = env.copy()
+    if new_param.ident in body_env.keys():
+      del body_env[new_param.ident]
+    new_body = body.const_eval(body_env)
+    return BindingExp(self.location, new_param, new_rhs, new_body)
+    
   def type_check(self, env):
     rhs_type, new_arg = self.arg.type_check(env)
     new_param = self.param.type_check(env)
@@ -121,6 +139,18 @@ class BindingStmt(Exp):
   def free_vars(self):
       return self.arg.free_vars() \
           | (self.body.free_vars() - set([self.param.ident]))
+
+  def const_eval(self, env):
+    param = self.param
+    rhs = self.arg
+    body = self.body
+    new_param = param.with_type(simplify(param.type_annot, env))
+    new_rhs = rhs.const_eval( env)
+    body_env = env.copy()
+    if new_param.ident in body_env.keys():
+      del body_env[new_param.ident]
+    new_body = body.const_eval(body_env)
+    return BindingStmt(self.location, new_param, new_rhs, new_body)
     
   def type_check(self, env):
     arg_type, new_arg = self.arg.type_check(env)

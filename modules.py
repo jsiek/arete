@@ -63,7 +63,14 @@ class ModuleDef(Decl):
   
   def __repr__(self):
     return str(self)
-  
+
+  def const_eval(self, env):
+      body_env = env.copy()
+      new_body = []
+      for d in self.body:
+          new_body += d.const_eval(body_env)
+      return [ModuleDef(self.location, self.name, self.exports, new_body)]
+
   def declare_type(self, env, output):
     member_types = {}
     for d in self.body:
@@ -115,10 +122,10 @@ class Import(Decl):
   def __repr__(self):
     return str(self)
 
-  def declare(self, env, mem):
-    for x in self.imports:
-        env[x] = mem.allocate(Void())
-      
+  def const_eval(self, env):
+      new_module = self.module.const_eval(env)
+      return [Import(self.location, new_module, self.imports)]
+
   def declare_type(self, env, output):
     mod, new_mod = self.module.type_check(env)
     mod = unfold(mod)
@@ -136,6 +143,10 @@ class Import(Decl):
     mod_type, new_module = self.module.type_check(env)
     return [Import(self.location, new_module, self.imports)]
 
+  def declare(self, env, mem):
+    for x in self.imports:
+        env[x] = mem.allocate(Void())
+      
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.module, runner.env, AddressCtx())
@@ -171,7 +182,11 @@ class ModuleMember(Exp):
     
   def free_vars(self):
       return self.arg.free_vars()
-    
+
+  def const_eval(self, env):
+      new_arg = self.arg.const_eval(env)
+      return ModuleMember(self.location, new_arg, self.field)
+  
   def type_check(self, env):
     mod_type, new_arg = self.arg.type_check(env)
     mod_type = unfold(mod_type)

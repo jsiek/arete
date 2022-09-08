@@ -83,6 +83,11 @@ class TagVariant(Exp):
   
   def free_vars(self):
     return self.arg.free_vars()
+
+  def const_eval(self, env):
+    new_arg = self.arg.const_eval(env)
+    new_ty = simplify(self.type, env)
+    return TagVariant(self.location, self.tag, new_arg, new_ty)
   
   def type_check(self, env):
     new_type = simplify(self.type, env)
@@ -144,6 +149,16 @@ class Match(Stmt):
     if tracing_on():
       print('free vars of match: ' + str(fvs))
     return fvs
+
+  def const_eval(self, env):
+    new_cond = self.condition.const_eval(env)
+    new_cases = []
+    for (tag, x, body) in self.cases:
+      body_env = env.copy()
+      if x in body_env.keys():
+        del body_env[x]
+      new_cases += [(tag, x, body.const_eval(body_env))]
+    return Match(self.location, new_cond, new_cases)
   
   def type_check(self, env):
     cond_ty, new_cond = self.condition.type_check(env)
@@ -237,6 +252,10 @@ class VariantMember(Exp):
     
   def free_vars(self):
       return self.arg.free_vars()
+
+  def const_eval(self, env):
+    new_arg = self.arg.const_eval(env)
+    return VariantMember(self.location, new_arg, self.field)
     
   def type_check(self, env):
     variant_type, new_arg = self.arg.type_check(env)

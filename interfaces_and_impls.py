@@ -62,9 +62,6 @@
 
 
 
-
-
-
 from dataclasses import dataclass
 from ast_base import *
 from ast_types import *
@@ -131,13 +128,17 @@ class Interface(Decl):
   
   def free_vars(self):
     pass
-  
-  def step(self, runner, machine):
-    machine.memory.unchecked_write(runner.env[self.name],
-                                   self.iface_info,
-                                   self.location)
-    machine.finish_definition(self.location)
 
+  def const_eval(self, env):
+    body_env = {x: t.copy()  for x, t in env.items()}
+    for x in self.type_params:
+      body_env[x] = TypeVar(self.location, x)
+    new_extends = [req.const_eval(body_env) for req in self.extends]
+    new_members = []
+    for x, t in self.members:
+      new_members.append(x, simplify(t, body_env))
+    return [Interface(self.location, self.name, self.type_params, new_extends, new_members)]
+  
   def declare_type(self, env, output):
     body_env = {x: t.copy()  for x, t in env.items()}
     for x in self.type_params:
@@ -160,6 +161,12 @@ class Interface(Decl):
   def type_check(self, env):
     pass
 
+  def step(self, runner, machine):
+    machine.memory.unchecked_write(runner.env[self.name],
+                                   self.iface_info,
+                                   self.location)
+    machine.finish_definition(self.location)
+
 @dataclass
 class Impl(Decl):
   name: str
@@ -178,6 +185,11 @@ class Impl(Decl):
   
   def free_vars(self):
     pass
+
+  def const_eval(self, env):
+    new_impl_types = [simplify(ty, env) for ty in self.impl_types]
+    new_assign = [(x, const_eval_exp(e, env)) for x,e in self.assignments]
+    return [Impl(self.location, self.name, self.iface_name, new_impl_types, new_assgn)]
   
   def declare_type(self, env, output):
     if not self.iface_name in env.keys():
@@ -258,6 +270,10 @@ class ImplReq(Type):
   
   def free_vars(self):
     pass
+
+  def const_eval(self, env):
+    new_impl_types = tuple(simplify(ty, env) for ty in self.impl_types)
+    return ImplReq(self.location, self.name, self.iface_name, new_impl_types, None)
   
   def declare_type(self, env, output):
     if not self.iface_name in env.keys():

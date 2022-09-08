@@ -97,7 +97,23 @@ class Function(Decl):
       print('function ' + self.name + ' free variables: ' + str(fvars)
             + '\nrequirements: ' + str(req_mem_vars))
     return fvars
-    
+
+  def const_eval(self, env):
+    body_env = env.copy()
+    for t in self.type_params:
+      body_env[t] = TypeVar(self.location, t)
+    new_params = [p.with_type(simplify(p.type_annot, body_env)) \
+                  for p in self.params]
+    new_return_ty = simplify(self.return_type, body_env)
+    # TODO const_eval the self.requirements
+    for p in new_params:
+      if p.ident in body_env.keys():
+        del body_env[p.ident]
+    new_body = self.body.const_eval(body_env)
+    return [Function(self.location, self.name, self.type_params,
+                     new_params, new_return_ty,
+                     self.return_mode, self.requirements, new_body)]
+
   def declare_type(self, env, output):
     ty = FunctionType(self.location,
                       self.type_params,
@@ -170,6 +186,11 @@ class Call(Exp):
           | set().union(*[arg.free_vars() for arg in self.args]) \
           | set().union(*[wit.free_vars() for wit in self.witnesses])
 
+  def const_eval(self, env):
+    new_fun = self.fun.const_eval(env)
+    new_args = [arg.const_eval(env) for arg in self.args]
+    return Call(self.location, new_fun, new_args)
+      
   def type_argument_deduction(self, type_params, param_types, arg_types):
       deduced_types = {}    
       for (param_ty, arg_ty) in zip(param_types, arg_types):
@@ -338,12 +359,24 @@ class Call(Exp):
 class Return(Stmt):
   arg: Exp
   __match_args__ = ("arg",)
+  
   def __str__(self):
       return "return " + str(self.arg) + ";"
+  
   def __repr__(self):
       return str(self)
+  
   def free_vars(self):
       return self.arg.free_vars()
+  
+  def const_eval(self, env):
+    new_arg = self.arg.const_eval(env)
+    return Return(self.location, new_arg)
+
+  def type_check(self, env):
+    arg_type, new_arg = self.arg.type_check(env)
+    return arg_type, Return(self.location, new_arg)
+      
   def step(self, runner, machine):
     if runner.state == 0:
       if runner.return_mode == 'value':
@@ -355,10 +388,6 @@ class Return(Stmt):
       runner.return_value = \
         runner.results[0].value.duplicate(1, self.location)
       machine.finish_statement(self.location)
-
-  def type_check(self, env):
-    arg_type, new_arg = self.arg.type_check(env)
-    return arg_type, Return(self.location, new_arg)
 
 @dataclass
 class Lambda(Exp):
@@ -392,6 +421,16 @@ class Lambda(Exp):
     params = set([p.ident for p in self.params])
     return self.body.free_vars() - params - req_vars
 
+  def const_eval(self, env):
+    new_params = [p.with_type(simplify(p.type_annot, env)) for p in self.params]
+    body_env = env.copy()
+    for p in new_params:
+      if p.ident in body_env.keys():
+        del body_env[p.ident]
+    new_body = self.body.const_eval(body_env)
+    return Lambda(self.location, new_params, self.return_mode,
+                  self.requirements, new_body, self.name)
+
   def type_check(self, env):
     body_env = {x: t.copy() for x,t in env.items()}
     for p in self.params:
@@ -419,8 +458,8 @@ class Lambda(Exp):
             error(self.location, 'in lambda, undefined free variable ' + x)
           v = runner.env[x]
           clos_env[x] = v.duplicate(Fraction(1,2), self.location)            
-      clos = Closure(self.name, self.params, self.return_mode, self.requirements,
-                     self.body, clos_env)
+      clos = Closure(self.name, self.params, self.return_mode,
+                     self.requirements, self.body, clos_env)
       if isinstance(runner.context, ValueCtx):
           result = clos
       elif isinstance(runner.context, AddressCtx):

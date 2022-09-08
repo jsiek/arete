@@ -39,6 +39,10 @@ class FutureExp(Exp):
   
   def free_vars(self):
     return self.arg.free_vars()
+
+  def const_eval(self, env):
+      new_arg = self.arg.const_eval(env)
+      return FutureExp(self.location, new_arg)
   
   def type_check(self, env):
     arg_type, new_arg = self.arg.type_check(env)
@@ -69,6 +73,10 @@ class Wait(Exp):
   def free_vars(self):
     return self.arg.free_vars()
   
+  def const_eval(self, env):
+    new_arg = self.arg.const_eval(env)
+    return Wait(self.location, new_arg)
+      
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.arg, runner.env)

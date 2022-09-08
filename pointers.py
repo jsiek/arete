@@ -31,23 +31,15 @@ class PercentOf(Exp):
       percent_fv = set() if isinstance(self.percentage, str) \
           else self.percentage.free_vars()
       return percent_fv | self.arg.free_vars()
-    
-  def step(self, runner, machine):
-    if runner.state == 0:
-      if self.percentage == 'default':
-        self.percentage = Frac(self.location, Fraction(1,2))
-      machine.schedule(self.percentage, runner.env,
-                       ValueCtx(runner.context.duplicate))
-    elif runner.state == 1:
-      percent = runner.results[0].value
-      runner.amount = to_number(percent, self.location)
-      machine.schedule(self.arg, runner.env, runner.context)
-    else:
-      val = runner.results[1].value
-      val_copy = val.duplicate(runner.amount, self.location)
-      machine.finish_expression(Result(runner.results[1].temporary, val_copy),
-                                self.location)
 
+  def const_eval(self, env):
+    if self.percentage == 'default':
+      new_percent = 'default'
+    else:
+      new_percent = self.percentage.const_eval(env)
+    new_arg = self.arg.const_eval(env)
+    return PercentOf(self.location, new_percent, new_arg)
+    
   def type_check(self, env):
     if self.percentage == 'default':
       percent_type = RationalType(self.location)
@@ -65,6 +57,23 @@ class PercentOf(Exp):
     else:
       error(self.location, 'in initializer, expected percentage '
             + 'not ' + str(percent_type))
+      
+  def step(self, runner, machine):
+    if runner.state == 0:
+      if self.percentage == 'default':
+        self.percentage = Frac(self.location, Fraction(1,2))
+      machine.schedule(self.percentage, runner.env,
+                       ValueCtx(runner.context.duplicate))
+    elif runner.state == 1:
+      percent = runner.results[0].value
+      runner.amount = to_number(percent, self.location)
+      machine.schedule(self.arg, runner.env, runner.context)
+    else:
+      val = runner.results[1].value
+      val_copy = val.duplicate(runner.amount, self.location)
+      machine.finish_expression(Result(runner.results[1].temporary, val_copy),
+                                self.location)
+
 
 @dataclass
 class Deref(Exp):
@@ -79,6 +88,10 @@ class Deref(Exp):
     
   def free_vars(self):
       return self.arg.free_vars()
+
+  def const_eval(self, env):
+    new_arg = self.arg.const_eval(env)
+    return Deref(self.location, new_arg)
     
   def type_check(self, env):
     arg_type, new_arg = self.arg.type_check(env)
@@ -125,6 +138,10 @@ class AddressOf(Exp):
     
   def free_vars(self):
       return self.arg.free_vars()
+
+  def const_eval(self, env):
+    new_arg = self.arg.const_eval(env)
+    return AddressOf(self.location, new_arg)
     
   def type_check(self, env):
     arg_type, new_arg = self.arg.type_check(env)
@@ -159,6 +176,12 @@ class Transfer(Stmt):
   def free_vars(self):
       return self.lhs.free_vars() | self.percent.free_vars() \
           | self.rhs.free_vars()
+
+  def const_eval(self, env):
+    new_lhs = self.lhs.const_eval(env)
+    new_percent = self.percent.const_eval(env)
+    new_rhs = self.rhs.const_eval(env)
+    return Transfer(self.location, new_lhs, new_percent, new_rhs)
 
   def type_check(self, env):
     lhs_type, new_lhs = self.lhs.type_check(env)
@@ -203,6 +226,10 @@ class Delete(Stmt):
   def free_vars(self):
       return self.arg.free_vars()
 
+  def const_eval(self, env):
+    new_arg = self.arg.const_eval(env)
+    return Delete(self.location, new_arg)
+    
   def type_check(self, env):
     arg_type, new_arg = self.arg.type_check(env)
     arg_type = unfold(arg_type)

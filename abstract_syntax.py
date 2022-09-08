@@ -45,6 +45,39 @@ class NoParam:
     
 # Expressions
 
+def is_constant(e):
+  match e:
+    case Int(n):
+      return True
+    case Frac(f):
+      return True
+    case Bool(b):
+      return True
+    case _:
+      return False
+
+def eval_constant(e):
+  match e:
+    case Int(n):
+      return Number(n)
+    case Frac(f):
+      return Number(f)
+    case Bool(b):
+      return Boolean(b)
+    case _:
+      error(e.location, "expected a constant, not " + str(e))
+      
+def const_eval_prim(loc, op, args):
+  match op:
+    case 'div':
+      if is_constant(args[0]) and is_constant(args[1]):
+        left = to_number(eval_constant(args[0]), loc)
+        right = to_number(eval_constant(args[1]), loc)
+        return Frac(loc, Fraction(left, right))
+      else:
+        return PrimitiveCall(loc, op, args)
+    case _:
+        return PrimitiveCall(loc, op, args)
 
 @dataclass
 class PrimitiveCall(Exp):
@@ -61,6 +94,29 @@ class PrimitiveCall(Exp):
 
   def free_vars(self):
       return set().union(*[arg.free_vars() for arg in self.args])
+
+  def const_eval(self, env):
+    op = self.op
+    args = self.args
+    new_args = [arg.const_eval(env) for arg in args]
+    return const_eval_prim(self.location, op, new_args)
+  
+  def type_check(self, env):
+    if tracing_on():
+      print("starting to type checking " + str(self))
+    arg_types = []
+    new_args = []
+    for arg in self.args:
+        arg_type, new_arg = arg.type_check(env)
+        arg_types.append(arg_type)
+        new_args.append(new_arg)
+    if tracing_on():
+      print("checking primitive " + str(self.op))
+    ret = type_check_prim(self.location, self.op, arg_types)
+    if tracing_on():
+      print("finished type checking " + str(self))
+      print("type: " + str(ret))
+    return ret, PrimitiveCall(self.location, self.op, new_args)
 
   def step(self, runner, machine):
     if runner.state < len(self.args):
@@ -79,23 +135,6 @@ class PrimitiveCall(Exp):
           result = machine.memory.allocate(result)
       machine.finish_expression(Result(True, result), self.location)
 
-  def type_check(self, env):
-    if tracing_on():
-      print("starting to type checking " + str(self))
-    arg_types = []
-    new_args = []
-    for arg in self.args:
-        arg_type, new_arg = arg.type_check(env)
-        arg_types.append(arg_type)
-        new_args.append(new_arg)
-    if tracing_on():
-      print("checking primitive " + str(self.op))
-    ret = type_check_prim(self.location, self.op, arg_types)
-    if tracing_on():
-      print("finished type checking " + str(self))
-      print("type: " + str(ret))
-    return ret, PrimitiveCall(self.location, self.op, new_args)
-
 @dataclass
 class Int(Exp):
   value: int
@@ -109,6 +148,9 @@ class Int(Exp):
 
   def free_vars(self):
       return set()
+
+  def const_eval(self, env):
+      return self
 
   def step(self, runner, machine):
       val = Number(self.value)
@@ -126,12 +168,22 @@ class Int(Exp):
 class Frac(Exp):
   value: Fraction
   __match_args__ = ("value",)
+  
   def __str__(self):
       return str(self.value)
+  
   def __repr__(self):
       return str(self)
+  
   def free_vars(self):
       return set()
+  
+  def const_eval(self, env):
+      return self
+  
+  def type_check(self, env):
+    return RationalType(self.location), self
+      
   def step(self, runner,  machine):
       val = Number(self.value)
       if isinstance(runner.context, ValueCtx):
@@ -142,19 +194,26 @@ class Frac(Exp):
       #   error(self.location, 'fraction not allowed in this context')
       machine.finish_expression(Result(True, result), self.location)
 
-  def type_check(self, env):
-    return RationalType(self.location), self
-      
 @dataclass
 class Bool(Exp):
   value: bool
   __match_args__ = ("value",)
+  
   def __str__(self):
-      return str(self.value)
+    return str(self.value)
+  
   def __repr__(self):
-      return str(self)
+    return str(self)
+  
   def free_vars(self):
-      return set()
+    return set()
+  
+  def const_eval(self, env):
+    return self
+
+  def type_check(self, env):
+    return BoolType(self.location), self
+  
   def step(self, runner, machine):
       val = Boolean(self.value)
       if isinstance(runner.context, ValueCtx):
@@ -164,9 +223,6 @@ class Bool(Exp):
       # if not runner.context.duplicate:
       #   error(self.location, 'Boolean not allowed in this context')
       machine.finish_expression(Result(True, result), self.location)
-
-  def type_check(self, env):
-    return BoolType(self.location), self
       
 
 @dataclass
@@ -187,6 +243,12 @@ class IfExp(Exp):
       return self.cond.free_vars() | self.thn.free_vars() \
           | self.els.free_vars()
     
+  def const_eval(self, env):
+    new_cond = self.cond.const_eval(env)
+    new_thn = self.thn.const_eval(env)
+    new_els = self.els.const_eval(env)
+    return IfExp(self.location, new_cond, new_thn, new_els)
+      
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.cond, runner.env)
@@ -236,6 +298,17 @@ class Seq(Stmt):
   def free_vars(self):
     return self.first.free_vars() | self.rest.free_vars()
 
+  def const_eval(self, env):
+    new_first = self.first.const_eval(env)
+    new_rest = self.rest.const_eval(env)
+    return Seq(self.location, new_first, new_rest)
+  
+  def type_check(self, env):
+    first_type, new_first = self.first.type_check(env)
+    rest_type, new_rest = self.rest.type_check(env)
+    return join(first_type, rest_type), \
+           Seq(self.location, new_first, new_rest)
+
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.first, runner.env)
@@ -248,12 +321,6 @@ class Seq(Stmt):
   def debug_skip(self):
       return True
 
-  def type_check(self, env):
-    first_type, new_first = self.first.type_check(env)
-    rest_type, new_rest = self.rest.type_check(env)
-    return join(first_type, rest_type), \
-           Seq(self.location, new_first, new_rest)
-    
     
 @dataclass
 class Write(Stmt):
@@ -275,6 +342,11 @@ class Write(Stmt):
         print('free variables of write rhs: ' + str(rhs_fvs))
       return lhs_fvs | rhs_fvs
 
+  def const_eval(self, env):
+    new_lhs = self.lhs.const_eval(env)
+    new_rhs = self.rhs.const_eval(env)
+    return Write(self.location, new_lhs, new_rhs)
+    
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.rhs, runner.env)
@@ -302,11 +374,15 @@ class Expr(Stmt):
       return "! " + str(self.exp) + ";"
 
   def __repr__(self):
-      return str(self)
+    return str(self)
 
   def free_vars(self):
-      return self.exp.free_vars()
+    return self.exp.free_vars()
 
+  def const_eval(self, env):
+    new_arg = self.exp.const_eval(env)
+    return Expr(self.location, new_arg)
+    
   def type_check(self, env):
     _, new_exp = self.exp.type_check(env)
     return None, Expr(self.location, new_exp)
@@ -331,7 +407,18 @@ class Assert(Stmt):
     
   def free_vars(self):
       return self.exp.free_vars()
+
+  def const_eval(self, env):
+    new_arg = self.exp.const_eval(env)
+    return Assert(self.location, new_arg)
     
+  def type_check(self, env):
+    arg_type, new_arg = self.exp.type_check(env)
+    if not isinstance(arg_type, BoolType):
+      error(self.location, "in assert, expected a Boolean, not "
+            + str(arg_type))
+    return None, Assert(self.location, new_arg)
+  
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.exp, runner.env)
@@ -340,14 +427,6 @@ class Assert(Stmt):
       if not val:
         error(self.location, "assertion failed: " + str(self.exp))
       machine.finish_statement(self.location)
-
-  def type_check(self, env):
-    arg_type, new_arg = self.exp.type_check(env)
-    if not isinstance(arg_type, BoolType):
-      error(self.location, "in assert, expected a Boolean, not "
-            + str(arg_type))
-    return None, Assert(self.location, new_arg)
-    
       
 @dataclass
 class IfStmt(Stmt):
@@ -369,6 +448,12 @@ class IfStmt(Stmt):
   def free_vars(self):
       return self.cond.free_vars() | self.thn.free_vars() \
           | self.els.free_vars()
+
+  def const_eval(self, env):
+    new_cond = self.cond.const_eval(env)
+    new_thn = self.thn.const_eval(env)
+    new_els = self.els.const_eval(env)
+    return IfStmt(self.location, new_cond, new_thn, new_els)
     
   def step(self, runner, machine):
     if runner.state == 0:
@@ -403,6 +488,11 @@ class While(Stmt):
     
   def free_vars(self):
       return self.cond.free_vars() | self.body.free_vars()
+
+  def const_eval(self, env):
+    new_cond = self.cond.const_eval(env)
+    new_body = self.body.const_eval(env)
+    return While(self.location, new_cond, new_body)
     
   def type_check(self, env):
     cond_type, new_cond = self.cond.type_check(env)
@@ -432,7 +522,10 @@ class Pass(Stmt):
     
   def free_vars(self):
       return set()
-    
+
+  def const_eval(self, env):
+    return self
+  
   def type_check(self, env):
     return None, self
 
@@ -454,6 +547,9 @@ class Block(Stmt):
   def free_vars(self):
       return self.body.free_vars()
 
+  def const_eval(self, env):
+    return Block(self.location, self.body.const_eval(env))
+    
   def type_check(self, env):
     body_type, new_body = self.body.type_check(env)
     return body_type, Block(self.location, new_body)
@@ -488,6 +584,11 @@ class Global(Decl):
   def local_vars(self):
     return set([var.ident])
 
+  def const_eval(self, env):
+    new_rhs = self.rhs.const_eval(env)
+    new_ty = simplify(self.type_annot, env)
+    return [Global(self.location, self.name, new_ty, new_rhs)]
+  
   def declare_type(self, env, output):
     env[self.name] = simplify(self.type_annot, env)
     output[self.name] = env[self.name]
@@ -525,6 +626,16 @@ class ConstantDef(Exp):
   def free_vars(self):
     return init.free_vars()
 
+  def const_eval(self, env):
+    new_ty = simplify(self.type_annot, env)
+    new_rhs = self.rhs.const_eval(env)
+    if is_constant(new_rhs):
+      env[self.name] = new_rhs
+    else:
+      error(self.location, 'right-hand side must be a constant, not '
+            + str(rhs))
+    return []
+    
   def local_vars(self):
     return set([var.ident])
 
@@ -539,7 +650,11 @@ class TypeAlias(Decl):
   
   def __repr__(self):
     return str(self)
-  
+
+  def const_eval(self, env):
+    env[self.name] = simplify(self.type, env)
+    return []
+    
 @dataclass
 class TypeOperator(Decl):
   name: str
@@ -554,6 +669,13 @@ class TypeOperator(Decl):
   def __repr__(self):
     return str(self)
 
-
+  def const_eval(self, env):
+    body_env = env.copy()
+    for t in self.params:
+      body_env[t] = TypeVar(self.location, t)
+    new_body = simplify(self.body, body_env)
+    env[self.name] = TypeOp(self.location, self.params, new_body)
+    return []
+    
 
   

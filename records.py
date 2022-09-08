@@ -109,7 +109,11 @@ class RecordExp(Exp):
     
   def free_vars(self):
     return set().union(*[e.free_vars() for f,e in self.fields])
-    
+
+  def const_eval(self, env):
+    new_fields = [(f, e.const_eval(env)) for f,e in self.fields]
+    return RecordExp(self.location, new_fields)
+  
   def type_check(self, env):
     field_types = {}
     new_fields = []
@@ -148,7 +152,11 @@ class FieldAccess(Exp):
   
   def free_vars(self):
       return self.arg.free_vars()
-  
+
+  def const_eval(self, env):
+    new_arg = self.arg.const_eval(env)
+    return FieldAccess(self.location, new_arg, self.field)
+    
   def type_check(self, env):
     arg_type, new_arg = self.arg.type_check(env)
     new_self = FieldAccess(self.location, new_arg, self.field)

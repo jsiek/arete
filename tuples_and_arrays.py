@@ -152,7 +152,22 @@ class Array(Exp):
     
   def free_vars(self):
       return self.size.free_vars() | self.arg.free_vars()
-    
+
+  def const_eval(self, env):
+    new_size = self.size.const_eval(env)
+    new_arg = self.arg.const_eval(env)
+    return Array(self.location, new_size, new_arg)
+  
+  def type_check(self, env):
+    size_type, new_size = self.size.type_check(env)
+    arg_type, new_arg = self.arg.type_check(env)
+    if not (isinstance(size_type, IntType)
+            or isinstance(size_type, AnyType)):
+        error(self.location, "expected integer array size, not "
+              + str(size_type))
+    return ArrayType(self.location, arg_type), \
+           Array(self.location, new_size, new_arg)
+
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.size, runner.env)
@@ -172,16 +187,6 @@ class Array(Exp):
           result = machine.memory.allocate(array)
       machine.finish_expression(Result(True, result), self.location)
 
-  def type_check(self, env):
-    size_type, new_size = self.size.type_check(env)
-    arg_type, new_arg = self.arg.type_check(env)
-    if not (isinstance(size_type, IntType)
-            or isinstance(size_type, AnyType)):
-        error(self.location, "expected integer array size, not "
-              + str(size_type))
-    return ArrayType(self.location, arg_type), \
-           Array(self.location, new_size, new_arg)
-
 # Tuple Creation
 
 @dataclass
@@ -198,6 +203,20 @@ class TupleExp(Exp):
   def free_vars(self):
       return set().union(*[init.free_vars() for init in self.inits])
 
+  def const_eval(self, env):
+    new_inits = [init.const_eval(env) for init in self.inits]
+    return TupleExp(self.location, new_inits)
+    
+  def type_check(self, env):
+    init_types = []
+    new_inits = []
+    for init in self.inits:
+        init_type, new_init = init.type_check(env)
+        init_types.append(init_type)
+        new_inits.append(new_init)
+    return TupleType(self.location, tuple(init_types)), \
+           TupleExp(self.location, new_inits)
+
   def step(self, runner, machine):
     if runner.state < len(self.inits):
       machine.schedule(self.inits[runner.state], runner.env)
@@ -209,16 +228,6 @@ class TupleExp(Exp):
       elif isinstance(runner.context, AddressCtx):
         result = machine.memory.allocate(tup)
       machine.finish_expression(Result(True, result), self.location)
-
-  def type_check(self, env):
-    init_types = []
-    new_inits = []
-    for init in self.inits:
-        init_type, new_init = init.type_check(env)
-        init_types.append(init_type)
-        new_inits.append(new_init)
-    return TupleType(self.location, tuple(init_types)), \
-           TupleExp(self.location, new_inits)
 
 # Element Access
 
@@ -236,7 +245,12 @@ class Index(Exp):
   
   def free_vars(self):
       return self.arg.free_vars() | self.index.free_vars()
-  
+
+  def const_eval(self, env):
+    new_arg = self.arg.const_eval(env)
+    new_index = self.index.const_eval(env)
+    return Index(self.location, new_arg, new_index)
+    
   def type_check(self, env):
     arg_type, new_arg = self.arg.type_check(env)
     index_type, new_index = self.index.type_check(env)
