@@ -71,21 +71,25 @@ class ModuleDef(Decl):
           new_body += d.const_eval(body_env)
       return [ModuleDef(self.location, self.name, self.exports, new_body)]
 
-  def declare_type(self, env, output):
+  def declare_type(self, env):
+    body_env = env.copy()
     member_types = {}
     for d in self.body:
-      d.declare_type(env, member_types)
+      new_members = d.declare_type(body_env)
+      member_types |= new_members
+      body_env |= new_members
     for ex in self.exports:
       if not ex in member_types:
         error(self.location, 'export ' + ex + ' not defined in module')
-    env[self.name] = ModuleType(self.location, member_types)
-    output[self.name] = env[self.name]
+    return {self.name: ModuleType(self.location, member_types)}
     
   def type_check(self, env):
     body_env = {x: t.copy() for x,t in env.items()}
     members = {}
     for d in self.body:
-      d.declare_type(body_env, members)
+      new_members = d.declare_type(body_env)
+      members |= new_members
+      body_env |= new_members
     new_body = []
     for d in self.body:
       new_body += d.type_check(body_env)
@@ -126,16 +130,17 @@ class Import(Decl):
       new_module = self.module.const_eval(env)
       return [Import(self.location, new_module, self.imports)]
 
-  def declare_type(self, env, output):
+  def declare_type(self, env):
     mod, new_mod = self.module.type_check(env)
     mod = unfold(mod)
     if isinstance(mod, ModuleType):
+      results = {}
       for x in self.imports:
           if not x in mod.member_types.keys():
             error(decl.location, "in import, no " + x
                   + " in " + str(module))
-          env[x] = mod.member_types[x]
-          output[x] = env[x]
+          results[x] = mod.member_types[x]
+      return results
     else:
       error(self.location, "in import, expected a module, not " + str(mod))
     

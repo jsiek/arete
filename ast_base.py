@@ -126,12 +126,11 @@ class Decl(AST):
   def free_vars(self) -> set[str]:
     raise Exception('unimplemented')
 
-  # Declares the type of this definition.
-  # The `env` parameter is an in-out parameter. It maps the in-scope variables to their types.
-  # It should be updated to include any variables that this declaration brings into scope
-  # for the following declarations.
-  # The `output` parameter is for contributing member types to an enclosing module.
-  def declare_type(self, env, output):
+  # Declares the names and types associated with this definition.
+  # The `env` parameter maps the in-scope variables to their types.
+  # The result is a dictionary mapping names to types and represents
+  # the names declared by this definitionn.
+  def declare_type(self, env):
     raise Exception('unimplemented')
     
   def type_check(self, env):

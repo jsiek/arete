@@ -23,14 +23,16 @@ class Closure(Value):
     requirements: list[AST]
     body: Stmt
     env: dict[str,Pointer]
-    __match_args__ = ("name", "params", "return_mode", "requirements", "body", "env")
+    __match_args__ = ("name", "params", "return_mode", "requirements",
+                      "body", "env")
     
     def duplicate(self, percentage, loc):
       if tracing_on():
         print('duplicating closure ' + str(self))
       env_copy = {x: v.duplicate(Fraction(1,2), loc) \
                   for x,v in self.env.items()}
-      return Closure(self.name, self.params, self.return_mode, self.requirements,
+      return Closure(self.name, self.params, self.return_mode,
+                     self.requirements,
                      self.body, env_copy)
     
     def kill(self, mem, location, progress=set()):
@@ -45,7 +47,8 @@ class Closure(Value):
       
     def __str__(self):
         if verbose():
-            return '<' + self.name + '>' + '(' + ', '.join([str(ptr) for x, ptr in self.env.items()]) + ')'
+            return '<' + self.name + '>' + '(' \
+                + ', '.join([str(ptr) for x, ptr in self.env.items()]) + ')'
         else:
             return '<' + self.name + '>'
       
@@ -56,7 +59,8 @@ class Closure(Value):
         return str(self.name)
       
     def node_label(self):
-        return 'fun ' + str(self.name) + '(' + ', '.join([ptr.node_label() for x, ptr in self.env.items()]) + ')'
+        return 'fun ' + str(self.name) + '(' \
+            + ', '.join([ptr.node_label() for x, ptr in self.env.items()]) + ')'
     
 
 @dataclass
@@ -114,14 +118,13 @@ class Function(Decl):
                      new_params, new_return_ty,
                      self.return_mode, self.requirements, new_body)]
 
-  def declare_type(self, env, output):
+  def declare_type(self, env):
     ty = FunctionType(self.location,
                       self.type_params,
                       tuple(p.type_annot for p in self.params),
                       self.return_type,
                       tuple(self.requirements))
-    env[self.name] = simplify(ty, env)
-    output[self.name] = env[self.name]
+    return {self.name: simplify(ty, env)}
     
   def type_check(self, env):
     if tracing_on():

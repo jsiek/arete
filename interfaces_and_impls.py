@@ -157,7 +157,8 @@ class Interface(Decl):
                                     immediate_mems, mems)
     env[self.name] = InterfaceImplInfo(self.iface_info, [])
     output[self.name] = env[self.name]
-  
+
+  # Traslate to a type operator and record
   def type_check(self, env):
     pass
 

@@ -589,9 +589,8 @@ class Global(Decl):
     new_ty = simplify(self.type_annot, env)
     return [Global(self.location, self.name, new_ty, new_rhs)]
   
-  def declare_type(self, env, output):
-    env[self.name] = simplify(self.type_annot, env)
-    output[self.name] = env[self.name]
+  def declare_type(self, env):
+    return {self.name: simplify(self.type_annot, env)}
 
   def type_check(self, env):
     rhs_type, new_rhs = self.rhs.type_check(env)
