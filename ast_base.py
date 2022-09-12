@@ -2,6 +2,7 @@ from __future__ import annotations # To refer to class type in the class.
 
 from dataclasses import dataclass
 from lark.tree import Meta
+from typing import Any
 
 @dataclass
 class Value:
@@ -126,17 +127,29 @@ class Decl(AST):
   def free_vars(self) -> set[str]:
     raise Exception('unimplemented')
 
+  # Evaluate compile-time constants and type expressions,
+  # producing a new version of this definition.
+  def const_eval(self, env: dict[str,Any]) -> list[Decl]:
+    raise Exception('unimplemented')
+  
   # Declares the names and types associated with this definition.
   # The `env` parameter maps the in-scope variables to their types.
   # The result is a dictionary mapping names to types and represents
   # the names declared by this definitionn.
-  def declare_type(self, env):
+  def declare_type(self, env: dict[str,Type]) -> dict[str,Type]:
     raise Exception('unimplemented')
     
-  def type_check(self, env):
+  # type_check ensures that the definition obeys the type checking rules.
+  # The environment `env` provides the types for all of the variables
+  # that are currently in scope. It also provides a translation of the
+  # variable, which in most cases is just the variable itself. The
+  # environment also maps each interface name to their declaration
+  # and impls.
+  # type_check returns a translation of this definition.
+  def type_check(self, env: dict[str,Any]) -> list[Decl]:
     raise Exception('unimplemented')
       
-  def declare(self, env, mem):
+  def declare(self, env: dict[str,Value], mem):
     env[self.name] = mem.allocate(Void())
     
   def step(self, runner, machine):

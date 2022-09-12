@@ -38,7 +38,11 @@ class Var(Exp):
   def type_check(self, env):
     if self.ident not in env:
         error(self.location, 'use of undefined variable ' + self.ident)
-    return env[self.ident], self
+    (ty, exp) = env[self.ident]
+    if exp is None:
+      return ty, self
+    else:
+      return ty, exp
   
   def step(self, runner, machine):
       if self.ident not in runner.env:
@@ -92,14 +96,13 @@ class BindingExp(Exp):
     
   def type_check(self, env):
     rhs_type, new_arg = self.arg.type_check(env)
-    new_param = self.param.type_check(env)
-    if not consistent(rhs_type, new_param.type_annot):
+    if not consistent(rhs_type, self.param.type_annot):
       error(self.arg.location, 'type of initializer ' + str(rhs_type) + '\n'
-            + ' is inconsistent with declared type ' + str(new_param.type_annot))
-    body_env = {x: t.copy() for x,t in env.items()}
-    body_env[self.param.ident] = rhs_type
+            + ' is inconsistent with declared type ' + str(self.param.type_annot))
+    body_env = {x: (t.copy(),e) for x,(t,e) in env.items()}
+    body_env[self.param.ident] = (rhs_type, None)
     body_type, new_body = self.body.type_check(body_env)
-    return body_type, BindingExp(self.location, new_param, new_arg, new_body)
+    return body_type, BindingExp(self.location, self.param, new_arg, new_body)
   
   def step(self, runner, machine):
     if runner.state == 0:
@@ -154,15 +157,14 @@ class BindingStmt(Exp):
     
   def type_check(self, env):
     arg_type, new_arg = self.arg.type_check(env)
-    new_param = self.param.type_check(env)
-    if not consistent(arg_type, new_param.type_annot):
+    if not consistent(arg_type, self.param.type_annot):
       error(self.arg.location, 'type of initializer ' + str(arg_type) + '\n'
             + ' is inconsistent with declared type '
             + str(new_param.type_annot))
     body_env = env.copy()
-    body_env[self.param.ident] = new_param.type_annot
+    body_env[self.param.ident] = (self.param.type_annot, None)
     body_type, new_body = self.body.type_check(body_env)
-    return body_type, BindingStmt(self.location, new_param, new_arg, new_body)
+    return body_type, BindingStmt(self.location, self.param, new_arg, new_body)
     
   def step(self, runner, machine):
     if runner.state == 0:

@@ -90,7 +90,7 @@ class TagVariant(Exp):
     return TagVariant(self.location, self.tag, new_arg, new_ty)
   
   def type_check(self, env):
-    new_type = simplify(self.type, env)
+    new_type = self.type
     if not (isinstance(new_type, VariantType) or isinstance(ty, AnyType)):
       error(self.location, 'expected variant type in tagging, not '
             + str(self.type))
@@ -178,8 +178,8 @@ class Match(Stmt):
         found = False
         for (alt_tag,alt_ty) in cond_ty.alternative_types:
           if tag == alt_tag:
-            body_env = {x: t.copy() for x,t in env.items()}
-            body_env[param.ident] = alt_ty
+            body_env = {x: (t.copy(),e) for x,(t,e) in env.items()}
+            body_env[param.ident] = (alt_ty, None)
             retty, new_body = body.type_check(body_env)
             new_cases.append((tag, param, new_body))
             if return_type is None:
@@ -190,8 +190,8 @@ class Match(Stmt):
         if found == False:
           error(self.location, tag + ' is not a tag in ' + str(cond_ty))
       elif isinstance(cond_ty, AnyType):
-          body_env = {x: t.copy() for x,t in env.items()}
-          body_env[param.ident] = AnyType(param.location)
+          body_env = {x: (t.copy(),e) for x,(t,e) in env.items()}
+          body_env[param.ident] = (AnyType(param.location), None)
           retty, new_body = body.type_check(body_env)
           new_cases.append((tag, param, new_body))
           if return_type is None:

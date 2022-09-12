@@ -33,11 +33,10 @@ class Param:
     def __repr__(self):
         return str(self)
 
-    def type_check(self, env):
+    def const_eval(self, env):
       type_annot = simplify(self.type_annot, env)
       return Param(self.location, self.kind, self.privilege,
-                   self.ident, type_annot)
-        
+                   self.ident, type_annot)        
 
 @dataclass(frozen=True)
 class NoParam:
@@ -590,11 +589,11 @@ class Global(Decl):
     return [Global(self.location, self.name, new_ty, new_rhs)]
   
   def declare_type(self, env):
-    return {self.name: simplify(self.type_annot, env)}
+    return {self.name: (self.type_annot, None)}
 
   def type_check(self, env):
     rhs_type, new_rhs = self.rhs.type_check(env)
-    type_annot = simplify(self.type_annot, env)
+    type_annot = self.type_annot
     if not consistent(rhs_type, type_annot):
       error(self.location, 'type of initializer ' + str(rhs_type) + '\n'
             + ' is inconsistent with declared type ' + str(type_annot))

@@ -76,15 +76,17 @@ class ModuleDef(Decl):
     member_types = {}
     for d in self.body:
       new_members = d.declare_type(body_env)
-      member_types |= new_members
+      member_types |= { x:t for x,(t,e) in new_members.items()}
       body_env |= new_members
     for ex in self.exports:
       if not ex in member_types:
         error(self.location, 'export ' + ex + ' not defined in module')
-    return {self.name: ModuleType(self.location, member_types)}
+    return {self.name: (ModuleType(self.location, member_types), None)}
     
   def type_check(self, env):
-    body_env = {x: t.copy() for x,t in env.items()}
+    if tracing_on():
+        print('type check ' + str(self) + '\nin ' + str(env))
+    body_env = {x: (t.copy(),e) for x,(t,e) in env.items()}
     members = {}
     for d in self.body:
       new_members = d.declare_type(body_env)
@@ -139,7 +141,7 @@ class Import(Decl):
           if not x in mod.member_types.keys():
             error(decl.location, "in import, no " + x
                   + " in " + str(module))
-          results[x] = mod.member_types[x]
+          results[x] = (mod.member_types[x], None)
       return results
     else:
       error(self.location, "in import, expected a module, not " + str(mod))

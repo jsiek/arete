@@ -210,6 +210,8 @@ def require_consistent(ty1 : Type, ty2 : Type, msg: str, location: Meta):
     error(location, msg + ', ' + str(ty1) + ' inconsistent with ' + str(ty2))
 
 def simplify(type: Type, env) -> Type:
+  if tracing_on():
+    print('simplify: ' + str(type))
   match type:
     case TypeVar(name):
       if name in env.keys():
