@@ -3,10 +3,6 @@ const none = 0;
 const half = 1/2;
 const all = 1;
 
-const data = 0;
-const prev = 1;
-const next = 2;
-
 const head = 0;
 const tail = 1;
 
@@ -19,53 +15,34 @@ fun listof(let dat) {
   return split(n);
 }
 
-fun get_data(ref n) {
-  return (*n)#some[data];
+fun data(ref n) {
+  return (*n)#some[0];
 }
 
-fun get_next(ref n) & {
-  return (*n)#some[next];
+fun next(ref n) & {
+  return (*n)#some[2];
 }
 
-fun get_prev(ref n) & {
-  return (*n)#some[prev];
+fun prev(ref n) & {
+  return (*n)#some[1];
 }
-
-fun set_next(inout n, ref nxt, let amount) {
-  match (*n) {
-  case empty(q):
-    ! exit(-1);
-  case some(inout node):
-    node[next] = amount of nxt; 
-  }
-}
-
-fun set_prev(inout n, ref prv, let amount) {
-  match (*n) {
-  case empty(q):
-    ! exit(-1);
-  case some(inout node):
-    node[prev] = amount of prv; 
-  }
-}
-
 
 fun push(let dat, var lst) {
   var first  = &some(⟨dat, &empty(), &empty()⟩);
   if (lst[head] == lst[tail]) { // lst is a 1 element list
     var n = copy(join(lst[head], lst[tail]));
-    ! set_prev(n, first, none);
-    ! set_next(first, n, half);
-    get_prev(n) <- half of first;
+    prev(n) = none of first;
+    next(first) = half of n;
+    prev(n) <- half of first;
     lst[head] = first;
     lst[tail] = n;
     return lst;
   } else { // lst has at least 2 elements
-    lst[head] <- all of get_prev(get_next(lst[head]));
-    ! set_prev(lst[head], first, none);
-    get_prev(get_next(lst[head])) <- half of lst[head];
-    ! set_next(first, lst[head], all);
-    get_prev(get_next(first)) <- half of first;
+    lst[head] <- all of prev(next(lst[head]));
+    prev(lst[head]) = none of first;
+    prev(next(lst[head])) <- half of lst[head];
+    next(first) = all of lst[head];
+    prev(next(first)) <- half of first;
     lst[head] = first;
     return lst;
   }
@@ -76,8 +53,8 @@ fun delete_list(var lst) {
     var n = copy(join(lst[head], lst[tail]));
     delete n;
   } else {
-    lst[head] <- all of get_prev(get_next(lst[head]));
-    var nxt = copy(get_next(lst[head]));
+    lst[head] <- all of prev(next(lst[head]));
+    var nxt = copy(next(lst[head]));
     delete lst[head];
     lst[head] = nxt;
     ! delete_list(lst);
@@ -88,7 +65,7 @@ fun main() {
   var three = listof(3);
   var two_three = push(2, three);
   var one_two_three = push(1, two_three);
-  let one = get_data(one_two_three[head]);
+  let one = data(one_two_three[head]);
   ! delete_list(one_two_three);
   return one - 1;
 }

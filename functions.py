@@ -286,9 +286,12 @@ class Call(Exp):
               machine.current_thread.pause_on_call = False
           if tracing_on():
             print('calling function ' + runner.clos.name)
+          # This treatment of the duplicate context is problematic
+          # wrt. separate compilation.
+          # Instead it needs to be declared.
+          duplicate = runner.context.duplicate
           machine.schedule(body, runner.body_env,
-                            # experiment!
-                           ValueCtx(duplicate = runner.context.duplicate),
+                           ValueCtx(duplicate=duplicate),
                            return_mode=ret_mode)
           if debug_mode() == 'n':
               if machine.pause:
@@ -314,7 +317,7 @@ class Call(Exp):
           if runner.context.duplicate:
             result = Result(True,
                             val.duplicate(runner.return_value.get_permission(),
-                                     self.location))
+                                          self.location))
             runner.return_value.kill(machine.memory, self.location)
           else:
             result = Result(False, val) # experimental
@@ -325,7 +328,12 @@ class Call(Exp):
         if runner.clos.return_mode == 'value':
           result = Result(True, machine.memory.allocate(runner.return_value))
         elif runner.clos.return_mode == 'address':
-          result = Result(False, runner.return_value)
+          if runner.context.duplicate:
+            result = Result(True, runner.return_value.duplicate(Fraction(1,1),
+                                                                self.location))
+            runner.return_value.kill(machine.memory, self.location)
+          else:
+            result = Result(False, runner.return_value)
         else:
           raise Exception('unrecognized return_mode: '
                           + runner.clos.return_mode)
