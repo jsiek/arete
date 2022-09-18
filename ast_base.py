@@ -4,6 +4,15 @@ from dataclasses import dataclass
 from lark.tree import Meta
 from typing import Any
 
+def copy(exp):
+  if exp is None:
+    return exp
+  else:
+    return exp.copy()
+
+def copy_type_env(type_env):
+  return {x: (t, copy(e)) for x,(t,e) in type_env.items()}
+
 @dataclass
 class Value:
   def node_name(self):
@@ -53,18 +62,10 @@ class AST:
 @dataclass(frozen=True)
 class Type:
     location: Meta
-    def copy(self):
-      return self
 
 @dataclass
 class Exp(AST):
   
-  def __str__(self):
-    raise Exception('unimplemented')
-  
-  def __repr__(self):
-    raise Exception('unimplemented')
-
   # Returns the set of free variables of this expression.
   def free_vars(self) -> set[str]:
     raise Exception('unimplemented')
@@ -84,7 +85,15 @@ class Exp(AST):
   def step(self, runner, machine):
     raise Exception('unimplemented')
   
+  def __str__(self):
+    raise Exception('unimplemented')
+  
+  def __repr__(self):
+    raise Exception('unimplemented')
 
+  def copy(self):
+    return self
+  
 @dataclass
 class Stmt(AST):
 

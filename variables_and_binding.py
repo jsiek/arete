@@ -99,7 +99,7 @@ class BindingExp(Exp):
     if not consistent(rhs_type, self.param.type_annot):
       error(self.arg.location, 'type of initializer ' + str(rhs_type) + '\n'
             + ' is inconsistent with declared type ' + str(self.param.type_annot))
-    body_env = {x: (t.copy(),e) for x,(t,e) in env.items()}
+    body_env = copy_type_env(env)
     body_env[self.param.ident] = (rhs_type, None)
     body_type, new_body = self.body.type_check(body_env)
     return body_type, BindingExp(self.location, self.param, new_arg, new_body)

@@ -343,7 +343,7 @@ class ImplReq(Type):
 
   # Used in the type checking of a Call AST node.
   # Lookup the witnesses for the required impls.
-  def satisfy_impl(self, deduced_types, env, fun_env):
+  def satisfy_impl(self, deduced_types, env):
     (_, info) = env[self.iface_name]
     req_impl_types = [substitute(deduced_types, ty) \
                       for ty in self.impl_types]
@@ -360,6 +360,8 @@ class ImplReq(Type):
             + ' for ' + str(req_impl_types)
             + '\nin impls:\n'
             + str(info.impls))
+    if tracing_on():
+      print('found impl ' + str(witness_exp))
     return witness_exp    
 
   # def bind_impl(self, witness_ptr, env, machine):

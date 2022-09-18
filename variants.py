@@ -178,7 +178,7 @@ class Match(Stmt):
         found = False
         for (alt_tag,alt_ty) in cond_ty.alternative_types:
           if tag == alt_tag:
-            body_env = {x: (t.copy(),e) for x,(t,e) in env.items()}
+            body_env = copy_type_env(env)
             body_env[param.ident] = (alt_ty, None)
             retty, new_body = body.type_check(body_env)
             new_cases.append((tag, param, new_body))
@@ -190,7 +190,7 @@ class Match(Stmt):
         if found == False:
           error(self.location, tag + ' is not a tag in ' + str(cond_ty))
       elif isinstance(cond_ty, AnyType):
-          body_env = {x: (t.copy(),e) for x,(t,e) in env.items()}
+          body_env = copy_type_env(env)
           body_env[param.ident] = (AnyType(param.location), None)
           retty, new_body = body.type_check(body_env)
           new_cases.append((tag, param, new_body))
@@ -217,9 +217,13 @@ class Match(Stmt):
                 + str(variant))
       current_case = self.cases[runner.state - 1]
       if variant.tag == current_case[0]:
+        # The variant matches this case
+        # Bind the variant to the pattern variable
         runner.body_env = runner.env.copy()
         runner.param = current_case[1]
         variant_val_addr = PointerOffset(ptr, variant.tag)
+        # variant_val_addr = ptr.element_address(variant.tag, Fraction(1,1),
+        #                                        self.location)
         runner.arg = Result(False, variant_val_addr)
         machine.bind_param(runner.param, runner.arg, runner.body_env,
                            self.location)
@@ -228,6 +232,7 @@ class Match(Stmt):
           # kill the result early
           ptr.kill(machine.memory, self.location)
           runner.results[0].temporary = False # don't kill twice
+        # Evaluate the body of the case
         machine.schedule(current_case[2], runner.body_env)
         runner.matched = True
     else:
@@ -245,7 +250,7 @@ class VariantMember(Exp):
   __match_args__ = ("arg", "field")
   
   def __str__(self):
-      return str(self.arg) + "." + self.field
+      return str(self.arg) + "#" + self.field
     
   def __repr__(self):
       return str(self)

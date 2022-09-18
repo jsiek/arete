@@ -86,7 +86,7 @@ class ModuleDef(Decl):
   def type_check(self, env):
     if tracing_on():
         print('type check ' + str(self) + '\nin ' + str(env))
-    body_env = {x: (t.copy(),e) for x,(t,e) in env.items()}
+    body_env = copy_type_env(env)
     members = {}
     for d in self.body:
       new_members = d.declare_type(body_env)

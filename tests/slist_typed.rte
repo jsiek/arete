@@ -21,7 +21,7 @@ fun push(let data: int, var lst: list_t) -> list_t {
   return some(&⟨data, lst⟩);
 }
 
-fun data(let node: list_t) -> int & {
+fun data(let node: list_t) -> int {
   match (node) {
   case null(w):
     return 0; // raise an exception
@@ -30,7 +30,7 @@ fun data(let node: list_t) -> int & {
   }
 }
 
-fun next(let node: ⟨int, list_t⟩*) -> list_t & {
+fun next(let node: ⟨int, list_t⟩*) -> list_t {
   return (*node)[1];
 }
 

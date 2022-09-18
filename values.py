@@ -205,6 +205,7 @@ class Pointer(Value):
             other_priv = self.permission * percentage
             ptr = Pointer(self.address, self.path, other_priv, self)
             self.permission -= other_priv
+            assert(self.permission >= 0)
             if self.kill_when_zero and self.permission <= Fraction(0,1):
               self.address = None
         if tracing_on():
@@ -278,12 +279,8 @@ class PointerOffset(Value):
         return self.ptr.set_permission(perm)
     
     def duplicate(self, percentage, location):
-        #other_priv = self.ptr.get_permission() * percentage
-        other_priv = percentage
-        self.ptr.set_permission(self.ptr.get_permission() - other_priv)
-        ptr = Pointer(self.ptr.get_address(),
-                       self.ptr.get_ptr_path() + [self.offset],
-                       other_priv, self.get_pointer())
+        ptr = self.ptr.duplicate(percentage, location)
+        ptr.path = ptr.path + [self.offset]
         if tracing_on():
             print('duplicating PointerOffset to produce\n\t '
                   + str(ptr))
@@ -296,7 +293,6 @@ class PointerOffset(Value):
         
     def upgrade(self, location):
         return self.ptr.upgrade(location)
-        
 
 def to_number(val, location):
     match val:

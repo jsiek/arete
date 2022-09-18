@@ -223,8 +223,10 @@ class Machine:
       if self.current_runner().pause_on_finish:
           self.pause = True
           print('\t=> ' + str(result.value))
+          print('\t\tin context ' + str(self.current_runner().context))
       elif debug() and (debug_mode() == 's' or debug_mode() == 'n'):
           print('\t=> ' + str(result.value))
+          print('\t\tin context ' + str(self.current_runner().context))
       if tracing_on():
           print('finish_expression ' + str(result))
           print(self.memory)
@@ -295,12 +297,15 @@ class Machine:
       self.threads.append(thread)
       return thread
 
+  # not sure if bind_param belongs in Machine -Jeremy 
   def bind_param(self, param, res : Result, env, loc):
     if isinstance(param, NoParam):
       return
     val = res.value
     if not (isinstance(val, Pointer) or isinstance(val, PointerOffset)):
       error(loc, 'for binding, expected a pointer, not ' + str(val))
+    if tracing_on():
+        print('for call, binding ' + param.ident + ' to ' + str(val))
     if res.temporary:
       # what if val is a PointerOffset??
       if param.kind == 'let':

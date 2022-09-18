@@ -1,6 +1,6 @@
-fun front(let ls) & { return ls[0]; }
+fun front(let ls) { return ls[0]; }
 
-fun rest(let ls) & { return ls[1]; }
+fun rest(let ls) { return ls[1]; }
 
 fun map(let f, let ls) {
   if (ls == ⟨⟩) {

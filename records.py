@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from ast_base import *
 from ast_types import *
 from utilities import AddressCtx, ValueCtx
-from values import Result
+from values import Result, duplicate_if_temporary, PointerOffset
 
 @dataclass
 class Record(Value):
@@ -192,7 +192,7 @@ class FieldAccess(Exp):
         result = Result(runner.results[0].temporary, val)
       elif isinstance(runner.context, AddressCtx):
         if tracing_on():
-            print('in Index.step, AddressCtx')
+            print('in FieldAccess.step, AddressCtx')
         res = duplicate_if_temporary(runner.results[0], self.location)
         ptr = res.value
         ptr_offset = PointerOffset(ptr, self.field)

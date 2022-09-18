@@ -19,7 +19,7 @@ fun push(let data, var list) {
   return some(&⟨data, list⟩);
 }
 
-fun data(let node) & {
+fun data(let node) {
   match (node) {
   case null(w):
     return 0; // raise an exception
@@ -28,7 +28,7 @@ fun data(let node) & {
   }
 }
 
-fun next(let node) & {
+fun next(let node) {
   return (*node)[1];
 }
 

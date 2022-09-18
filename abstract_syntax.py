@@ -315,7 +315,7 @@ class Seq(Stmt):
       machine.finish_statement(self.location)
     else:
       machine.finish_statement(self.location)
-      machine.schedule(self.rest, runner.env)
+      machine.schedule(self.rest, runner.env, runner.context)
       
   def debug_skip(self):
       return True
@@ -555,7 +555,8 @@ class Block(Stmt):
     
   def step(self, runner, machine):
     if runner.state == 0:
-      machine.schedule(self.body, runner.env)
+      machine.schedule(self.body, runner.env,
+                       runner.context) # experimental -Jeremy
     else:
       machine.finish_statement(self.location)
 

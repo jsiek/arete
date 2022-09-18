@@ -20,21 +20,17 @@ fun listof(let dat) {
 }
 
 fun get_data(ref n) {
-  match (*n) {
-  case empty(q):
-    ! exit(-1);
-  case some(node):
-    return node[data];
-  }
+  return (*n)#some[data];
 }
+
 fun get_next(ref n) & {
-  match (*n) {
-  case empty(q):
-    ! exit(-1);
-  case some(node):
-    return node[next];
-  }
+  return (*n)#some[next];
 }
+
+fun get_prev(ref n) & {
+  return (*n)#some[prev];
+}
+
 fun set_next(inout n, ref nxt, let amount) {
   match (*n) {
   case empty(q):
@@ -44,14 +40,6 @@ fun set_next(inout n, ref nxt, let amount) {
   }
 }
 
-fun get_prev(ref n) & {
-  match (*n) {
-  case empty(q):
-    ! exit(-1);
-  case some(node):
-    return node[prev];
-  }
-}
 fun set_prev(inout n, ref prv, let amount) {
   match (*n) {
   case empty(q):

@@ -129,7 +129,7 @@ class Function(Decl):
   def type_check(self, env):
     if tracing_on():
       print('type checking function ' + str(self))
-    body_env = {x: (t.copy(),e) for x,(t,e) in env.items()}
+    body_env = copy_type_env(env)
     for t in self.type_params:
       tyvar = TypeVar(self.location, t)
       body_env[t] = (tyvar, tyvar)
@@ -150,12 +150,12 @@ class Function(Decl):
     if not consistent(body_type, new_return_type):
       error(self.location, 'return type mismatch:\n' + str(new_return_type)
             + ' inconsistent with ' + str(body_type))
-    if tracing_on():
-      print('finished type checking function ' + self.name)
-
-    return [Function(self.location, self.name, self.type_params,
+    new_fun = Function(self.location, self.name, self.type_params,
                      new_params, new_return_type,
-                     self.return_mode, [], new_body)]
+                     self.return_mode, [], new_body)
+    if tracing_on():
+      print('finished type checking function\n' + str(new_fun))
+    return [new_fun]
       
   def step(self, runner, machine):
     if runner.state == 0:
@@ -217,8 +217,6 @@ class Call(Exp):
       print('function type: ' + str(fun_type))
       print('in environment: ' + str(env))
     if isinstance(fun_type, FunctionType):
-      fun_env = {x: (t.copy(),e)  for x, (t,e) in env.items()}
-
       if len(fun_type.param_types) != len(arg_types):
         error(self.location, 'incorrect number of arguments: '
               + str(len(arg_types))
@@ -233,7 +231,7 @@ class Call(Exp):
         print('deduced: ' + str(deduced_types))
 
       for req in fun_type.requirements:
-        wit_exp = req.satisfy_impl(deduced_types, env, fun_env)
+        wit_exp = req.satisfy_impl(deduced_types, env)
         new_args.append(wit_exp)
 
       ret = substitute(deduced_types, rt)
@@ -264,7 +262,8 @@ class Call(Exp):
     elif runner.state <= len(self.args):
       self.set_closure(runner, machine)
       # evaluate the operand subexpressions
-      machine.schedule(self.args[runner.state - 1], runner.env, AddressCtx())
+      machine.schedule(self.args[runner.state - 1], runner.env,
+                       AddressCtx(runner.context.duplicate))
     elif runner.state == 1 + len(self.args):
       self.set_closure(runner, machine)
       # call the function
@@ -275,7 +274,7 @@ class Call(Exp):
                   + str(len(params)) + ' not ' + str(len(self.args)))
           runner.params = params
           runner.body_env = clos_env.copy()
-          runner.args = runner.results[1:1+len(self.args)]
+          runner.args = runner.results[1:]
             
           # Bind the parameters to their arguments.
           for param, arg in zip(params, runner.args):
@@ -287,7 +286,10 @@ class Call(Exp):
               machine.current_thread.pause_on_call = False
           if tracing_on():
             print('calling function ' + runner.clos.name)
-          machine.schedule(body, runner.body_env, return_mode=ret_mode)
+          machine.schedule(body, runner.body_env,
+                            # experiment!
+                           ValueCtx(duplicate = runner.context.duplicate),
+                           return_mode=ret_mode)
           if debug_mode() == 'n':
               if machine.pause:
                   machine.pause = False
@@ -306,26 +308,30 @@ class Call(Exp):
         runner.return_value = Void()
       if isinstance(runner.context, ValueCtx):
         if runner.clos.return_mode == 'value':
-          result = runner.return_value
+          result = Result(True, runner.return_value)
         elif runner.clos.return_mode == 'address':
           val = machine.memory.read(runner.return_value, self.location)
-          result = val.duplicate(runner.return_value.get_permission(),
-                                 self.location)
-          runner.return_value.kill(machine.memory, self.location)
+          if runner.context.duplicate:
+            result = Result(True,
+                            val.duplicate(runner.return_value.get_permission(),
+                                     self.location))
+            runner.return_value.kill(machine.memory, self.location)
+          else:
+            result = Result(False, val) # experimental
         else:
           raise Exception('unrecognized return_mode: '
                           + runner.clos.return_mode)
       elif isinstance(runner.context, AddressCtx):
         if runner.clos.return_mode == 'value':
-          result = machine.memory.allocate(runner.return_value)
+          result = Result(True, machine.memory.allocate(runner.return_value))
         elif runner.clos.return_mode == 'address':
-          result = runner.return_value
+          result = Result(False, runner.return_value)
         else:
           raise Exception('unrecognized return_mode: '
                           + runner.clos.return_mode)
       else:
         error(self.location, 'unknown context ' + repr(runner.context))
-      machine.finish_expression(Result(True, result), self.location)
+      machine.finish_expression(result, self.location)
 
       
 @dataclass
@@ -353,13 +359,16 @@ class Return(Stmt):
   def step(self, runner, machine):
     if runner.state == 0:
       if runner.return_mode == 'value':
-        context = ValueCtx()
+        context = ValueCtx(runner.context.duplicate)
       elif runner.return_mode == 'address':
-        context = AddressCtx()
+        context = AddressCtx(runner.context.duplicate)
       machine.schedule(self.arg, runner.env, context)
     else:
-      runner.return_value = \
-        runner.results[0].value.duplicate(1, self.location)
+      if runner.context.duplicate:
+        runner.return_value = \
+          runner.results[0].value.duplicate(1, self.location)
+      else:
+        runner.return_value = runner.results[0].value
       machine.finish_statement(self.location)
 
 @dataclass
@@ -405,7 +414,7 @@ class Lambda(Exp):
                   self.requirements, new_body, self.name)
 
   def type_check(self, env):
-    body_env = {x: (t.copy(),e) for x,(t,e) in env.items()}
+    body_env = copy_type_env(env)
     for p in self.params:
         body_env[p.ident] = (p.type_annot, None)
     new_reqs = []
