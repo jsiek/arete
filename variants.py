@@ -290,9 +290,11 @@ class VariantMember(Exp):
           if not isinstance(variant, Variant):
             error(self.location, "expected a variant, not " + str(variant))
           val = variant.value
-          if runner.results[0].temporary:
-            val = val.duplicate(variant_ptr.permission, self.location)
-          result = Result(runner.results[0].temporary, val)
+          # if runner.results[0].temporary:
+          #   val = val.duplicate(variant_ptr.permission, self.location)
+          # result = Result(runner.results[0].temporary, val)
+          result = Result(True, val.duplicate(variant_ptr.get_permission(),
+                                              self.location))
         elif isinstance(runner.context, AddressCtx):
           res = duplicate_if_temporary(runner.results[0], self.location)
           ptr = res.value
