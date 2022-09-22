@@ -82,6 +82,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "upgrade" "(" expression ")"                      -> upgrade
     | "breakpoint" "(" ")"                              -> breakpoint
     | "exit" "(" expression ")"                         -> exit
+    | "input" "(" ")"                                   -> input
     | IDENT                                             -> var
     | expression_hi "::" IDENT                          -> module_member
     | expression_hi "#" IDENT                           -> variant_member

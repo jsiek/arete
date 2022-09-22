@@ -184,7 +184,7 @@ primitive_ops = {'add', 'sub', 'mul', 'div', 'int_div', 'neg',
                  'len', 'split', 'join',
                  'equal', 'not_equal',
                  'less', 'greater', 'less_equal', 'greater_equal',
-                 'permission', 'upgrade', 'breakpoint', 'exit'}
+                 'permission', 'upgrade', 'breakpoint', 'exit', 'input'}
 
 impl_num = 0
 def next_impl_num():

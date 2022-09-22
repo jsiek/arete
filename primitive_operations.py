@@ -16,6 +16,8 @@ def eval_prim(op, vals, machine, location):
         return Void()
       case 'exit':
         exit(vals[0])
+      case 'input':
+        return Number(int(input()))
       case 'copy':
         return vals[0].duplicate(1, location)
       case 'equal':
@@ -134,6 +136,9 @@ def type_check_prim(location, op, arg_types):
         assert len(arg_types) == 1
         require_consistent(arg_types[0], IntType(location), 'in exit', location)
         return VoidType(location)
+      case 'input':
+        assert len(arg_types) == 0
+        return IntType(location)
       case 'and':
         assert len(arg_types) == 2
         require_consistent(arg_types[0], BoolType(location), 'in and', location)

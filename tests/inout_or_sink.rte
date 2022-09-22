@@ -1,0 +1,11 @@
+fun main() -> int {
+  var x: int = 1;
+  if (input() == 0) {
+    inout y = x;
+    y = 0;
+  } else {
+    var z = x;
+    z = 0;
+  }
+  return x;
+}
