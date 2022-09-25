@@ -7,11 +7,13 @@
 # * member access.
 
 from dataclasses import dataclass
-from abstract_syntax import Param, Int
+from abstract_syntax import Int
+from variables_and_binding import Param
 from ast_base import *
 from ast_types import *
 from values import Pointer, Result, delete_env
 from utilities import *
+
 
 @dataclass(eq=False)
 class Module(Value):
@@ -49,6 +51,7 @@ class Module(Value):
     def node_label(self):
         return str(self.name)
 
+    
 @dataclass
 class ModuleDef(Decl):
   name: str
@@ -76,12 +79,13 @@ class ModuleDef(Decl):
     member_types = {}
     for d in self.body:
       new_members = d.declare_type(body_env)
-      member_types |= { x:t for x,(t,e) in new_members.items()}
+      member_types |= { x: info.type for x,info in new_members.items()}
       body_env |= new_members
     for ex in self.exports:
       if not ex in member_types:
         error(self.location, 'export ' + ex + ' not defined in module')
-    return {self.name: (ModuleType(self.location, member_types), None)}
+    return {self.name: StaticVarInfo(ModuleType(self.location, member_types),
+                                     None, ProperFraction())}
     
   def type_check(self, env):
     if tracing_on():
@@ -141,7 +145,8 @@ class Import(Decl):
           if not x in mod.member_types.keys():
             error(decl.location, "in import, no " + x
                   + " in " + str(module))
-          results[x] = (mod.member_types[x], None)
+          results[x] = StaticVarInfo(mod.member_types[x], None,
+                                     ProperFraction())
       return results
     else:
       error(self.location, "in import, expected a module, not " + str(mod))
@@ -174,7 +179,8 @@ class Import(Decl):
       machine.finish_definition(self.location)
       if tracing_on():
           print('** finish import is complete')
-      
+
+
 @dataclass
 class ModuleMember(Exp):
   arg: Exp

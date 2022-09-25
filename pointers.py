@@ -8,7 +8,8 @@
 # * delete.
 
 from dataclasses import dataclass
-from abstract_syntax import Param, Int
+from abstract_syntax import Int
+from variables_and_binding import Param
 from ast_base import *
 from ast_types import *
 from values import *

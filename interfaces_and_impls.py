@@ -63,9 +63,9 @@
 from dataclasses import dataclass
 from ast_base import *
 from ast_types import *
-from abstract_syntax import Param, TypeOperator, Global
+from abstract_syntax import TypeOperator, Global
 from values import Result, Pointer
-from variables_and_binding import Var
+from variables_and_binding import Var, Param
 from records import Record, FieldAccess, RecordExp
 from utilities import *
 
@@ -96,7 +96,7 @@ from utilities import *
 #         error(loc, 'InterfaceInfo has no parts')
 
 @dataclass
-class InterfaceImplInfo:
+class InterfaceImplInfo(StaticInfo):
   iface: Decl
   impls: list[tuple[list[Type], Exp]]
 
@@ -143,23 +143,7 @@ class Interface(Decl):
                       new_members)]
   
   def declare_type(self, env):
-    # body_env = {x: t.copy()  for x, t in env.items()}
-    # for x in self.type_params:
-    #   body_env[x] = TypeVar(self.location, x)
-    # mems = self.members.copy()
-    # # Add inherited members
-    # for req in self.extends:
-    #   if not req.iface_name in env.keys():
-    #     error(self.location, 'interface ' + req.iface_name + ' is not defined')
-    #   iface_info = env[req.iface_name].iface
-    #   subst = {x:ty for x, ty in zip(iface_info.params, req.impl_types) }
-    #   for x, ty in iface_info.members.items():
-    #     mems[x] = substitute(subst, ty)
-    # self.iface_info = InterfaceInfo(self.name, self.type_params, self.extends,
-    #                                 immediate_mems, mems)
-    # env[self.name] = InterfaceImplInfo(self.iface_info, [])
-    # output[self.name] = env[self.name]
-    return {self.name: (AnyType(self.location), InterfaceImplInfo(self, []))}
+    return {self.name: InterfaceImplInfo(self, [])}
     
   # Traslate the interface to a type operator and record type
   # For example
@@ -213,9 +197,9 @@ class Impl(Decl):
   def declare_type(self, env):
     if not self.iface_name in env.keys():
       error(self.location, "undefined interface " + self.iface_name)
-    (ty, info) = env[self.iface_name]
+    info = env[self.iface_name]
     return {self.iface_name: \
-            (ty, info.extend([(self.impl_types, Var(self.location, self.name))]))}
+            info.extend([(self.impl_types, Var(self.location, self.name))])}
 
   # Check this impl and translate it into a record expression.
   # For example
@@ -233,7 +217,7 @@ class Impl(Decl):
     if tracing_on():
       print('type checking ' + str(self) + '\n'
             'in environment: ' + str(env))
-    (_, info) = env[self.iface_name]
+    info = env[self.iface_name]
     
     member_types = {}
     new_assignments = []
@@ -260,37 +244,9 @@ class Impl(Decl):
       print('finished type checking ' + str(self))
     # TODO: add impls for inherited interfaces
     return [Global(self.location, self.name,
-                   RecordType(self.location,[(x,t) for x,t in member_types.items()]),
+                   RecordType(self.location,
+                              [(x,t) for x,t in member_types.items()]),
                    RecordExp(self.location, new_assignments))] 
-    
-  # def step(self, runner, machine):
-  #   if runner.state < len(self.assignments):
-  #     machine.schedule(self.assignments[runner.state][1], runner.env)
-  #   else:
-  #     iface_impl_ptr = runner.env[self.iface_name]
-  #     info = machine.memory.read(iface_impl_ptr, self.location)
-
-  #     # lookup all the requirements in the current environment
-  #     # members = {}
-  #     # for x in info.members.keys():
-  #     #   if not x in runner.env.keys():
-  #     #     error(self.location, "could not find requirement " + x
-  #     #           + " in the current environment")
-  #     #   members[x] = runner.env[x].duplicate(Fraction(1,2), self.location)
-
-  #     members = {}
-  #     for (f,e),res in zip(self.assignments, runner.results):
-  #       members[f] = res.value
-  #     for x in info.immediate_members.keys():
-  #       if not x in members.keys():
-  #         error(self.location, "requirement " + x
-  #                + " was not provided by the implementation")
-  #     witness = Record(members)
-  #     #witness_ptr = machine.memory.allocate(witness)
-  #     machine.memory.unchecked_write(runner.env[self.name], witness,
-  #                                    self.location)
-  #     #witness_ptr.kill(machine.memory, self.location) # because write duplicates
-  #     machine.finish_definition(self.location)
 
 @dataclass(eq=True, frozen=True)
 class ImplReq(Type):
@@ -319,7 +275,7 @@ class ImplReq(Type):
   def declare(self, env):
     if not self.iface_name in env.keys():
       error(self.location, "undefined interface " + self.iface_name)
-    (_, info) = env[self.iface_name]
+    info = env[self.iface_name]
     subst = { x:ty for x, ty in zip(info.iface.type_params,
                                     self.impl_types)}
     # Bring the impl into scope
@@ -337,14 +293,16 @@ class ImplReq(Type):
     
     # Bring the impl members into scope
     for x, ty in info.iface.members:
-      env[x] = (substitute(subst, ty), FieldAccess(self.location, witness, x))
+      env[x] = StaticVarInfo(substitute(subst, ty),
+                             FieldAccess(self.location, witness, x),
+                             ProperFraction())
 
     return Param(self.location, 'let', 'none', self.name, None)
 
   # Used in the type checking of a Call AST node.
   # Lookup the witnesses for the required impls.
   def satisfy_impl(self, deduced_types, env):
-    (_, info) = env[self.iface_name]
+    info = env[self.iface_name]
     req_impl_types = [substitute(deduced_types, ty) \
                       for ty in self.impl_types]
     if tracing_on():

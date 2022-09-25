@@ -3,6 +3,7 @@ from __future__ import annotations # To refer to class type in the class.
 from dataclasses import dataclass
 from lark.tree import Meta
 from typing import Any
+from fractions import Fraction
 
 def copy(exp):
   if exp is None:
@@ -11,7 +12,7 @@ def copy(exp):
     return exp.copy()
 
 def copy_type_env(type_env):
-  return {x: (t, copy(e)) for x,(t,e) in type_env.items()}
+  return {x: info.copy() for x,info in type_env.items()}
 
 @dataclass
 class Value:
@@ -75,7 +76,7 @@ class Exp(AST):
   # variables that are currently in scope.
   # Returns the type of this expression and a translation
   # of this expression.
-  def type_check(self, env: dict[str,Type]) -> tuple[Type,Exp]:
+  def type_check(self, env: dict[str,Type], ctx:str = 'let') -> tuple[Type,Exp]:
     raise Exception('unimplemented')
 
   # Takes one small step of runtime execution of this expression.

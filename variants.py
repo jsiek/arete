@@ -7,7 +7,7 @@
 # * variant member access.
 
 from dataclasses import dataclass
-from abstract_syntax import Param, NoParam
+from variables_and_binding import Param, NoParam
 from ast_base import *
 from ast_types import *
 from values import Result, PointerOffset, duplicate_if_temporary
@@ -153,11 +153,15 @@ class Match(Stmt):
   def const_eval(self, env):
     new_cond = self.condition.const_eval(env)
     new_cases = []
-    for (tag, x, body) in self.cases:
-      body_env = env.copy()
-      if x in body_env.keys():
-        del body_env[x]
-      new_cases += [(tag, x, body.const_eval(body_env))]
+    for (tag, param, body) in self.cases:
+      if isinstance(param, NoParam):
+        new_cases += [(tag, param, body.const_eval(env))]
+      elif isinstance(param, Param):
+        body_env = env.copy()
+        if param.ident in body_env.keys():
+          del body_env[param.ident]
+        new_param = param.with_type(simplify(param.type_annot, env))
+        new_cases += [(tag, new_param, body.const_eval(body_env))]
     return Match(self.location, new_cond, new_cases)
   
   def type_check(self, env):
@@ -179,7 +183,8 @@ class Match(Stmt):
         for (alt_tag,alt_ty) in cond_ty.alternative_types:
           if tag == alt_tag:
             body_env = copy_type_env(env)
-            body_env[param.ident] = (alt_ty, None)
+            #body_env[param.ident] = (alt_ty, None, param)
+            param.bind_type(body_env)
             retty, new_body = body.type_check(body_env)
             new_cases.append((tag, param, new_body))
             if return_type is None:
@@ -191,7 +196,8 @@ class Match(Stmt):
           error(self.location, tag + ' is not a tag in ' + str(cond_ty))
       elif isinstance(cond_ty, AnyType):
           body_env = copy_type_env(env)
-          body_env[param.ident] = (AnyType(param.location), None)
+          #body_env[param.ident] = (AnyType(param.location), None, param)
+          param.bind_type(body_env)
           retty, new_body = body.type_check(body_env)
           new_cases.append((tag, param, new_body))
           if return_type is None:
@@ -225,8 +231,8 @@ class Match(Stmt):
         # variant_val_addr = ptr.element_address(variant.tag, Fraction(1,1),
         #                                        self.location)
         runner.arg = Result(False, variant_val_addr)
-        machine.bind_param(runner.param, runner.arg, runner.body_env,
-                           self.location)
+        runner.param.bind(runner.arg, runner.body_env, machine.memory,
+                          self.location)
         if isinstance(runner.param, NoParam) \
            and runner.results[0].temporary:
           # kill the result early

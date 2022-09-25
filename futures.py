@@ -5,7 +5,7 @@
 # * waiting on a future
 
 from dataclasses import dataclass
-from abstract_syntax import Param
+from variables_and_binding import Param
 from ast_base import *
 from ast_types import *
 from values import Result

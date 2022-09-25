@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from ast_base import Type, AST
+from ast_base import Type, AST, Exp
+from typing import Any
 from lark.tree import Meta
 from utilities import tracing_on, error
 
@@ -196,7 +197,8 @@ class TypeOp(Type):
   params: list[str]
   type: Type
   __match_args__ = ("params", "type")
-  
+
+
     
 def unfold(ty: Type) -> Type:
   if isinstance(ty, RecursiveType):
@@ -443,4 +445,59 @@ def match_types(vars: tuple[str],
     case _:
       return False
 
-      
+@dataclass(frozen=True)
+class StaticState:
+  pass
+
+# The variable is readable and globally immutable.
+# A proper fraction is less-than 1 and greater than 0.
+@dataclass(frozen=True)
+class ProperFraction(StaticState):
+  def __str__(self):
+    return "1/?"
+  def __repr__(self):
+    return str(self)
+
+# The variable is readable and writable.
+@dataclass(frozen=True)
+class FullFraction(StaticState):
+  def __str__(self):
+    return "1/1"
+  def __repr__(self):
+    return str(self)
+
+# The variable is temporarily unusable.
+@dataclass(frozen=True)
+class EmptyFraction(StaticState):
+  def __str__(self):
+    return "0/1"
+  def __repr__(self):
+    return str(self)
+  
+# The variable has been consumed.
+@dataclass(frozen=True)
+class Dead(StaticState):
+  def __str__(self):
+    return "dead"
+  def __repr__(self):
+    return str(self)
+
+def static_readable(frac):
+    return isinstance(frac, ProperFraction) \
+      or isinstance(frac, FullFraction)
+  
+@dataclass
+class StaticInfo:
+  def copy(self):
+    raise Exception('unimplemented')
+
+@dataclass
+class StaticVarInfo(StaticInfo):
+  type : Type
+  translation : Exp = None
+  state : StaticState = None
+  param : Any = None # Param type
+  
+  def copy(self):
+    return StaticVarInfo(self.type, self.translation,
+                         self.state, self.param)

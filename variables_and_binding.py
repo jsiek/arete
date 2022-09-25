@@ -9,11 +9,103 @@
 # functions are defined in `functions.py`.
 
 from dataclasses import dataclass
-from abstract_syntax import Param
 from ast_base import *
 from ast_types import *
 from values import *
 from utilities import *
+
+# Parameters
+
+@dataclass(frozen=True)
+class Param:
+    location: Meta
+    kind: str # let, var, inout, sink, set
+    privilege: str # read, write # OBSOLETE?
+    ident: str
+    type_annot: Type
+    __match_args__ = ("privilege", "ident")
+
+    # Return a Param that's the same except for the type annotation.
+    def with_type(self, ty):
+        return Param(self.location, self.kind, self.privilege, self.ident, ty)
+
+    def const_eval(self, env):
+      type_annot = simplify(self.type_annot, env)
+      return Param(self.location, self.kind, self.privilege,
+                   self.ident, type_annot)
+
+    def bind_type(self, env):
+      if self.kind == 'let':
+        state = ProperFraction()
+      elif self.kind == 'inout' or self.kind == 'var':
+        state = FullFraction()
+      elif self.kind == 'ref':
+        state = ProperFraction()
+      env[self.ident] = StaticVarInfo(self.type_annot, None, state, self)
+  
+    # At runtime, bind the result to this parameter/variable
+    def bind(self, res : Result, env, memory, loc):
+      val = res.value
+      if not (isinstance(val, Pointer) or isinstance(val, PointerOffset)):
+        error(loc, 'for binding, expected a pointer, not ' + str(val))
+      if tracing_on():
+          print('for call, binding ' + self.ident + ' to ' + str(val))
+      if res.temporary:
+        # what if val is a PointerOffset??
+        if self.kind == 'let':
+          env[self.ident] = val.duplicate(Fraction(1,2), loc)
+        else:
+          env[self.ident] = val
+
+      if self.kind == 'let':
+        if (not val.get_address() is None) \
+             and val.get_permission() == Fraction(0,1):
+          error(loc, 'let binding requires non-zero permission, not '
+                + str(val))
+        if not res.temporary:      
+          env[self.ident] = val.duplicate(Fraction(1,2), loc)
+        env[self.ident].kill_when_zero = True
+
+      elif self.kind == 'var' or self.kind == 'inout':
+        success = val.upgrade(loc)
+        if not success:
+          error(self.location,
+                self.kind + ' binding requires permission 1/1, not ' + str(val))
+        if not res.temporary:
+          env[self.ident] = val.duplicate(Fraction(1,1), loc)
+          if self.kind == 'var':
+            val.kill(memory, loc)
+        if self.kind == 'var':
+            env[self.ident].no_give_backs = True
+
+      # The `ref` kind is not in Val. It doesn't guarantee any
+      # read/write ability and it does not guarantee others
+      # won't mutate. Unlike `var`, it does not consume the
+      # initializing value. I'm not entirely sure if `ref`
+      # is needed, but it has come in handy a few times.
+      elif self.kind == 'ref':
+        if not res.temporary:
+          env[self.ident] = val.duplicate(Fraction(1,1), loc)
+
+      else:
+        error(loc, 'unrecognized kind of parameter: ' + self.kind)
+    
+    def __str__(self):
+        if self.kind is None:
+          return self.privilege + ' ' + self.ident + ': ' + str(self.type_annot)
+        else:
+          return self.kind + ' ' + self.ident + ': ' + str(self.type_annot)
+      
+    def __repr__(self):
+        return str(self)
+
+
+@dataclass(frozen=True)
+class NoParam:
+  location: Meta
+  
+  def bind(self, res : Result, env, mem, loc):
+    return
 
 @dataclass
 class Var(Exp):
@@ -38,11 +130,17 @@ class Var(Exp):
   def type_check(self, env):
     if self.ident not in env:
         error(self.location, 'use of undefined variable ' + self.ident)
-    (ty, exp) = env[self.ident]
-    if exp is None:
-      return ty, self
+    info = env[self.ident]
+    if not hasattr(info, 'state'):
+      print('bad type env info: ' + str(info))
+      exit(-1)
+    if not static_readable(info.state):
+      warning(self.location, "don't have read permission for " + self.ident
+              + ", only " + str(info.state))
+    if info.translation is None:
+      return info.type, self
     else:
-      return ty, exp
+      return info.type, info.translation
   
   def step(self, runner, machine):
       if self.ident not in runner.env:
@@ -100,7 +198,7 @@ class BindingExp(Exp):
       error(self.arg.location, 'type of initializer ' + str(rhs_type) + '\n'
             + ' is inconsistent with declared type ' + str(self.param.type_annot))
     body_env = copy_type_env(env)
-    body_env[self.param.ident] = (rhs_type, None)
+    self.param.bind_type(body_env)
     body_type, new_body = self.body.type_check(body_env)
     return body_type, BindingExp(self.location, self.param, new_arg, new_body)
   
@@ -109,8 +207,8 @@ class BindingExp(Exp):
       machine.schedule(self.arg, runner.env, AddressCtx())
     elif runner.state == 1:
       runner.body_env = runner.env.copy()
-      machine.bind_param(self.param, runner.results[0],
-                         runner.body_env, self.arg.location)
+      self.param.bind(runner.results[0], runner.body_env, machine.memory,
+                      self.arg.location)
       machine.schedule(self.body, runner.body_env, runner.context)
     else:
       machine.dealloc_param(self.param, runner.results[0],
@@ -162,7 +260,7 @@ class BindingStmt(Exp):
             + ' is inconsistent with declared type '
             + str(new_param.type_annot))
     body_env = env.copy()
-    body_env[self.param.ident] = (self.param.type_annot, None)
+    self.param.bind_type(body_env)
     body_type, new_body = self.body.type_check(body_env)
     return body_type, BindingStmt(self.location, self.param, new_arg, new_body)
     
@@ -171,8 +269,8 @@ class BindingStmt(Exp):
       machine.schedule(self.arg, runner.env, AddressCtx())
     elif runner.state == 1:
       runner.body_env = runner.env.copy()
-      machine.bind_param(self.param, runner.results[0],
-                         runner.body_env, self.arg.location)
+      self.param.bind(runner.results[0], runner.body_env, machine.memory,
+                      self.arg.location)
       # Treat binding statements special for debugging. 
       # Pretend they finish before the body runs.
       if runner.pause_on_finish:

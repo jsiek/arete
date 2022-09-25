@@ -297,55 +297,6 @@ class Machine:
       self.threads.append(thread)
       return thread
 
-  # not sure if bind_param belongs in Machine -Jeremy 
-  def bind_param(self, param, res : Result, env, loc):
-    if isinstance(param, NoParam):
-      return
-    val = res.value
-    if not (isinstance(val, Pointer) or isinstance(val, PointerOffset)):
-      error(loc, 'for binding, expected a pointer, not ' + str(val))
-    if tracing_on():
-        print('for call, binding ' + param.ident + ' to ' + str(val))
-    if res.temporary:
-      # what if val is a PointerOffset??
-      if param.kind == 'let':
-        env[param.ident] = val.duplicate(Fraction(1,2), loc)
-      else:
-        env[param.ident] = val
-
-    if param.kind == 'let':
-      if (not val.get_address() is None) \
-           and val.get_permission() == Fraction(0,1):
-        error(loc, 'let binding requires non-zero permission, not '
-              + str(val))
-      if not res.temporary:      
-        env[param.ident] = val.duplicate(Fraction(1,2), loc)
-      env[param.ident].kill_when_zero = True
-
-    elif param.kind == 'var' or param.kind == 'inout':
-      success = val.upgrade(loc)
-      if not success:
-        error(param.location,
-              param.kind + ' binding requires permission 1/1, not ' + str(val))
-      if not res.temporary:
-        env[param.ident] = val.duplicate(Fraction(1,1), loc)
-        if param.kind == 'var':
-          val.kill(self.memory, loc)
-      if param.kind == 'var':
-          env[param.ident].no_give_backs = True
-
-    # The `ref` kind is not in Val. It doesn't guarantee any
-    # read/write ability and it does not guarantee others
-    # won't mutate. Unlike `var`, it does not consume the
-    # initializing value. I'm not entirely sure if `ref`
-    # is needed, but it has come in handy a few times.
-    elif param.kind == 'ref':
-      if not res.temporary:
-        env[param.ident] = val.duplicate(Fraction(1,1), loc)
-
-    else:
-      error(loc, 'unrecognized kind of parameter: ' + param.kind)
-
   def inout_end_of_life(self, ptr, source, loc):
       if ptr.permission != Fraction(1,1):
           error(loc, 'failed to restore inout variable '

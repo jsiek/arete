@@ -9,7 +9,7 @@
 #
 
 from dataclasses import dataclass
-from abstract_syntax import Param
+from variables_and_binding import Param
 from ast_base import *
 from ast_types import *
 from values import Result, Pointer
@@ -124,21 +124,22 @@ class Function(Decl):
                       tuple(p.type_annot for p in self.params),
                       self.return_type,
                       tuple(self.requirements))
-    return {self.name: (ty, None)}
+    return {self.name: StaticVarInfo(ty, None, ProperFraction())}
     
   def type_check(self, env):
     if tracing_on():
       print('type checking function ' + str(self))
+      print(env)
     body_env = copy_type_env(env)
     for t in self.type_params:
       tyvar = TypeVar(self.location, t)
-      body_env[t] = (tyvar, tyvar)
+      body_env[t] = StaticVarInfo(tyvar, tyvar) # ???
     new_return_type = self.return_type
     new_params = [p for p in self.params]
     
     # Bind parameters to their types
     for p in new_params:
-        body_env[p.ident] = (p.type_annot, None)
+        p.bind_type(body_env)
         
     # Bring the impls and their members into scope.
     # Add parameters for the witnesses.
@@ -278,7 +279,7 @@ class Call(Exp):
             
           # Bind the parameters to their arguments.
           for param, arg in zip(params, runner.args):
-            machine.bind_param(param, arg, runner.body_env, self.location)
+            param.bind( arg, runner.body_env, machine.memory, self.location)
 
           machine.push_frame()
           if machine.current_thread.pause_on_call:
@@ -379,6 +380,7 @@ class Return(Stmt):
         runner.return_value = runner.results[0].value
       machine.finish_statement(self.location)
 
+      
 @dataclass
 class Lambda(Exp):
   params: list[Param]
@@ -424,7 +426,8 @@ class Lambda(Exp):
   def type_check(self, env):
     body_env = copy_type_env(env)
     for p in self.params:
-        body_env[p.ident] = (p.type_annot, None)
+        body_env[p.ident] = StaticVarInfo(p.type_annot, None,
+                                          ProperFraction(), p)
     new_reqs = []
     for req in self.requirements:
       new_req = req.declare_type(body_env, {})
@@ -447,7 +450,7 @@ class Lambda(Exp):
           if not x in runner.env.keys():
             error(self.location, 'in lambda, undefined free variable ' + x)
           v = runner.env[x]
-          clos_env[x] = v.duplicate(Fraction(1,2), self.location)            
+          clos_env[x] = v.duplicate(Fraction(1,2), self.location)
       clos = Closure(self.name, self.params, self.return_mode,
                      self.requirements, self.body, clos_env)
       if isinstance(runner.context, ValueCtx):

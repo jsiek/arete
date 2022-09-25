@@ -9,38 +9,6 @@ from primitive_operations import eval_prim, compare_ops, type_check_prim
 from ast_base import *
 from ast_types import *
 
-# Parameters
-
-@dataclass(frozen=True)
-class Param:
-    location: Meta
-    kind: str # let, var, inout, sink, set
-    privilege: str # read, write # OBSOLETE?
-    ident: str
-    type_annot: Type
-    __match_args__ = ("privilege", "ident")
-
-    # Return a Param that's the same except for the type annotation.
-    def with_type(self, ty):
-        return Param(self.location, self.kind, self.privilege, self.ident, ty)
-    
-    def __str__(self):
-        if self.kind is None:
-          return self.privilege + ' ' + self.ident + ': ' + str(self.type_annot)
-        else:
-          return self.kind + ' ' + self.ident + ': ' + str(self.type_annot)
-      
-    def __repr__(self):
-        return str(self)
-
-    def const_eval(self, env):
-      type_annot = simplify(self.type_annot, env)
-      return Param(self.location, self.kind, self.privilege,
-                   self.ident, type_annot)        
-
-@dataclass(frozen=True)
-class NoParam:
-    location: Meta
     
 # Expressions
 
@@ -346,6 +314,12 @@ class Write(Stmt):
     new_rhs = self.rhs.const_eval(env)
     return Write(self.location, new_lhs, new_rhs)
     
+  def type_check(self, env):
+    lhs_type, new_lhs = self.lhs.type_check(env)
+    rhs_type, new_rhs = self.rhs.type_check(env)
+    require_consistent(lhs_type, rhs_type, 'in assignment', self.location)
+    return None, Write(self.location, new_lhs, new_rhs)
+    
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.rhs, runner.env)
@@ -357,12 +331,6 @@ class Write(Stmt):
       machine.memory.write(ptr, val_ptr, self.location)
       machine.finish_statement(self.location)
 
-  def type_check(self, env):
-    lhs_type, new_lhs = self.lhs.type_check(env)
-    rhs_type, new_rhs = self.rhs.type_check(env)
-    require_consistent(lhs_type, rhs_type, 'in assignment', self.location)
-    return None, Write(self.location, new_lhs, new_rhs)
-    
       
 @dataclass
 class Expr(Stmt):
@@ -590,7 +558,7 @@ class Global(Decl):
     return [Global(self.location, self.name, new_ty, new_rhs)]
   
   def declare_type(self, env):
-    return {self.name: (self.type_annot, None)}
+    return {self.name: StaticVarInfo(self.type_annot, None, ProperFraction())}
 
   def type_check(self, env):
     rhs_type, new_rhs = self.rhs.type_check(env)
