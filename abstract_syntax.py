@@ -68,13 +68,13 @@ class PrimitiveCall(Exp):
     new_args = [arg.const_eval(env) for arg in args]
     return const_eval_prim(self.location, op, new_args)
   
-  def type_check(self, env):
+  def type_check(self, env, ctx):
     if tracing_on():
       print("starting to type checking " + str(self))
     arg_types = []
     new_args = []
     for arg in self.args:
-        arg_type, new_arg = arg.type_check(env)
+        arg_type, new_arg = arg.type_check(env, 'none')
         arg_types.append(arg_type)
         new_args.append(new_arg)
     if tracing_on():
@@ -127,7 +127,7 @@ class Int(Exp):
           result = machine.memory.allocate(val)
       machine.finish_expression(Result(True, result), self.location)
 
-  def type_check(self, env):
+  def type_check(self, env, ctx):
     return IntType(self.location), self
     
     
@@ -148,7 +148,7 @@ class Frac(Exp):
   def const_eval(self, env):
       return self
   
-  def type_check(self, env):
+  def type_check(self, env, ctx):
     return RationalType(self.location), self
       
   def step(self, runner,  machine):
@@ -178,7 +178,7 @@ class Bool(Exp):
   def const_eval(self, env):
     return self
 
-  def type_check(self, env):
+  def type_check(self, env, ctx):
     return BoolType(self.location), self
   
   def step(self, runner, machine):
@@ -230,10 +230,10 @@ class IfExp(Exp):
                       runner.results[1].value.duplicate(1, self.location))
       machine.finish_expression(result, self.location)
 
-  def type_check(self, env):
-    cond_type, new_cond = self.cond.type_check(env)
-    thn_type, new_thn = self.thn.type_check(env)
-    els_type, new_els = self.els.type_check(env)
+  def type_check(self, env, ctx):
+    cond_type, new_cond = self.cond.type_check(env, 'none')
+    thn_type, new_thn = self.thn.type_check(env, ctx)
+    els_type, new_els = self.els.type_check(env, ctx)
     if not (isinstance(cond_type, BoolType)
             or isinstance(cond_type, AnyType)):
       error(self.location, 'in conditional, expected a Boolean, not '
@@ -315,8 +315,8 @@ class Write(Stmt):
     return Write(self.location, new_lhs, new_rhs)
     
   def type_check(self, env):
-    lhs_type, new_lhs = self.lhs.type_check(env)
-    rhs_type, new_rhs = self.rhs.type_check(env)
+    lhs_type, new_lhs = self.lhs.type_check(env, 'write_lhs')
+    rhs_type, new_rhs = self.rhs.type_check(env, 'write_rhs')
     require_consistent(lhs_type, rhs_type, 'in assignment', self.location)
     return None, Write(self.location, new_lhs, new_rhs)
     
@@ -351,7 +351,7 @@ class Expr(Stmt):
     return Expr(self.location, new_arg)
     
   def type_check(self, env):
-    _, new_exp = self.exp.type_check(env)
+    _, new_exp = self.exp.type_check(env, 'none')
     return None, Expr(self.location, new_exp)
 
   def step(self, runner, machine):
@@ -380,7 +380,7 @@ class Assert(Stmt):
     return Assert(self.location, new_arg)
     
   def type_check(self, env):
-    arg_type, new_arg = self.exp.type_check(env)
+    arg_type, new_arg = self.exp.type_check(env, 'none')
     if not isinstance(arg_type, BoolType):
       error(self.location, "in assert, expected a Boolean, not "
             + str(arg_type))
@@ -434,7 +434,7 @@ class IfStmt(Stmt):
       machine.finish_statement(self.location)
 
   def type_check(self, env):
-    cond_type, new_cond = self.cond.type_check(env)
+    cond_type, new_cond = self.cond.type_check(env, 'none')
     thn_type, new_thn = self.thn.type_check(env)
     els_type, new_els = self.els.type_check(env)
     return join(thn_type, els_type), \
@@ -462,7 +462,7 @@ class While(Stmt):
     return While(self.location, new_cond, new_body)
     
   def type_check(self, env):
-    cond_type, new_cond = self.cond.type_check(env)
+    cond_type, new_cond = self.cond.type_check(env, 'none')
     body_type, new_body = self.body.type_check(env)
     return body_type, \
            While(self.location, new_cond, new_body)
@@ -561,7 +561,7 @@ class Global(Decl):
     return {self.name: StaticVarInfo(self.type_annot, None, ProperFraction())}
 
   def type_check(self, env):
-    rhs_type, new_rhs = self.rhs.type_check(env)
+    rhs_type, new_rhs = self.rhs.type_check(env, 'var')
     type_annot = self.type_annot
     if not consistent(rhs_type, type_annot):
       error(self.location, 'type of initializer ' + str(rhs_type) + '\n'

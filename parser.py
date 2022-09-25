@@ -85,7 +85,7 @@ def parse_tree_to_type(e):
     elif e.data == 'function_type':
        return FunctionType(e.meta,
                            tuple(), # TODO: add type parameters
-                           parse_tree_to_type_list(e.children[0]),
+                           parse_tree_to_param_type_list(e.children[0]),
                            parse_tree_to_type(e.children[1]),
                            tuple()) # TODO: add requirements
     elif e.data == 'variant_type':
@@ -119,6 +119,22 @@ def parse_tree_to_type_list(e):
     else:
         raise Exception('unrecognized as a type list ' + repr(e))
 
+def parse_tree_to_param_type_list(e):
+    e.meta.filename = filename
+    if e.data == 'empty':
+        return ()
+    elif e.data == 'single':
+        kind = str(e.children[0])
+        ty = parse_tree_to_type(e.children[1])
+        return ((kind, ty) ,)
+    elif e.data == 'push':
+        kind = str(e.children[0])
+        ty = parse_tree_to_type(e.children[1])
+        return ((kind, ty),) \
+            + parse_tree_to_param_type_list(e.children[2])
+    else:
+        raise Exception('unrecognized as a type list ' + repr(e))
+    
 def parse_tree_to_req_list(e):
     e.meta.filename = filename
     if e.data == 'empty':

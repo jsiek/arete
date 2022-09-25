@@ -127,7 +127,7 @@ class Var(Exp):
     else:
       return self
     
-  def type_check(self, env):
+  def type_check(self, env, ctx):
     if self.ident not in env:
         error(self.location, 'use of undefined variable ' + self.ident)
     info = env[self.ident]
@@ -137,6 +137,20 @@ class Var(Exp):
     if not static_readable(info.state):
       warning(self.location, "don't have read permission for " + self.ident
               + ", only " + str(info.state))
+
+    if ctx == 'let':
+      env[self.ident].state = ProperFraction()
+    elif ctx == 'var':
+      env[self.ident].state = Dead()
+    elif ctx == 'inout':
+      pass
+      #env[self.ident].state = EmptyFraction()
+    elif ctx == 'write_lhs' and info.state != FullFraction():
+      warning(self.location, "don't have write permission for " + self.ident
+              + ", only " + str(info.state))
+    elif ctx == 'write_rhs':
+      env[self.ident].state = EmptyFraction()
+      
     if info.translation is None:
       return info.type, self
     else:
@@ -192,14 +206,14 @@ class BindingExp(Exp):
     new_body = body.const_eval(body_env)
     return BindingExp(self.location, new_param, new_rhs, new_body)
     
-  def type_check(self, env):
-    rhs_type, new_arg = self.arg.type_check(env)
+  def type_check(self, env, ctx):
+    rhs_type, new_arg = self.arg.type_check(env, self.param.kind)
     if not consistent(rhs_type, self.param.type_annot):
       error(self.arg.location, 'type of initializer ' + str(rhs_type) + '\n'
             + ' is inconsistent with declared type ' + str(self.param.type_annot))
     body_env = copy_type_env(env)
     self.param.bind_type(body_env)
-    body_type, new_body = self.body.type_check(body_env)
+    body_type, new_body = self.body.type_check(body_env, ctx)
     return body_type, BindingExp(self.location, self.param, new_arg, new_body)
   
   def step(self, runner, machine):
@@ -254,7 +268,7 @@ class BindingStmt(Exp):
     return BindingStmt(self.location, new_param, new_rhs, new_body)
     
   def type_check(self, env):
-    arg_type, new_arg = self.arg.type_check(env)
+    arg_type, new_arg = self.arg.type_check(env, self.param.kind)
     if not consistent(arg_type, self.param.type_annot):
       error(self.arg.location, 'type of initializer ' + str(arg_type) + '\n'
             + ' is inconsistent with declared type '

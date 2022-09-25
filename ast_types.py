@@ -133,7 +133,7 @@ class VariantType(Type):
 @dataclass(eq=True, frozen=True)
 class FunctionType(Type):
   type_params: tuple[str]
-  param_types: tuple[Type]
+  param_types: tuple[tuple[str,Type]]
   return_type: Type
   requirements: list[AST]
   __match_args__ = ("type_params", "param_types", "return_type", "requirements")
@@ -142,7 +142,7 @@ class FunctionType(Type):
     return ('<' + ', '.join(self.type_params) + '>'
             if len(self.type_params) > 0\
             else '') \
-           + '(' + ', '.join([str(t) for t in self.param_types]) + ')' \
+           + '(' + ', '.join([k + ' ' + str(t) for k,t in self.param_types]) + ')' \
            + '->' + str(self.return_type) \
            + ' ' + ', '.join(str(req) for req in self.requirements)
   def __repr__(self):
@@ -231,11 +231,12 @@ def simplify(type: Type, env) -> Type:
       ret = RecursiveType(type.location, name, simplify(elt_ty, body_env))
     case FunctionType(ty_params, param_tys, ret_ty, requirements):
       body_env = env.copy()
-      for t in ty_params:
+      for k,t in ty_params:
         body_env[t] = TypeVar(type.location, t)
       ret = FunctionType(type.location,
                          ty_params,
-                         tuple(simplify(ty, body_env) for ty in param_tys),
+                         tuple((k, simplify(ty, body_env)) \
+                               for k,ty in param_tys),
                          simplify(ret_ty, body_env),
                          requirements) # TODO: simplify requirements
     case IntType():
@@ -297,7 +298,7 @@ def substitute(subst: dict[str, Type], ty2: Type) -> Type:
       subst2 = subst.copy()
       for t in type_params:
         subst2[t] = TypeVar(ty2.location, t)
-      params = tuple(substitute(subst2, pt) for pt in param_types)
+      params = tuple((k, substitute(subst2, pt)) for (k,pt) in param_types)
       ret = substitute(subst2, return_type)
       return FunctionType(ty2.location, type_params, params, ret,
                           tuple()) # TODO: handle requirements
@@ -339,7 +340,7 @@ def consistent(ty1: Type, ty2: Type, assumed_consistent=set()) -> bool:
     case (FunctionType(tp1, ps1, rt1), FunctionType(tp2, ps2, rt2)):
       # TODO: deal with type parameters
       result = all([consistent(t1, t2, assumed_consistent) \
-                    for t1, t2 in zip(ps1, ps2)]) \
+                    for (k1,t1), (k2,t2) in zip(ps1, ps2)]) \
         and consistent(rt1,rt2, assumed_consistent)
     case (FutureType(t1), FutureType(t2)):
       result = consistent(t1, t2, assumed_consistent)
@@ -377,7 +378,9 @@ def join(ty1: Type, ty2: Type) -> Type:
       return TupleType(tuple(join(t1, t2) for t1,t2 in zip(ts1, ts2)))
     case (FunctionType(tp1, ps1, rt1), FunctionType(tp2, ps2, rt2)):
       return FunctionType(tp1,
-                          tuple(join(t1, t2) for t1, t2 in zip(ps1, ps2)),
+                          # TODO join the k's
+                          tuple((k1,join(t1, t2)) \
+                                for (k1,t1), (k2,t2) in zip(ps1, ps2)),
                           join(rt1,rt2))
     case (FutureType(t1), FutureType(t2)):
       return FutureType(join(t1, t2))
@@ -432,7 +435,7 @@ def match_types(vars: tuple[str],
           FunctionType(tps2, pts2, rt2)):
       # TODO: handle type parameters
       return all([match_types(vars, pt1, pt2, matches, assumed_consistent) \
-                  for (pt1, pt2) in zip(pts1, pts2)]) \
+                  for ((k1,pt1), (k2,pt2)) in zip(pts1, pts2)]) \
              and match_types(vars, rt1, rt2, matches, assumed_consistent)
     case (IntType(), IntType()):
       return True
@@ -454,7 +457,7 @@ class StaticState:
 @dataclass(frozen=True)
 class ProperFraction(StaticState):
   def __str__(self):
-    return "1/?"
+    return "1/N"
   def __repr__(self):
     return str(self)
 

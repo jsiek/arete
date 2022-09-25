@@ -137,7 +137,7 @@ class Import(Decl):
       return [Import(self.location, new_module, self.imports)]
 
   def declare_type(self, env):
-    mod, new_mod = self.module.type_check(env)
+    mod, new_mod = self.module.type_check(env, 'none')
     mod = unfold(mod)
     if isinstance(mod, ModuleType):
       results = {}
@@ -152,7 +152,7 @@ class Import(Decl):
       error(self.location, "in import, expected a module, not " + str(mod))
     
   def type_check(self, env):
-    mod_type, new_module = self.module.type_check(env)
+    mod_type, new_module = self.module.type_check(env, 'none')
     return [Import(self.location, new_module, self.imports)]
 
   def declare(self, env, mem):
@@ -200,8 +200,8 @@ class ModuleMember(Exp):
       new_arg = self.arg.const_eval(env)
       return ModuleMember(self.location, new_arg, self.field)
   
-  def type_check(self, env):
-    mod_type, new_arg = self.arg.type_check(env)
+  def type_check(self, env, ctx):
+    mod_type, new_arg = self.arg.type_check(env, ctx)
     mod_type = unfold(mod_type)
     if not (isinstance(mod_type, ModuleType) \
             or isinstance(mod_type, AnyType)):

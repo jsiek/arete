@@ -159,9 +159,9 @@ class Array(Exp):
     new_arg = self.arg.const_eval(env)
     return Array(self.location, new_size, new_arg)
   
-  def type_check(self, env):
-    size_type, new_size = self.size.type_check(env)
-    arg_type, new_arg = self.arg.type_check(env)
+  def type_check(self, env, ctx):
+    size_type, new_size = self.size.type_check(env, 'none')
+    arg_type, new_arg = self.arg.type_check(env, 'let')
     if not (isinstance(size_type, IntType)
             or isinstance(size_type, AnyType)):
         error(self.location, "expected integer array size, not "
@@ -169,6 +169,7 @@ class Array(Exp):
     return ArrayType(self.location, arg_type), \
            Array(self.location, new_size, new_arg)
 
+  # TODO: compare the ownership transfer here to that of tuple creation.
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.size, runner.env)
@@ -208,11 +209,11 @@ class TupleExp(Exp):
     new_inits = [init.const_eval(env) for init in self.inits]
     return TupleExp(self.location, new_inits)
     
-  def type_check(self, env):
+  def type_check(self, env, ctx):
     init_types = []
     new_inits = []
     for init in self.inits:
-        init_type, new_init = init.type_check(env)
+        init_type, new_init = init.type_check(env, 'write_rhs')
         init_types.append(init_type)
         new_inits.append(new_init)
     return TupleType(self.location, tuple(init_types)), \
@@ -252,9 +253,9 @@ class Index(Exp):
     new_index = self.index.const_eval(env)
     return Index(self.location, new_arg, new_index)
     
-  def type_check(self, env):
-    arg_type, new_arg = self.arg.type_check(env)
-    index_type, new_index = self.index.type_check(env)
+  def type_check(self, env, ctx):
+    arg_type, new_arg = self.arg.type_check(env, ctx)
+    index_type, new_index = self.index.type_check(env, 'none')
     new_self = Index(self.location, new_arg, new_index)
     arg_type = unfold(arg_type)
     if isinstance(arg_type, TupleType):

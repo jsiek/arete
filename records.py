@@ -114,11 +114,11 @@ class RecordExp(Exp):
     new_fields = [(f, e.const_eval(env)) for f,e in self.fields]
     return RecordExp(self.location, new_fields)
   
-  def type_check(self, env):
+  def type_check(self, env, ctx):
     field_types = {}
     new_fields = []
     for field, init in self.fields:
-      init_type, new_init = init.type_check(env)
+      init_type, new_init = init.type_check(env, 'write_rhs')
       field_types[field] = init_type
       new_fields.append((field, new_init))
     return RecordType(self.location, tuple(field_types.items())), \
@@ -157,8 +157,8 @@ class FieldAccess(Exp):
     new_arg = self.arg.const_eval(env)
     return FieldAccess(self.location, new_arg, self.field)
     
-  def type_check(self, env):
-    arg_type, new_arg = self.arg.type_check(env)
+  def type_check(self, env, ctx):
+    arg_type, new_arg = self.arg.type_check(env, ctx)
     new_self = FieldAccess(self.location, new_arg, self.field)
     arg_type = unfold(arg_type)
     if isinstance(arg_type, RecordType):

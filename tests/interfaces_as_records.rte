@@ -1,5 +1,5 @@
 
-typeop Monoid(T) = { combine : (T,T) -> T, identity : T };
+typeop Monoid(T) = { combine : (let T, let T) -> T, identity : T };
 
 fun accumulate<T>(A: [T], Monoid0: Monoid(T)) {
   var total:T = copy(Monoid0.identity);

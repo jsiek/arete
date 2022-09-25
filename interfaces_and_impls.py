@@ -222,7 +222,7 @@ class Impl(Decl):
     member_types = {}
     new_assignments = []
     for x,e in self.assignments:
-      (ty, new_e) = e.type_check(env)
+      (ty, new_e) = e.type_check(env, 'let')
       new_assignments.append((x, new_e))
       member_types[x] = ty
 

@@ -17,7 +17,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "⟨" type_list "⟩"                          -> tuple_type
     | "{" field_type_list "}"                    -> record_type
     | alternative_list                           -> variant_type
-    | "(" type_list ")" "->" type                -> function_type
+    | "(" param_type_list ")" "->" type          -> function_type
     | "rec" IDENT "in" type                      -> recursive_type
     | IDENT                                      -> type_var
     | type "(" type_list ")"                     -> type_application
@@ -27,7 +27,10 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | type                                      -> single
     | type "," type_list                         -> push
 
-
+?param_type_list:                               -> empty
+    | strict_binding_kind type                         -> single
+    | strict_binding_kind type "," param_type_list     -> push
+    
 ?alternative: IDENT ":" type                     -> alternative
     
 ?alternative_list: alternative                   -> single
@@ -142,12 +145,13 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | initializer                                       -> single
     | initializer "," initializer_list                  -> push
 				                 
-?binding_kind: "let"                                    -> let
-    |                                                   -> let
+?strict_binding_kind: "let"                                    -> let
     | "var"                                             -> var
     | "inout"                                           -> inout
     | "ref"                                             -> ref
 
+?binding_kind: strict_binding_kind
+    |                                                   -> let
 parameter: binding_kind IDENT type_opt                  -> binding
     | "_"                                               -> no_binding
 				                 

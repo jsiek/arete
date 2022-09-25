@@ -44,8 +44,8 @@ class FutureExp(Exp):
       new_arg = self.arg.const_eval(env)
       return FutureExp(self.location, new_arg)
   
-  def type_check(self, env):
-    arg_type, new_arg = self.arg.type_check(env)
+  def type_check(self, env, ctx):
+    arg_type, new_arg = self.arg.type_check(env, 'let')
     return FutureType(self.location, arg_type), \
            FutureExp(self.location, new_arg)
 
@@ -93,8 +93,8 @@ class Wait(Exp):
           result = Result(True, machine.memory.allocate(val))
         machine.finish_expression(result, self.location)
 
-  def type_check(self, env):
-    arg_type, new_arg = self.arg.type_check(env)
+  def type_check(self, env, ctx):
+    arg_type, new_arg = self.arg.type_check(env, 'let')
     arg_type = unfold(arg_type)
     if isinstance(arg_type, FutureType):
       return arg_type.result_type, Wait(self.location, new_arg)

@@ -74,6 +74,11 @@ class Exp(AST):
   # Checks that the expression obeys the type checking rules.
   # The environment `env` provides the types for all of the
   # variables that are currently in scope.
+  # The context `ctx` says whether the expression is being
+  # used to initialize a `let`, `var`, or `inout` parameter,
+  # or the left-hand side or right-hand side of an assignment statement,
+  # `write_lhs` and `write_rhs`,
+  # which effects the ownership, or `none` for no effect.
   # Returns the type of this expression and a translation
   # of this expression.
   def type_check(self, env: dict[str,Type], ctx:str = 'let') -> tuple[Type,Exp]:

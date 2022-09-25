@@ -121,7 +121,7 @@ class Function(Decl):
   def declare_type(self, env):
     ty = FunctionType(self.location,
                       self.type_params,
-                      tuple(p.type_annot for p in self.params),
+                      tuple((p.kind,p.type_annot) for p in self.params),
                       self.return_type,
                       tuple(self.requirements))
     return {self.name: StaticVarInfo(ty, None, ProperFraction())}
@@ -195,7 +195,7 @@ class Call(Exp):
       
   def type_argument_deduction(self, type_params, param_types, arg_types):
       deduced_types = {}    
-      for (param_ty, arg_ty) in zip(param_types, arg_types):
+      for ((kind,param_ty), arg_ty) in zip(param_types, arg_types):
           if not match_types(type_params, param_ty, arg_ty,
                              deduced_types, set()):
               error(self.location, 'in call, '
@@ -204,12 +204,17 @@ class Call(Exp):
                     + '\ndoes not match parameter type:\n\t' + str(param_ty))
       return deduced_types
     
-  def type_check(self, env):
-    fun_type, new_fun = self.fun.type_check(env)
+  def type_check(self, env, ctx):
+    fun_type, new_fun = self.fun.type_check(env, 'none')
     arg_types = []
     new_args = []
-    for arg in self.args:
-        arg_type, new_arg = arg.type_check(env)
+    if isinstance(fun_type, FunctionType):
+        param_kinds = [k for k,t in fun_type.param_types]
+    else:
+        param_kinds = ['let' for e in self.args]
+
+    for arg, kind in zip(self.args, param_kinds):
+        arg_type, new_arg = arg.type_check(env, kind)
         arg_types.append(arg_type)
         new_args.append(new_arg)
     fun_type = unfold(fun_type)
@@ -362,7 +367,7 @@ class Return(Stmt):
     return Return(self.location, new_arg)
 
   def type_check(self, env):
-    arg_type, new_arg = self.arg.type_check(env)
+    arg_type, new_arg = self.arg.type_check(env, 'write_rhs')
     return arg_type, Return(self.location, new_arg)
       
   def step(self, runner, machine):
@@ -423,7 +428,7 @@ class Lambda(Exp):
     return Lambda(self.location, new_params, self.return_mode,
                   self.requirements, new_body, self.name)
 
-  def type_check(self, env):
+  def type_check(self, env, ctx):
     body_env = copy_type_env(env)
     for p in self.params:
         body_env[p.ident] = StaticVarInfo(p.type_annot, None,
@@ -435,7 +440,7 @@ class Lambda(Exp):
     ret_type, new_body = self.body.type_check(body_env)
     return FunctionType(self.location,
                         tuple(),
-                        tuple(p.type_annot for p in self.params),
+                        tuple((p.kind,p.type_annot) for p in self.params),
                         ret_type,
                         tuple()), \
            Lambda(self.location, self.params, self.return_mode, new_reqs,

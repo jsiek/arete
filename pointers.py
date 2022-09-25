@@ -41,13 +41,13 @@ class PercentOf(Exp):
     new_arg = self.arg.const_eval(env)
     return PercentOf(self.location, new_percent, new_arg)
     
-  def type_check(self, env):
+  def type_check(self, env, ctx):
     if self.percentage == 'default':
       percent_type = RationalType(self.location)
       new_percent = 'default'
     else:
-      percent_type, new_percent = self.percentage.type_check(env)
-    arg_type, new_arg = self.arg.type_check(env)
+      percent_type, new_percent = self.percentage.type_check(env, 'none')
+    arg_type, new_arg = self.arg.type_check(env, 'let') # TODO
     percent_type = unfold(percent_type)
     if isinstance(percent_type, RationalType) \
        or isinstance(percent_type, IntType):
@@ -94,8 +94,8 @@ class Deref(Exp):
     new_arg = self.arg.const_eval(env)
     return Deref(self.location, new_arg)
     
-  def type_check(self, env):
-    arg_type, new_arg = self.arg.type_check(env)
+  def type_check(self, env, ctx):
+    arg_type, new_arg = self.arg.type_check(env, ctx)
     new_self = Deref(self.location, new_arg)
     arg_type = unfold(arg_type)
     if isinstance(arg_type, PointerType):
@@ -144,8 +144,8 @@ class AddressOf(Exp):
     new_arg = self.arg.const_eval(env)
     return AddressOf(self.location, new_arg)
     
-  def type_check(self, env):
-    arg_type, new_arg = self.arg.type_check(env)
+  def type_check(self, env, ctx):
+    arg_type, new_arg = self.arg.type_check(env, ctx)
     return PointerType(self.location, arg_type), \
            AddressOf(self.location, new_arg)
         
@@ -185,10 +185,10 @@ class Transfer(Stmt):
     return Transfer(self.location, new_lhs, new_percent, new_rhs)
 
   def type_check(self, env):
-    lhs_type, new_lhs = self.lhs.type_check(env)
+    lhs_type, new_lhs = self.lhs.type_check(env, 'none') # TODO
     lhs_type = unfold(lhs_type)
-    percent_type, new_percent = self.percent.type_check(env)
-    rhs_type, new_rhs = self.rhs.type_check(env)
+    percent_type, new_percent = self.percent.type_check(env, 'none')
+    rhs_type, new_rhs = self.rhs.type_check(env, 'none') # TODO
     rhs_type = unfold(rhs_type)
     if not (isinstance(lhs_type, PointerType) or isinstance(lhs_type, AnyType)):
       error(self.location, 'in transfer LHS, expected a pointer, not '
@@ -232,7 +232,7 @@ class Delete(Stmt):
     return Delete(self.location, new_arg)
     
   def type_check(self, env):
-    arg_type, new_arg = self.arg.type_check(env)
+    arg_type, new_arg = self.arg.type_check(env, 'var')
     arg_type = unfold(arg_type)
     if not (isinstance(arg_type, PointerType) or isinstance(arg_type, AnyType)):
       error(self.location, 'in delete, expected a pointer, not '

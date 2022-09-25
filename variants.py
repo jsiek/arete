@@ -89,12 +89,12 @@ class TagVariant(Exp):
     new_ty = simplify(self.type, env)
     return TagVariant(self.location, self.tag, new_arg, new_ty)
   
-  def type_check(self, env):
+  def type_check(self, env, ctx):
     new_type = self.type
     if not (isinstance(new_type, VariantType) or isinstance(ty, AnyType)):
       error(self.location, 'expected variant type in tagging, not '
             + str(self.type))
-    arg_ty, new_arg = self.arg.type_check(env)
+    arg_ty, new_arg = self.arg.type_check(env, 'write_rhs')
     if isinstance(new_type, VariantType):
       found = False
       for (alt_tag, alt_ty) in new_type.alternative_types:
@@ -165,7 +165,7 @@ class Match(Stmt):
     return Match(self.location, new_cond, new_cases)
   
   def type_check(self, env):
-    cond_ty, new_cond = self.condition.type_check(env)
+    cond_ty, new_cond = self.condition.type_check(env, 'none')
     cond_ty = unfold(cond_ty)
     if not (isinstance(cond_ty, VariantType) \
             or isinstance(cond_ty, AnyType)):
@@ -268,8 +268,8 @@ class VariantMember(Exp):
     new_arg = self.arg.const_eval(env)
     return VariantMember(self.location, new_arg, self.field)
     
-  def type_check(self, env):
-    variant_type, new_arg = self.arg.type_check(env)
+  def type_check(self, env, ctx):
+    variant_type, new_arg = self.arg.type_check(env, ctx)
     variant_type = unfold(variant_type)
     new_self = VariantMember(self.location, new_arg, self.field)
     if not (isinstance(variant_type, VariantType) \
