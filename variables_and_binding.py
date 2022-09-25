@@ -69,8 +69,8 @@ class Param:
       elif self.kind == 'var' or self.kind == 'inout':
         success = val.upgrade(loc)
         if not success:
-          error(self.location,
-                self.kind + ' binding requires permission 1/1, not ' + str(val))
+          error(loc, ' binding ' + str(self) + ' requires permission 1/1, not '
+                + str(val))
         if not res.temporary:
           env[self.ident] = val.duplicate(Fraction(1,1), loc)
           if self.kind == 'var':
@@ -143,8 +143,7 @@ class Var(Exp):
     elif ctx == 'var':
       env[self.ident].state = Dead()
     elif ctx == 'inout':
-      pass
-      #env[self.ident].state = EmptyFraction()
+      env[self.ident].state = EmptyFraction()
     elif ctx == 'write_lhs' and info.state != FullFraction():
       warning(self.location, "don't have write permission for " + self.ident
               + ", only " + str(info.state))
@@ -268,12 +267,16 @@ class BindingStmt(Exp):
     return BindingStmt(self.location, new_param, new_rhs, new_body)
     
   def type_check(self, env):
-    arg_type, new_arg = self.arg.type_check(env, self.param.kind)
+    if self.param.kind == 'inout':
+      arg_env = copy_type_env(env)
+    else:
+      arg_env = env
+    arg_type, new_arg = self.arg.type_check(arg_env, self.param.kind)
     if not consistent(arg_type, self.param.type_annot):
       error(self.arg.location, 'type of initializer ' + str(arg_type) + '\n'
             + ' is inconsistent with declared type '
             + str(new_param.type_annot))
-    body_env = env.copy()
+    body_env = copy_type_env(arg_env)
     self.param.bind_type(body_env)
     body_type, new_body = self.body.type_check(body_env)
     return body_type, BindingStmt(self.location, self.param, new_arg, new_body)

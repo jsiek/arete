@@ -371,7 +371,7 @@ if __name__ == "__main__":
             exit(0)
         else:
             print('unexpected failure')
-            if True or tracing_on() or debug():
+            if tracing_on() or debug():
                 raise ex
             else:
                 print(str(ex))

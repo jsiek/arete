@@ -1,0 +1,8 @@
+fun main() {
+  var x = 42;
+  {
+    var y = x;
+    y = 0;
+  }
+  return x;
+}
