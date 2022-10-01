@@ -332,9 +332,8 @@ if __name__ == "__main__":
           continue
       set_filename(filename)
       file = open(filename, 'r')
-      expect_fail = False
       if 'fail' in sys.argv:
-        expect_fail = True
+        set_expect_fail(True)
       if 'trace' in sys.argv:
         set_trace(True)
         set_verbose(True)
@@ -359,7 +358,7 @@ if __name__ == "__main__":
 
       machine = Machine(Memory(), [], None, None, None)
       retval = machine.run(decls)
-      if expect_fail:
+      if expect_fail():
           print("expected failure, but didn't, returned " + str(retval))
           exit(-1)
       else:
@@ -367,7 +366,7 @@ if __name__ == "__main__":
               print('result: ' + str(retval.value))
           exit(int(retval.value))
     except Exception as ex:
-        if expect_fail:
+        if expect_fail():
             exit(0)
         else:
             print('unexpected failure')

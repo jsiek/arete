@@ -107,6 +107,22 @@ class NoParam:
   def bind(self, res : Result, env, mem, loc):
     return
 
+# The inout_vars global is for communicating variables bound
+# to inout parameters in function calls.
+  
+inout_vars = set()
+
+def clear_inout_vars():
+  global inout_vars
+  inout_vars = set()
+    
+def add_inout_var(var):
+  global inout_vars
+  inout_vars = inout_vars | set([var])
+
+def get_inout_vars():
+    return inout_vars
+
 @dataclass
 class Var(Exp):
   ident: str
@@ -134,21 +150,37 @@ class Var(Exp):
     if not hasattr(info, 'state'):
       print('bad type env info: ' + str(info))
       exit(-1)
-    if not static_readable(info.state):
-      warning(self.location, "don't have read permission for " + self.ident
-              + ", only " + str(info.state))
 
     if ctx == 'let':
-      env[self.ident].state = ProperFraction()
+      if not static_readable(info.state):
+        warning(self.location, "don't have read permission for " + self.ident
+                + ", only " + str(info.state))
+      info.state = ProperFraction()
     elif ctx == 'var':
-      env[self.ident].state = Dead()
+      if info.state != FullFraction():
+        warning(self.location, "dont' have write permission for " + self.ident
+                + ", only " + str(info.state))
+      info.state = Dead()
     elif ctx == 'inout':
-      env[self.ident].state = EmptyFraction()
-    elif ctx == 'write_lhs' and info.state != FullFraction():
-      warning(self.location, "don't have write permission for " + self.ident
-              + ", only " + str(info.state))
+      if info.state != FullFraction():
+        warning(self.location, "dont' have write permission for " + self.ident
+                + ", only " + str(info.state))
+      info.state = EmptyFraction()
+      add_inout_var(self.ident)
+    elif ctx == 'write_lhs':
+      if info.state != FullFraction():
+        warning(self.location, "don't have write permission for " + self.ident
+                + ", only " + str(info.state))
     elif ctx == 'write_rhs':
-      env[self.ident].state = EmptyFraction()
+      if not static_readable(info.state):
+        warning(self.location, "don't have read permission for " + self.ident
+                + ", only " + str(info.state))
+      # problem: see tests/array.rte
+      # env[self.ident].state = EmptyFraction()
+    elif ctx == 'none':
+      pass
+    else:
+      error(self.location, "unrecognized context: " + ctx)
       
     if info.translation is None:
       return info.type, self

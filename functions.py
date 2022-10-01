@@ -9,7 +9,7 @@
 #
 
 from dataclasses import dataclass
-from variables_and_binding import Param
+from variables_and_binding import Param, clear_inout_vars, get_inout_vars
 from ast_base import *
 from ast_types import *
 from values import Result, Pointer
@@ -168,7 +168,6 @@ class Function(Decl):
                                      runner.results[0].value,
                                      self.location)
       machine.finish_definition(self.location)
-
     
 @dataclass
 class Call(Exp):
@@ -206,22 +205,28 @@ class Call(Exp):
     
   def type_check(self, env, ctx):
     fun_type, new_fun = self.fun.type_check(env, 'none')
+    # types of the arguments
     arg_types = []
+    # translated arguments
     new_args = []
+    
     if isinstance(fun_type, FunctionType):
         param_kinds = [k for k,t in fun_type.param_types]
     else:
         param_kinds = ['let' for e in self.args]
 
+    # type check (and translate) the arguments
+    clear_inout_vars()
     for arg, kind in zip(self.args, param_kinds):
         arg_type, new_arg = arg.type_check(env, kind)
         arg_types.append(arg_type)
         new_args.append(new_arg)
+
+    # restore state of variables used to initialize inout parameters
+    for var in get_inout_vars():
+        env[var].state = FullFraction()
+        
     fun_type = unfold(fun_type)
-    if tracing_on():
-      print('type checking call ' + str(self))
-      print('function type: ' + str(fun_type))
-      print('in environment: ' + str(env))
     if isinstance(fun_type, FunctionType):
       if len(fun_type.param_types) != len(arg_types):
         error(self.location, 'incorrect number of arguments: '
