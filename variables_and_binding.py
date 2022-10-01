@@ -36,6 +36,9 @@ class Param:
 
     def bind_type(self, env):
       if self.kind == 'let':
+        # let-bound variables are unsinkable.
+        # This differs from Val, where let-bound locals are sinkable
+        # if they are not aliased. Val's let-bound parameters are unsinkable.
         state = ProperFraction()
       elif self.kind == 'inout' or self.kind == 'var':
         state = FullFraction()
