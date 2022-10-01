@@ -153,32 +153,38 @@ class Var(Exp):
 
     if ctx == 'let':
       if not static_readable(info.state):
-        warning(self.location, "don't have read permission for " + self.ident
+        error(self.location, "don't have read permission for " + self.ident
                 + ", only " + str(info.state))
       info.state = ProperFraction()
     elif ctx == 'var':
       if info.state != FullFraction():
-        warning(self.location, "dont' have write permission for " + self.ident
+        error(self.location, "dont' have write permission for " + self.ident
                 + ", only " + str(info.state))
       info.state = Dead()
     elif ctx == 'inout':
       if info.state != FullFraction():
-        warning(self.location, "dont' have write permission for " + self.ident
+        error(self.location, "dont' have write permission for " + self.ident
                 + ", only " + str(info.state))
       info.state = EmptyFraction()
       add_inout_var(self.ident)
     elif ctx == 'write_lhs':
       if info.state != FullFraction():
-        warning(self.location, "don't have write permission for " + self.ident
+        error(self.location, "don't have write permission for " + self.ident
                 + ", only " + str(info.state))
     elif ctx == 'write_rhs':
       if not static_readable(info.state):
-        warning(self.location, "don't have read permission for " + self.ident
+        error(self.location, "don't have read permission for " + self.ident
                 + ", only " + str(info.state))
       # problem: see tests/array.rte
       # env[self.ident].state = EmptyFraction()
     elif ctx == 'none':
       pass
+    elif ctx == 'ref':
+      # UNDER CONSTRUCTION
+      if not static_readable(info.state):
+        error(self.location, "don't have read permission for " + self.ident
+                + ", only " + str(info.state))
+      info.state = ProperFraction() ## ??
     else:
       error(self.location, "unrecognized context: " + ctx)
       

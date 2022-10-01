@@ -461,6 +461,15 @@ class ProperFraction(StaticState):
   def __repr__(self):
     return str(self)
 
+# Not sure whether need the following
+# @dataclass(frozen=True)
+# class PreciseFraction(StaticState):
+#   frac : Fraction
+#   def __str__(self):
+#     return str(self.frac)
+#   def __repr__(self):
+#     return str(self)
+  
 # The variable is readable and writable.
 @dataclass(frozen=True)
 class FullFraction(StaticState):

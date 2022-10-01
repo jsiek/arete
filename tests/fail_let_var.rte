@@ -1,5 +1,5 @@
 fun main() {
   let x = 0;
   var y = x;
-  return x + y; // pointer does not have read permission in eval. of x
+  return y;
 }
