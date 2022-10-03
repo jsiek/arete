@@ -110,21 +110,21 @@ class NoParam:
   def bind(self, res : Result, env, mem, loc):
     return
 
-# The inout_vars global is for communicating variables bound
+# The borrowed_vars global is for communicating variables bound
 # to inout parameters in function calls.
   
-inout_vars = set()
+borrowed_vars = dict()
 
-def clear_inout_vars():
-  global inout_vars
-  inout_vars = set()
+def clear_borrowed_vars():
+  global borrowed_vars
+  borrowed_vars = dict()
     
-def add_inout_var(var):
-  global inout_vars
-  inout_vars = inout_vars | set([var])
+def add_borrowed_var(var, info):
+  global borrowed_vars
+  borrowed_vars = borrowed_vars | {var: info.copy()}
 
-def get_inout_vars():
-    return inout_vars
+def get_borrowed_vars():
+    return borrowed_vars
 
 @dataclass
 class Var(Exp):
@@ -158,6 +158,7 @@ class Var(Exp):
       if not static_readable(info.state):
         error(self.location, "don't have read permission for " + self.ident
                 + ", only " + str(info.state))
+      add_borrowed_var(self.ident, info)
       info.state = ProperFraction()
     elif ctx == 'var':
       if info.state != FullFraction():
@@ -168,8 +169,8 @@ class Var(Exp):
       if info.state != FullFraction():
         error(self.location, "dont' have write permission for " + self.ident
                 + ", only " + str(info.state))
+      add_borrowed_var(self.ident, info)
       info.state = EmptyFraction()
-      add_inout_var(self.ident)
     elif ctx == 'write_lhs':
       if info.state != FullFraction():
         error(self.location, "don't have write permission for " + self.ident

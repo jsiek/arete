@@ -9,7 +9,7 @@
 #
 
 from dataclasses import dataclass
-from variables_and_binding import Param, clear_inout_vars, get_inout_vars
+from variables_and_binding import Param, clear_borrowed_vars, get_borrowed_vars
 from ast_base import *
 from ast_types import *
 from values import Result, Pointer
@@ -216,15 +216,15 @@ class Call(Exp):
         param_kinds = ['let' for e in self.args]
 
     # type check (and translate) the arguments
-    clear_inout_vars()
+    clear_borrowed_vars()
     for arg, kind in zip(self.args, param_kinds):
         arg_type, new_arg = arg.type_check(env, kind)
         arg_types.append(arg_type)
         new_args.append(new_arg)
 
-    # restore state of variables used to initialize inout parameters
-    for var in get_inout_vars():
-        env[var].state = FullFraction()
+    # restore info of variables that we borrowed from
+    for var, old_info in get_borrowed_vars().items():
+        env[var] = old_info
         
     fun_type = unfold(fun_type)
     if isinstance(fun_type, FunctionType):
