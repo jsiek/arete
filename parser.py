@@ -124,11 +124,11 @@ def parse_tree_to_param_type_list(e):
     if e.data == 'empty':
         return ()
     elif e.data == 'single':
-        kind = str(e.children[0])
+        kind = str(e.children[0].data)
         ty = parse_tree_to_type(e.children[1])
         return ((kind, ty) ,)
     elif e.data == 'push':
-        kind = str(e.children[0])
+        kind = str(e.children[0].data)
         ty = parse_tree_to_type(e.children[1])
         return ((kind, ty),) \
             + parse_tree_to_param_type_list(e.children[2])

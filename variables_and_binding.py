@@ -308,10 +308,10 @@ class BindingStmt(Exp):
     return BindingStmt(self.location, new_param, new_rhs, new_body)
     
   def type_check(self, env):
-    if self.param.kind == 'inout':
-      arg_env = copy_type_env(env)
-    else:
+    if self.param.kind == 'var':
       arg_env = env
+    else:
+      arg_env = copy_type_env(env)
     arg_type, new_arg = self.arg.type_check(arg_env, self.param.kind)
     if not consistent(arg_type, self.param.type_annot):
       error(self.arg.location, 'type of initializer ' + str(arg_type) + '\n'
