@@ -43,7 +43,9 @@ class Param:
       elif self.kind == 'inout' or self.kind == 'var':
         state = FullFraction()
       elif self.kind == 'ref':
-        state = ProperFraction()
+        #state = ProperFraction()
+        # warning: optimistic! TODO
+        state = FullFraction()
       env[self.ident] = StaticVarInfo(self.type_annot, None, state, self)
   
     # At runtime, bind the result to this parameter/variable
@@ -188,6 +190,7 @@ class Var(Exp):
       if not static_readable(info.state):
         error(self.location, "don't have read permission for " + self.ident
                 + ", only " + str(info.state))
+      add_borrowed_var(self.ident, info)
       info.state = ProperFraction() ## ??
     else:
       error(self.location, "unrecognized context: " + ctx)

@@ -47,7 +47,7 @@ class PercentOf(Exp):
       new_percent = 'default'
     else:
       percent_type, new_percent = self.percentage.type_check(env, 'none')
-    arg_type, new_arg = self.arg.type_check(env, 'let') # TODO
+    arg_type, new_arg = self.arg.type_check(env, 'none') # TODO
     percent_type = unfold(percent_type)
     if isinstance(percent_type, RationalType) \
        or isinstance(percent_type, IntType):
@@ -232,7 +232,7 @@ class Delete(Stmt):
     return Delete(self.location, new_arg)
     
   def type_check(self, env):
-    arg_type, new_arg = self.arg.type_check(env, 'var')
+    arg_type, new_arg = self.arg.type_check(env, 'none') # TODO
     arg_type = unfold(arg_type)
     if not (isinstance(arg_type, PointerType) or isinstance(arg_type, AnyType)):
       error(self.location, 'in delete, expected a pointer, not '
