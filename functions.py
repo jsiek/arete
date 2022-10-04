@@ -149,8 +149,9 @@ class Function(Decl):
     # type check the body of the function
     body_type, new_body = self.body.type_check(body_env)
     if not consistent(body_type, new_return_type):
-      error(self.location, 'return type mismatch:\n' + str(new_return_type)
-            + ' inconsistent with ' + str(body_type))
+      static_error(self.location, 'return type mismatch:\n'
+                   + str(new_return_type)
+                   + ' inconsistent with ' + str(body_type))
     new_fun = Function(self.location, self.name, self.type_params,
                      new_params, new_return_type,
                      self.return_mode, [], new_body)
@@ -229,9 +230,9 @@ class Call(Exp):
     fun_type = unfold(fun_type)
     if isinstance(fun_type, FunctionType):
       if len(fun_type.param_types) != len(arg_types):
-        error(self.location, 'incorrect number of arguments: '
-              + str(len(arg_types))
-              + '\nexpected: ' + str(len(fun_type.param_types)))
+        static_error(self.location, 'incorrect number of arguments: '
+                     + str(len(arg_types))
+                     + '\nexpected: ' + str(len(fun_type.param_types)))
         
       param_types = fun_type.param_types
       rt = fun_type.return_type
@@ -254,8 +255,8 @@ class Call(Exp):
       return AnyType(self.location), \
              Call(self.location, new_fun, new_args)
     else:
-      error(self.location, "in call, expected a function, not "
-            + str(fun_type))
+      static_error(self.location, "in call, expected a function, not "
+                   + str(fun_type))
 
   def set_closure(self, runner, machine):
       if runner.clos is None:

@@ -323,7 +323,7 @@ class Machine:
       print(str(k) + ':\t' + str(val) + '\t\t\t' + str(ptr))
     print()
 
-flags = set(['trace', 'fail', 'debug'])
+flags = set(['trace', 'fail', 'debug', 'static_fail'])
 
 if __name__ == "__main__":
     decls = []
@@ -334,6 +334,8 @@ if __name__ == "__main__":
       file = open(filename, 'r')
       if 'fail' in sys.argv:
         set_expect_fail(True)
+      if 'static_fail' in sys.argv:
+        set_expect_static_fail(True)
       if 'trace' in sys.argv:
         set_trace(True)
         set_verbose(True)
@@ -365,6 +367,16 @@ if __name__ == "__main__":
           if tracing_on() or debug():
               print('result: ' + str(retval.value))
           exit(int(retval.value))
+    except StaticError as ex:
+        if expect_static_fail():
+            exit(0)
+        else:
+            print('unexpected static failure')
+            if tracing_on() or debug():
+                raise ex
+            else:
+                print(str(ex))
+                print()
     except Exception as ex:
         if expect_fail():
             exit(0)

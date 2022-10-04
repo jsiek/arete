@@ -56,8 +56,8 @@ class PercentOf(Exp):
       return AnyType(self.location), \
              PercentOf(self.location, new_percent, new_arg)
     else:
-      error(self.location, 'in initializer, expected percentage '
-            + 'not ' + str(percent_type))
+      static_error(self.location, 'in initializer, expected percentage '
+                   + 'not ' + str(percent_type))
       
   def step(self, runner, machine):
     if runner.state == 0:
@@ -103,8 +103,8 @@ class Deref(Exp):
     elif isinstance(arg_type, AnyType):
       return AnyType(self.location), new_self
     else:
-      error(self.location, 'in deref, expected a pointer, not '
-            + str(arg_type))
+      static_error(self.location, 'in deref, expected a pointer, not '
+                   + str(arg_type))
       
   def step(self, runner, machine):
     if runner.state == 0:
@@ -191,11 +191,11 @@ class Transfer(Stmt):
     rhs_type, new_rhs = self.rhs.type_check(env, 'none') # TODO
     rhs_type = unfold(rhs_type)
     if not (isinstance(lhs_type, PointerType) or isinstance(lhs_type, AnyType)):
-      error(self.location, 'in transfer LHS, expected a pointer, not '
-            + str(lhs_type))
+      static_error(self.location, 'in transfer LHS, expected a pointer, not '
+                   + str(lhs_type))
     if not (isinstance(rhs_type, PointerType) or isinstance(rhs_type, AnyType)):
-      error(self.location, 'in transfer RHS, expected a pointer, not '
-            + str(rhs_type))
+      static_error(self.location, 'in transfer RHS, expected a pointer, not '
+                   + str(rhs_type))
     return None, Transfer(self.location, new_lhs, new_percent, new_rhs)
 
   def step(self, runner, machine):
@@ -235,8 +235,8 @@ class Delete(Stmt):
     arg_type, new_arg = self.arg.type_check(env, 'none') # TODO
     arg_type = unfold(arg_type)
     if not (isinstance(arg_type, PointerType) or isinstance(arg_type, AnyType)):
-      error(self.location, 'in delete, expected a pointer, not '
-            + str(arg_type))
+      static_error(self.location, 'in delete, expected a pointer, not '
+                   + str(arg_type))
     return None, Delete(self.location, new_arg)
 
   def step(self, runner, machine):

@@ -209,7 +209,8 @@ def unfold(ty: Type) -> Type:
 
 def require_consistent(ty1 : Type, ty2 : Type, msg: str, location: Meta):
   if not consistent(ty1, ty2):
-    error(location, msg + ', ' + str(ty1) + ' inconsistent with ' + str(ty2))
+    static_error(location, msg + ', ' + str(ty1)
+                 + ' inconsistent with ' + str(ty2))
 
 def simplify(type: Type, env) -> Type:
   match type:
@@ -320,6 +321,10 @@ def consistent(ty1: Type, ty2: Type, assumed_consistent=set()) -> bool:
     case (AnyType(), _):
       result = True
     case (_, AnyType()):
+      result = True
+    case (None, _):
+      result = True
+    case (_, None):
       result = True
     case (RecursiveType(X, t1), _):
       assm = assumed_consistent | set([(ty1,ty2)])

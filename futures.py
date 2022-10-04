@@ -101,5 +101,5 @@ class Wait(Exp):
     elif isinstance(arg_type, AnyType):
       return AnyType(self.location), Wait(self.location, new_arg)
     else:
-      error(self.arg.location, 'in wait, expected a future, not '
-            + str(arg_type))
+      static_error(self.arg.location, 'in wait, expected a future, not '
+                   + str(arg_type))

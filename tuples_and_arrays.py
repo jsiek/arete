@@ -164,8 +164,8 @@ class Array(Exp):
     arg_type, new_arg = self.arg.type_check(env, 'let')
     if not (isinstance(size_type, IntType)
             or isinstance(size_type, AnyType)):
-        error(self.location, "expected integer array size, not "
-              + str(size_type))
+        static_error(self.location, "expected integer array size, not "
+                     + str(size_type))
     return ArrayType(self.location, arg_type), \
            Array(self.location, new_size, new_arg)
 
@@ -265,18 +265,19 @@ class Index(Exp):
           return arg_type.member_types[self.index.value], new_self
                  
         else:
-          error(self.location, 'index ' + str(self.index.value)
+          static_error(self.location, 'index ' + str(self.index.value)
                 + ' out of bounds for pointer ' + str(arg_type))
       else:
-        error(self.location, 'in subscript, expected an integer index, not '
-              + str(self.index))
+        static_error(self.location,
+                     'in subscript, expected an integer index, not '
+                     + str(self.index))
     elif isinstance(arg_type, ArrayType):
       return arg_type.element_type, new_self
     elif isinstance(arg_type, AnyType):
       return AnyType(self.location), new_self
     else:
-      error(self.location, 'in subscript, expected tuple or array, not '
-            + str(arg_type))
+      static_error(self.location, 'in subscript, expected tuple or array, not '
+                   + str(arg_type))
       
   def step(self, runner, machine):
     if runner.state == 0:

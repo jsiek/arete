@@ -92,8 +92,8 @@ class TagVariant(Exp):
   def type_check(self, env, ctx):
     new_type = self.type
     if not (isinstance(new_type, VariantType) or isinstance(ty, AnyType)):
-      error(self.location, 'expected variant type in tagging, not '
-            + str(self.type))
+      static_error(self.location, 'expected variant type in tagging, not '
+                   + str(self.type))
     arg_ty, new_arg = self.arg.type_check(env, 'write_rhs')
     if isinstance(new_type, VariantType):
       found = False
@@ -104,7 +104,8 @@ class TagVariant(Exp):
                   + str(arg_ty))
           found = True
       if not found:
-        error(self.location, 'no tag ' + self.tag + ' in ' + str(new_type))
+        static_error(self.location, 'no tag ' + self.tag + ' in '
+                     + str(new_type))
     return new_type, TagVariant(self.location, self.tag, new_arg, new_type)
   
   def step(self, runner, machine):
@@ -169,8 +170,8 @@ class Match(Stmt):
     cond_ty = unfold(cond_ty)
     if not (isinstance(cond_ty, VariantType) \
             or isinstance(cond_ty, AnyType)):
-      error(self.location, 'expected variant type in match, not '
-            + str(cond_ty))
+      static_error(self.location, 'expected variant type in match, not '
+                   + str(cond_ty))
     return_type = None
     new_cases = []
     for (tag, param, body) in self.cases:
@@ -193,7 +194,7 @@ class Match(Stmt):
               return_type = join(retty, return_type)
             found = True
         if found == False:
-          error(self.location, tag + ' is not a tag in ' + str(cond_ty))
+          static_error(self.location, tag + ' is not a tag in ' + str(cond_ty))
       elif isinstance(cond_ty, AnyType):
           body_env = copy_type_env(env)
           #body_env[param.ident] = (AnyType(param.location), None, param)
@@ -274,12 +275,13 @@ class VariantMember(Exp):
     new_self = VariantMember(self.location, new_arg, self.field)
     if not (isinstance(variant_type, VariantType) \
             or isinstance(variant_type, AnyType)):
-        error(self.location, "expected a variant, not " + str(variant_type))
+        static_error(self.location, "expected a variant, not "
+                     + str(variant_type))
     if isinstance(variant_type, VariantType):
       alts = {x:t for x,t in variant_type.alternative_types}
       if not self.field in alts.keys():
-          error(self.location, "variant " + str(self.arg) + " does not contain "
-                + self.field)
+          static_error(self.location, "variant " + str(self.arg)
+                       + " does not contain " + self.field)
       return alts[self.field], new_self
     else:
       return AnyType(self.location), new_self

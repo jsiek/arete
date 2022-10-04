@@ -234,11 +234,12 @@ class Impl(Decl):
     for x,ty in info.iface.members:
       req_ty = substitute(subst, ty)
       if not x in member_types.keys():
-        error(self.location, "missing requirement " + x + " for impl of "
-              + self.iface_name
-              + ' for ' + ', '.join([str(ty) for ty in self.impl_types]))
+        static_error(self.location, "missing requirement " + x + " for impl of "
+                     + self.iface_name
+                     + ' for ' + ', '.join([str(ty) for ty in self.impl_types]))
       if not consistent(req_ty, member_types[x]):
-        error(self.location, "type of " + x + ":\n" + str(member_types[x])
+        static_error(self.location, "type of " + x + ":\n"
+                     + str(member_types[x])
               + "\nis not consistent with the required type:\n" + str(req_ty))
     if tracing_on():
       print('finished type checking ' + str(self))

@@ -143,13 +143,14 @@ class Import(Decl):
       results = {}
       for x in self.imports:
           if not x in mod.member_types.keys():
-            error(decl.location, "in import, no " + x
-                  + " in " + str(module))
+            static_error(decl.location, "in import, no " + x
+                         + " in " + str(module))
           results[x] = StaticVarInfo(mod.member_types[x], None,
                                      ProperFraction())
       return results
     else:
-      error(self.location, "in import, expected a module, not " + str(mod))
+      static_error(self.location, "in import, expected a module, not "
+                   + str(mod))
     
   def type_check(self, env):
     mod_type, new_module = self.module.type_check(env, 'none')
@@ -205,10 +206,10 @@ class ModuleMember(Exp):
     mod_type = unfold(mod_type)
     if not (isinstance(mod_type, ModuleType) \
             or isinstance(mod_type, AnyType)):
-        error(self.location, "expected a module, not " + str(mod_type))
+        static_error(self.location, "expected a module, not " + str(mod_type))
     if not self.field in mod_type.member_types.keys():
-        error(self.location, "module " + str(self.arg) + " does not contain "
-              + self.field)
+        static_error(self.location, "module " + str(self.arg)
+                     + " does not contain " + self.field)
     return mod_type.member_types[self.field], \
         ModuleMember(self.location, new_arg, self.field)
       

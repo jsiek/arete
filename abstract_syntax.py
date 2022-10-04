@@ -236,11 +236,12 @@ class IfExp(Exp):
     els_type, new_els = self.els.type_check(env, ctx)
     if not (isinstance(cond_type, BoolType)
             or isinstance(cond_type, AnyType)):
-      error(self.location, 'in conditional, expected a Boolean, not '
+      static_error(self.location, 'in conditional, expected a Boolean, not '
             + str(cond_type))
     if not consistent(thn_type, els_type):
-      error(self.location, 'in conditional, branches must be consistent, not '
-            + str(cond_type))
+      static_error(self.location,
+                   'in conditional, branches must be consistent, not '
+                   + str(cond_type))
     return join(thn_type, els_type), \
            IfExp(self.location, new_cond, new_thn, new_els)
     
@@ -273,6 +274,9 @@ class Seq(Stmt):
   def type_check(self, env):
     first_type, new_first = self.first.type_check(env)
     rest_type, new_rest = self.rest.type_check(env)
+    if not consistent(first_type, rest_type):
+      static_error(self.location, "inconsistent return types: "
+                   + str(first_type) + " and " + str(rest_type))
     return join(first_type, rest_type), \
            Seq(self.location, new_first, new_rest)
 
@@ -382,8 +386,8 @@ class Assert(Stmt):
   def type_check(self, env):
     arg_type, new_arg = self.exp.type_check(env, 'none')
     if not isinstance(arg_type, BoolType):
-      error(self.location, "in assert, expected a Boolean, not "
-            + str(arg_type))
+      static_error(self.location, "in assert, expected a Boolean, not "
+                   + str(arg_type))
     return None, Assert(self.location, new_arg)
   
   def step(self, runner, machine):
@@ -437,6 +441,7 @@ class IfStmt(Stmt):
     cond_type, new_cond = self.cond.type_check(env, 'none')
     thn_type, new_thn = self.thn.type_check(env)
     els_type, new_els = self.els.type_check(env)
+    require_consistent(thn_type, els_type, 'in if statement', self.location)
     return join(thn_type, els_type), \
            IfStmt(self.location, new_cond, new_thn, new_els)
     
@@ -564,8 +569,8 @@ class Global(Decl):
     rhs_type, new_rhs = self.rhs.type_check(env, 'var')
     type_annot = self.type_annot
     if not consistent(rhs_type, type_annot):
-      error(self.location, 'type of initializer ' + str(rhs_type) + '\n'
-            + ' is inconsistent with declared type ' + str(type_annot))
+      static_error(self.location, 'type of initializer ' + str(rhs_type) + '\n'
+                   + ' is inconsistent with declared type ' + str(type_annot))
     return [Global(self.location, self.name, type_annot, new_rhs)]
     
   def step(self, runner, machine):

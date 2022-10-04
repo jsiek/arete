@@ -166,13 +166,13 @@ class FieldAccess(Exp):
         if self.field in field_types.keys():
           return field_types[self.field], new_self
         else:
-          error(self.location, 'field ' + self.field
-                + ' not in record ' + str(arg_type))
+          static_error(self.location, 'field ' + self.field
+                       + ' not in record ' + str(arg_type))
     elif isinstance(arg_type, AnyType):
       return AnyType(self.location), new_self
     else:
-      error(self.location, 'in field access, expected a record, not '
-            + str(arg_type))
+      static_error(self.location, 'in field access, expected a record, not '
+                   + str(arg_type))
       
   def step(self, runner, machine):
     if runner.state == 0:

@@ -150,7 +150,7 @@ class Var(Exp):
     
   def type_check(self, env, ctx):
     if self.ident not in env:
-        error(self.location, 'use of undefined variable ' + self.ident)
+        static_error(self.location, 'use of undefined variable ' + self.ident)
     info = env[self.ident]
     if not hasattr(info, 'state'):
       print('bad type env info: ' + str(info))
@@ -158,29 +158,34 @@ class Var(Exp):
 
     if ctx == 'let':
       if not static_readable(info.state):
-        error(self.location, "don't have read permission for " + self.ident
-                + ", only " + str(info.state))
+        static_error(self.location,
+                     "don't have read permission for " + self.ident
+                     + ", only " + str(info.state))
       add_borrowed_var(self.ident, info)
       info.state = ProperFraction()
     elif ctx == 'var':
       if info.state != FullFraction():
-        error(self.location, "dont' have write permission for " + self.ident
-                + ", only " + str(info.state))
+        static_error(self.location,
+                     "dont' have write permission for " + self.ident
+                     + ", only " + str(info.state))
       info.state = Dead()
     elif ctx == 'inout':
       if info.state != FullFraction():
-        error(self.location, "dont' have write permission for " + self.ident
-                + ", only " + str(info.state))
+        static_error(self.location,
+                     "don't have write permission for " + self.ident
+                     + ", only " + str(info.state))
       add_borrowed_var(self.ident, info)
       info.state = EmptyFraction()
     elif ctx == 'write_lhs':
       if info.state != FullFraction():
-        error(self.location, "don't have write permission for " + self.ident
-                + ", only " + str(info.state))
+        static_error(self.location,
+                     "don't have write permission for " + self.ident
+                     + ", only " + str(info.state))
     elif ctx == 'write_rhs':
       if not static_readable(info.state):
-        error(self.location, "don't have read permission for " + self.ident
-                + ", only " + str(info.state))
+        static_error(self.location,
+                     "don't have read permission for " + self.ident
+                     + ", only " + str(info.state))
       # problem: see tests/array.rte
       # env[self.ident].state = EmptyFraction()
     elif ctx == 'none':
@@ -188,12 +193,13 @@ class Var(Exp):
     elif ctx == 'ref':
       # UNDER CONSTRUCTION
       if not static_readable(info.state):
-        error(self.location, "don't have read permission for " + self.ident
-                + ", only " + str(info.state))
+        static_error(self.location,
+                     "don't have read permission for " + self.ident
+                     + ", only " + str(info.state))
       add_borrowed_var(self.ident, info)
       info.state = ProperFraction() ## ??
     else:
-      error(self.location, "unrecognized context: " + ctx)
+      static_error(self.location, "unrecognized context: " + ctx)
       
     if info.translation is None:
       return info.type, self
@@ -253,8 +259,9 @@ class BindingExp(Exp):
   def type_check(self, env, ctx):
     rhs_type, new_arg = self.arg.type_check(env, self.param.kind)
     if not consistent(rhs_type, self.param.type_annot):
-      error(self.arg.location, 'type of initializer ' + str(rhs_type) + '\n'
-            + ' is inconsistent with declared type ' + str(self.param.type_annot))
+      static_error(self.arg.location, 'type of initializer ' + str(rhs_type)
+                   + '\nis inconsistent with declared type '
+                   + str(self.param.type_annot))
     body_env = copy_type_env(env)
     self.param.bind_type(body_env)
     body_type, new_body = self.body.type_check(body_env, ctx)
@@ -318,9 +325,9 @@ class BindingStmt(Exp):
       arg_env = copy_type_env(env)
     arg_type, new_arg = self.arg.type_check(arg_env, self.param.kind)
     if not consistent(arg_type, self.param.type_annot):
-      error(self.arg.location, 'type of initializer ' + str(arg_type) + '\n'
-            + ' is inconsistent with declared type '
-            + str(new_param.type_annot))
+      static_error(self.arg.location, 'type of initializer ' + str(arg_type)
+                   + '\nis inconsistent with declared type '
+                   + str(new_param.type_annot))
     body_env = copy_type_env(arg_env)
     self.param.bind_type(body_env)
     body_type, new_body = self.body.type_check(body_env)

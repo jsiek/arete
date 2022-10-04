@@ -61,6 +61,17 @@ def set_expect_fail(b):
   global expect_fail_flag
   expect_fail_flag = b
 
+# flag for expect static_fail
+
+expect_static_fail_flag = False
+
+def expect_static_fail():
+  return expect_static_fail_flag
+
+def set_expect_static_fail(b):
+  global expect_static_fail_flag
+  expect_static_fail_flag = b
+  
 # interpreting primitives
 
 interp_prim = {}
@@ -130,7 +141,13 @@ def warning(location, msg):
 
 def error(location, msg):
   raise Exception(error_header(location) + msg)
-      
+
+class StaticError(Exception):
+  pass
+
+def static_error(location, msg):
+  raise StaticError(error_header(location) + msg)
+
 def writable(frac):
     return frac == Fraction(1, 1)
 
