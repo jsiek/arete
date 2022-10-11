@@ -94,7 +94,24 @@ class Param:
 
       else:
         error(loc, 'unrecognized kind of parameter: ' + self.kind)
-    
+
+    # This binding is going out of scope, so deallocate it.
+    def dealloc(self, memory, arg, env, loc):
+      ptr = env[self.ident]
+      if self.kind == 'inout':
+        self.inout_end_of_life(ptr, arg.value, loc)
+      # TODO: let
+      ptr.kill(memory, loc)
+        
+    def inout_end_of_life(self, ptr, source, loc):
+        if ptr.permission != Fraction(1,1):
+            error(loc, 'failed to restore inout variable '
+                  + 'to full\npermission by the end of its scope')
+        if source.get_address() is None:
+            error(loc, "inout can't return ownership because"
+                  + " previous owner died")
+        ptr.transfer(Fraction(1,1), source, loc)
+
     def __str__(self):
         if self.kind is None:
           return self.privilege + ' ' + self.ident + ': ' + str(self.type_annot)
@@ -110,7 +127,10 @@ class NoParam:
   location: Meta
   
   def bind(self, res : Result, env, mem, loc):
-    return
+    pass
+
+  def dealloc(self, memory, arg, env, loc):
+    pass
 
 # The borrowed_vars global is for communicating variables bound
 # to inout parameters in function calls.
@@ -276,8 +296,8 @@ class BindingExp(Exp):
                       self.arg.location)
       machine.schedule(self.body, runner.body_env, runner.context)
     else:
-      machine.dealloc_param(self.param, runner.results[0],
-                            runner.body_env, self.location)
+      self.param.dealloc(machine.memory, runner.results[0],
+                         runner.body_env, self.location)
       result = duplicate_if_temporary(runner.results[1], self.location)
       machine.finish_expression(result, self.location)
 
@@ -347,7 +367,7 @@ class BindingStmt(Exp):
           runner.pause_on_finish = False
       machine.schedule(self.body, runner.body_env)
     else:
-      machine.dealloc_param(self.param, runner.results[0],
-                            runner.body_env, self.location)
+      self.param.dealloc(machine.memory, runner.results[0],
+                         runner.body_env, self.location)
       machine.finish_statement(self.location)
 

@@ -244,8 +244,8 @@ class Match(Stmt):
         runner.matched = True
     else:
       if runner.matched:
-        machine.dealloc_param(runner.param, runner.arg, runner.body_env,
-                              self.location)
+        runner.param.dealloc(machine.memory, runner.arg, runner.body_env,
+                             self.location)
       else:
         error(self.location, 'failed to match a case with ' + str(runner.variant))
       machine.finish_statement(self.location)

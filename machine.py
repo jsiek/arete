@@ -297,22 +297,6 @@ class Machine:
       self.threads.append(thread)
       return thread
 
-  def inout_end_of_life(self, ptr, source, loc):
-      if ptr.permission != Fraction(1,1):
-          error(loc, 'failed to restore inout variable '
-                + 'to full\npermission by the end of its scope')
-      if source.get_address() is None:
-          error(loc, "inout can't return ownership because"
-                + " previous owner died")
-      ptr.transfer(Fraction(1,1), source, loc)
-
-  def dealloc_param(self, param, arg, env, loc):
-    if isinstance(param, Param):
-      ptr = env[param.ident]
-      if param.kind == 'inout':
-        self.inout_end_of_life(ptr, arg.value, loc)
-      ptr.kill(self.memory, loc)
-
   def print_env(self, env, loc):
     for (k,ptr) in env.items():
       if ptr.get_address() is None:

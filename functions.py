@@ -316,8 +316,8 @@ class Call(Exp):
       # return from the function:
       # deallocate the parameters
       for (param, arg) in zip(runner.params, runner.args):
-        machine.dealloc_param(param, arg, runner.body_env,
-                              runner.clos.body.location)
+        param.dealloc(machine.memory, arg, runner.body_env,
+                      runner.clos.body.location)
 
       if runner.return_value is None:
         runner.return_value = Void()
