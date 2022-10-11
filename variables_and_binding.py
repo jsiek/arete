@@ -127,11 +127,9 @@ class Param:
                   + '\nptr: ' + str(ptr)
                   + '\nsource: ' + str(source))
         if ptr.permission != source.permission / 2:
-            error(loc, 'failed to restore let variable '
-                  + 'to original\npermission of\n\t'
+            error(loc, 'failed to restore let-bound variable '
+                  + 'to\noriginal permission of\n\t'
                   + str(source.permission / 2)
-                  + ' from '
-                  + str(source.value)
                   + '\nby the end of its scope, only have\n\t'
                   + str(ptr.permission))
         if source.value.get_address() is None:
