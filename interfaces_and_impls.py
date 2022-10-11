@@ -107,6 +107,13 @@ class InterfaceImplInfo(StaticInfo):
     return InterfaceImplInfo(self.iface,
                              [(tys, e) for tys, e in self.impls])
 
+  def merge(self, other):
+    if self.iface is other.iface:
+      return InterfaceImplInfo(self.iface,
+                               self.impls + other.impls)
+    else:
+      error(iface.location, "in merge, two interfaces with same name")
+
   def duplicate(self, percent, loc):
     return self.copy()
   
@@ -114,7 +121,7 @@ class InterfaceImplInfo(StaticInfo):
 class Interface(Decl):
   name: str
   type_params: list[str]
-  extends: list[AST]
+  extends: list[AST] # list of ImplReq
   members: list[tuple[str,Type]]
   __match_args__ = ("name", "type_params", "extends", "members")
 
@@ -274,35 +281,41 @@ class ImplReq(Type):
   # Brings the required impl members into scope
   # and returns the new parameters for the witnesses.
   def declare(self, env):
+    output_env = {}
     if not self.iface_name in env.keys():
       error(self.location, "undefined interface " + self.iface_name)
     info = env[self.iface_name]
     subst = { x:ty for x, ty in zip(info.iface.type_params,
                                     self.impl_types)}
     # Bring the impl into scope
-    info.impls += [(self.impl_types, Var(self.location, self.name))]
-
-    # TODO: this needs to be recursive to handle deep inheritance chains.
-    # Bring the inherited impls into scope
-    for req in info.iface.extends:
-      subst = {x: ty for x, ty in zip(info.iface.params,
-                                      self.impl_types)}
-      impl_types = [substitute(subst, ty) for ty in req.impl_types]
-      env[req.iface_name].impls += [(impl_types, Var(self.location, req.name))]
+    output_env[self.iface_name] = \
+      InterfaceImplInfo(info.iface,
+                        [(self.impl_types, Var(self.location, self.name))])
+    if tracing_on():
+      print('declare impl ' + self.iface_name + str(self.impl_types))
 
     witness = Var(self.location, self.name)
     
     # Bring the impl members into scope
     for x, ty in info.iface.members:
-      env[x] = StaticVarInfo(substitute(subst, ty),
-                             FieldAccess(self.location, witness, x),
-                             ProperFraction())
+      output_env[x] = StaticVarInfo(substitute(subst, ty),
+                                    FieldAccess(self.location, witness, x),
+                                    ProperFraction())
+      
+    # TODO: this needs to be recursive to handle deep inheritance chains.
+    # Bring the inherited impls into scope
+    # for req in info.iface.extends:
+    #   req.declare(env) ## too simple
+      # subst = {x: ty for x, ty in zip(info.iface.params,
+      #                                 self.impl_types)}
+      # impl_types = [substitute(subst, ty) for ty in req.impl_types]
+      # env[req.iface_name].impls += [(impl_types, Var(self.location, req.name))]
 
-    return Param(self.location, 'let', 'none', self.name, None)
+    return Param(self.location, 'let', 'none', self.name, None), output_env
 
   # Used in the type checking of a Call AST node.
   # Lookup the witnesses for the required impls.
-  def satisfy_impl(self, deduced_types, env):
+  def satisfy_impl(self, deduced_types, env, loc):
     info = env[self.iface_name]
     req_impl_types = [substitute(deduced_types, ty) \
                       for ty in self.impl_types]
@@ -315,7 +328,7 @@ class ImplReq(Type):
         witness_exp = wit_exp
         break
     if witness_exp is None:
-      error(self.location, 'could not find impl of ' + self.iface_name
+      error(loc, 'could not find impl of ' + self.iface_name
             + ' for ' + str(req_impl_types)
             + '\nin impls:\n'
             + str(info.impls))

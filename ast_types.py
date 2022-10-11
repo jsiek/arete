@@ -518,3 +518,6 @@ class StaticVarInfo(StaticInfo):
   def copy(self):
     return StaticVarInfo(self.type, self.translation,
                          self.state, self.param)
+
+  # def merge(self, other):
+  #   return self

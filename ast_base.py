@@ -14,6 +14,18 @@ def copy(exp):
 def copy_type_env(type_env):
   return {x: info.copy() for x,info in type_env.items()}
 
+def merge_type_env(tyenv1, tyenv2):
+  tyenv3 = {}
+  for x, info in tyenv1.items():
+    tyenv3[x] = info.copy()
+  for x, info in tyenv2.items():
+    if x in tyenv3.keys():
+      tyenv3[x] = info.merge(tyenv3[x])
+    else:
+      tyenv3[x] = info.copy()
+  return tyenv3
+    
+
 @dataclass
 class Value:
   def node_name(self):

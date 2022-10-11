@@ -144,7 +144,9 @@ class Function(Decl):
     # Bring the impls and their members into scope.
     # Add parameters for the witnesses.
     for req in self.requirements:
-      new_params.append(req.declare(body_env))
+      (new_param, req_env) = req.declare(body_env)
+      body_env = merge_type_env(body_env, req_env)
+      new_params.append(new_param)
     
     # type check the body of the function
     body_type, new_body = self.body.type_check(body_env)
@@ -243,7 +245,7 @@ class Call(Exp):
         print('deduced: ' + str(deduced_types))
 
       for req in fun_type.requirements:
-        wit_exp = req.satisfy_impl(deduced_types, env)
+        wit_exp = req.satisfy_impl(deduced_types, env, self.location)
         new_args.append(wit_exp)
 
       ret = substitute(deduced_types, rt)

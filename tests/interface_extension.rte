@@ -1,5 +1,5 @@
-interface Semigroup(T) {
-  combine : (T,T) -> T;
+interface Semigroup(U) {
+  combine : (let U, let U) -> U;
 }
 
 fun accumulate<T>(A: [T], let init: T) -> T where Semigroup(T) {
@@ -12,8 +12,8 @@ fun accumulate<T>(A: [T], let init: T) -> T where Semigroup(T) {
   return total;
 }
 
-interface Monoid(T) extends Semigroup(T) {
-  identity : T;
+interface Monoid(S) extends Semigroup(S) {
+  identity : S;
 }
 
 fun sum<T>(A: [T]) -> T where Monoid(T) {
