@@ -116,6 +116,12 @@ class InterfaceImplInfo(StaticInfo):
 
   def duplicate(self, percent, loc):
     return self.copy()
+
+  def apply_subst(self, subst):
+    new_impls = [([substitute(subst, ty) for ty in tys], exp) \
+                 for (tys, exp) in self.impls]
+    return InterfaceImplInfo(self.iface, new_impls)
+    
   
 @dataclass
 class Interface(Decl):
@@ -298,19 +304,16 @@ class ImplReq(Type):
     
     # Bring the impl members into scope
     for x, ty in info.iface.members:
-      output_env[x] = StaticVarInfo(substitute(subst, ty),
+      output_env[x] = StaticVarInfo(ty,
                                     FieldAccess(self.location, witness, x),
-                                    ProperFraction())
+                                    ProperFraction()).apply_subst(subst)
       
-    # TODO: this needs to be recursive to handle deep inheritance chains.
     # Bring the inherited impls into scope
-    # for req in info.iface.extends:
-    #   req.declare(env) ## too simple
-      # subst = {x: ty for x, ty in zip(info.iface.params,
-      #                                 self.impl_types)}
-      # impl_types = [substitute(subst, ty) for ty in req.impl_types]
-      # env[req.iface_name].impls += [(impl_types, Var(self.location, req.name))]
-
+    for req in info.iface.extends:
+       (_, req_env) = req.declare(env)
+       sub_env = {x:info.apply_subst(subst) for x,info in req_env.items()}
+       output_env = merge_type_env(output_env, sub_env)
+         
     return Param(self.location, 'let', 'none', self.name, None), output_env
 
   # Used in the type checking of a Call AST node.

@@ -519,5 +519,11 @@ class StaticVarInfo(StaticInfo):
     return StaticVarInfo(self.type, self.translation,
                          self.state, self.param)
 
+  def apply_subst(self, subst):
+    return StaticVarInfo(substitute(subst, self.type),
+                         self.translation,
+                         self.state,
+                         self.param)
+  
   # def merge(self, other):
   #   return self
