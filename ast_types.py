@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from ast_base import Type, AST, Exp
 from typing import Any
 from lark.tree import Meta
-from utilities import tracing_on, error
+from utilities import tracing_on, error, static_error
 
 # Types
 

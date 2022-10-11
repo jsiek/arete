@@ -1,0 +1,8 @@
+fun main() {
+  var p:int* = &0;
+  {
+    let x:int = 1;
+    p = x;          // error: int* inconsistent with int
+  }
+  return *p;
+}

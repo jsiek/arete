@@ -254,6 +254,7 @@ class Machine:
       val = self.current_runner().return_value
       if tracing_on():
           print('finish_statement ' + str(val))
+          print('killing temporaries')
       for res in self.current_runner().results:
           if res.temporary:
               res.value.kill(machine.memory, location)

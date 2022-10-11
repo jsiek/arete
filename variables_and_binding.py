@@ -54,7 +54,11 @@ class Param:
       if not (isinstance(val, Pointer) or isinstance(val, PointerOffset)):
         error(loc, 'for binding, expected a pointer, not ' + str(val))
       if tracing_on():
-          print('for call, binding ' + self.ident + ' to ' + str(val))
+          print('binding ' + self.ident + ' to ' + str(val))
+          
+      if self.kind == 'let':
+        res.permission = val.get_permission()
+          
       if res.temporary:
         # what if val is a PointerOffset??
         if self.kind == 'let':
@@ -100,18 +104,41 @@ class Param:
       ptr = env[self.ident]
       if self.kind == 'inout':
         self.inout_end_of_life(ptr, arg.value, loc)
-      # TODO: let
+      elif self.kind == 'let':  # UNDER CONSTRUCTION
+        self.let_end_of_life(ptr, arg, loc)
+      if tracing_on():
+          print('deallocating binding ' + self.ident)
       ptr.kill(memory, loc)
         
     def inout_end_of_life(self, ptr, source, loc):
+        if tracing_on():
+            print('inout end-of-life ' + self.ident)
         if ptr.permission != Fraction(1,1):
             error(loc, 'failed to restore inout variable '
                   + 'to full\npermission by the end of its scope')
         if source.get_address() is None:
             error(loc, "inout can't return ownership because"
                   + " previous owner died")
-        ptr.transfer(Fraction(1,1), source, loc)
+        source.transfer(Fraction(1,1), ptr, loc)
 
+    def let_end_of_life(self, ptr, source, loc):
+        if tracing_on():
+            print('let end-of-life ' + self.ident
+                  + '\nptr: ' + str(ptr)
+                  + '\nsource: ' + str(source))
+        if ptr.permission != source.permission / 2:
+            error(loc, 'failed to restore let variable '
+                  + 'to original\npermission of\n\t'
+                  + str(source.permission / 2)
+                  + ' from '
+                  + str(source.value)
+                  + '\nby the end of its scope, only have\n\t'
+                  + str(ptr.permission))
+        if source.value.get_address() is None:
+            error(loc, "let can't return ownership because"
+                  + " previous owner died")
+        source.value.transfer(Fraction(1,1), ptr, loc)
+        
     def __str__(self):
         if self.kind is None:
           return self.privilege + ' ' + self.ident + ': ' + str(self.type_annot)

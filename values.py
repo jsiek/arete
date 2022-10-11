@@ -11,6 +11,8 @@ from utilities import *
 class Result:
     temporary: bool
     value: Value
+    # The permission at the time of binding to a `let` variable
+    permission: Fraction = Fraction(0,1)
 
 @dataclass
 class Number(Value):
@@ -98,6 +100,9 @@ class Pointer(Value):
     def get_address(self):
         return self.address
 
+    def set_address(self, addr):
+        self.address = addr
+    
     def get_ptr_path(self):
         return self.path
     
@@ -269,6 +274,9 @@ class PointerOffset(Value):
     def get_address(self):
         return self.ptr.get_address()
 
+    def set_address(self, addr):
+        self.ptr.set_address(addr)
+    
     def get_ptr_path(self):
         return self.ptr.get_ptr_path() + [self.offset]
     
@@ -286,6 +294,9 @@ class PointerOffset(Value):
                   + str(ptr))
         return ptr
 
+    def transfer(self, percent, source, location):
+        self.ptr.transfer(percent, source, location)
+    
     def kill(self, mem, loc):
         # TODO: change to just kill the part
         # kill the whole thing
