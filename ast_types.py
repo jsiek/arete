@@ -524,6 +524,11 @@ class StaticVarInfo(StaticInfo):
                          self.translation,
                          self.state,
                          self.param)
+
+  # def prefix(self, name, loc):
+  #   return StaticVarInfo(self.type, prefix_access(self.translation,
+  #                                                 Var(loc,name)),
+  #                        self.state, self.param)
   
   # def merge(self, other):
   #   return self

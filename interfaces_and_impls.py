@@ -121,7 +121,30 @@ class InterfaceImplInfo(StaticInfo):
     new_impls = [([substitute(subst, ty) for ty in tys], exp) \
                  for (tys, exp) in self.impls]
     return InterfaceImplInfo(self.iface, new_impls)
-    
+
+  # def prefix(self, name, loc):
+  #   new_impls = [(tys, prefix_access(exp, Var(loc, name))) \
+  #                for (tys, exp) in self.impls]
+  #   return InterfaceImplInfo(self.iface, new_impls)
+
+def prefix_access(exp, prefix):
+  match exp:
+    case FieldAccess(arg, field):
+      return FieldAccess(exp.location, prefix_access(arg, prefix), field)
+    case Var(name):
+      return FieldAccess(prefix.location, prefix, name)
+    case _:
+      error(prefix.location, "in prefix_access, unhandled " + str(exp))
+
+def prefix_info(info, name, loc):
+  match info:
+    case StaticVarInfo(ty, transl, state, param):
+      return StaticVarInfo(ty, prefix_access(transl, Var(loc,name)),
+                           state, param)
+    case InterfaceImplInfo(iface, impls):
+      new_impls = [(tys, prefix_access(exp, Var(loc, name))) \
+                   for (tys, exp) in impls]
+      return InterfaceImplInfo(iface, new_impls)
   
 @dataclass
 class Interface(Decl):
@@ -254,9 +277,13 @@ class Impl(Decl):
         static_error(self.location, "type of " + x + ":\n"
                      + str(member_types[x])
               + "\nis not consistent with the required type:\n" + str(req_ty))
+
+    for req in info.iface.extends:
+      wit_exp = req.satisfy_impl(subst, env, self.location)
+      new_assignments.append((req.name, wit_exp))
+    
     if tracing_on():
       print('finished type checking ' + str(self))
-    # TODO: add impls for inherited interfaces
     return [Global(self.location, self.name,
                    RecordType(self.location,
                               [(x,t) for x,t in member_types.items()]),
@@ -311,7 +338,10 @@ class ImplReq(Type):
     # Bring the inherited impls into scope
     for req in info.iface.extends:
        (_, req_env) = req.declare(env)
-       sub_env = {x:info.apply_subst(subst) for x,info in req_env.items()}
+       sub_env = {x: info.apply_subst(subst) for x, info in req_env.items()}
+       # prefix everything in sub_env with this impl name
+       sub_env = {x: prefix_info(info, self.name, self.location) \
+                  for x, info in sub_env.items()}
        output_env = merge_type_env(output_env, sub_env)
          
     return Param(self.location, 'let', 'none', self.name, None), output_env
