@@ -254,7 +254,8 @@ class Impl(Decl):
       print('type checking ' + str(self) + '\n'
             'in environment: ' + str(env))
     info = env[self.iface_name]
-    
+
+    # check the members, aka. assignments, inside this impl
     member_types = {}
     new_assignments = []
     for x,e in self.assignments:
@@ -262,9 +263,6 @@ class Impl(Decl):
       new_assignments.append((x, new_e))
       member_types[x] = ty
 
-    # check that the inherited interfaces are implemented
-    # TODO
-      
     # check that this Impl satisfies the interface
     subst = { x:t for x,t in zip(info.iface.type_params, self.impl_types)}
     for x,ty in info.iface.members:
@@ -278,6 +276,7 @@ class Impl(Decl):
                      + str(member_types[x])
               + "\nis not consistent with the required type:\n" + str(req_ty))
 
+    # check that the inherited interfaces are satisfied
     for req in info.iface.extends:
       wit_exp = req.satisfy_impl(subst, env, self.location)
       new_assignments.append((req.name, wit_exp))
