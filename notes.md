@@ -65,7 +65,7 @@ again.)
 	* mutable and ISOlated
 	* thread LOCAL
 	* unsafe
-  a category is fixed for each object at creatoin
+  a category is fixed for each object at creation
   hierarchy: imm < iso < local < unsafe.
   
     Objects can only refer to other objects with the same or lesser

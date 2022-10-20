@@ -64,7 +64,7 @@ fun push(let dat: int, var lst: list_t) -> list_t {
     lst[tail] = n;
     return lst;
   } else { // lst has at least 2 elements
-    lst[head] <- all of get_prev(get_next(lst[head])); // bug
+    lst[head] <- all of get_prev(get_next(lst[head]));
     ! set_prev(lst[head], first, none);
     get_prev(get_next(lst[head])) <- half of lst[head];
     ! set_next(first, lst[head], all);
