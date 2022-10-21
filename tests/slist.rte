@@ -20,12 +20,7 @@ fun push(let data, var list) {
 }
 
 fun data(let node) {
-  match (node) {
-  case null(w):
-    return 0; // raise an exception instead?
-  case some(n):
-    return (*n).data;
-  }
+  return (*node#some).data;
 }
 
 fun is_last(let node) {

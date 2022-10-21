@@ -111,6 +111,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "delete" expression ";"                           -> delete
     | "assert" expression ";"                           -> assert
     | "while" "(" expression ")" block                  -> while
+    | "for" parameter "in" expression block             -> for_in
     | block
     | if_statement
     | "match" "(" expression ")" "{" case_list "}"      -> match

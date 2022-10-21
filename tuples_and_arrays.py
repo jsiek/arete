@@ -311,3 +311,66 @@ class Index(Exp):
         error(self.location, 'unrecognized context ' + repr(runner.context))
       machine.finish_expression(result, self.location)
 
+# for_in loop
+@dataclass
+class ForIn(Stmt):
+  param: Param
+  arg: Exp
+  body: Stmt
+  __match_args__ = ("param", "arg", "body")
+  
+  def __str__(self):
+      return "for " + str(self.param) + " in " + str(self.arg) + "\n" \
+          + str(self.body)
+    
+  def __repr__(self):
+      return str(self)
+    
+  def free_vars(self):
+      return self.arg.free_vars() \
+          | (self.body.free_vars() - set([self.param.ident]))
+
+  def const_eval(self, env):
+    new_param = self.param.with_type(simplify(self.param.type_annot, env))
+    new_arg = self.arg.const_eval(env)
+    new_body = self.body.const_eval(env)
+    return ForIn(self.location, new_param, new_arg, new_body)
+    
+  def type_check(self, env):
+    arg_type, new_arg = self.arg.type_check(env, 'none')
+    body_env = copy_type_env(env)
+    self.param.bind_type(body_env)
+    body_type, new_body = self.body.type_check(body_env)
+    return body_type, \
+           ForIn(self.location, self.param, new_arg, new_body)
+
+  def step(self, runner, machine):
+    if runner.state == 0:
+      machine.schedule(self.arg, runner.env, AddressCtx())
+    elif runner.state == 1:
+      runner.tuple_ptr = runner.results[0].value
+      tup = machine.memory.read(runner.tuple_ptr, self.location)
+      if not isinstance(tup, TupleValue):
+          error(self.location, 'expected a tuple, not ' + str(tup))
+      runner.tuple_len = len(tup.elts)
+    elif runner.state - 2 < runner.tuple_len:
+        # deallocate the previous iteration's binding
+        if runner.state > 2:
+            self.param.dealloc(machine.memory,
+                               runner.results[runner.state - 2],
+                               runner.body_env, self.location)
+        # bind the current element
+        runner.body_env = runner.env.copy()
+        index = runner.state - 2
+        res = Result(False, PointerOffset(runner.tuple_ptr, index))
+        runner.results.append(res)
+        self.param.bind(res,
+                        runner.body_env, machine.memory, self.arg.location)
+        # schedule the body of the loop
+        machine.schedule(self.body, runner.body_env)
+    else:
+      # deallocate the last iteration's binding
+      if runner.tuple_len > 0:
+          self.param.dealloc(machine.memory, runner.results[runner.state - 3],
+                             runner.body_env, self.location)
+      machine.finish_statement(self.location)
