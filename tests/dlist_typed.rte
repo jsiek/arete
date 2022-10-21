@@ -22,7 +22,7 @@ fun listof(let dat: int) -> ⟨node_t, node_t⟩ {
   return split(n);
 }
 
-fun get_data(ref n: node_t) -> int {
+fun get_data(let n: node_t) -> int {
   return (*n)#some[data];
 }
 

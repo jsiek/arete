@@ -12,24 +12,20 @@ fun is_null(let p : pointer) {
 fun some(var p : ?*) -> pointer { return tag some(p) as pointer; }
 
 fun listof(let data) {
-  return some(&⟨data, null()⟩);
+  return some(&{data = data, next = null()});
 }
 
 fun push(let data, var list) {
-  return some(&⟨data, list⟩);
+  return some(&{data = data, next = list});
 }
 
 fun data(let node) {
   match (node) {
   case null(w):
-    return 0; // raise an exception
+    return 0; // raise an exception instead?
   case some(n):
-    return (*n)[0];
+    return (*n).data;
   }
-}
-
-fun next(let node) {
-  return (*node)[1];
 }
 
 fun is_last(let node) {
@@ -37,7 +33,7 @@ fun is_last(let node) {
   case null(w):
     return false;
   case some(n):
-    return is_null(next(n));
+    return is_null((*n).next);
   }
 }
 
@@ -48,12 +44,12 @@ fun remove_last(inout n) {
   case null(q):
     return null();
   case some(inout node):
-    if (is_last(next(node))) {
-      var q = copy((*node)[1]); // want all permissions to next(n)
-      (*node)[1] = null();
+    if (is_last((*node).next)) {
+      var q = copy((*node).next);
+      (*node).next = null();
       return q;
     } else {
-      return remove_last((*n)[1]);
+      return remove_last((*n).next);
     }
   }
 }
