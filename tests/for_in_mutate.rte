@@ -1,0 +1,10 @@
+fun main() {
+  let n : int = 10;
+  var a : [int] = [n of 0];
+  var i : int = 0;
+  for inout x: int in a {
+    x = i;
+    i = i + 1;
+  }
+  return a[9] - 9;
+}
