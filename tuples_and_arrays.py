@@ -311,6 +311,55 @@ class Index(Exp):
         error(self.location, 'unrecognized context ' + repr(runner.context))
       machine.finish_expression(result, self.location)
 
+@dataclass
+class Slice(Exp):
+  arg: Exp
+  start: Exp
+  stop: Exp
+  step: Exp
+  __match_args__ = ("arg", "start", "stop", "step")
+
+  def __str__(self):
+      return str(self.arg) + "[" + str(self.start) \
+          + ":" + str(self.stop) + ":" + str(self.step) + "]"
+  
+  def __repr__(self):
+      return str(self)
+  
+  def free_vars(self):
+      return self.arg.free_vars() | self.start.free_vars() \
+          | self.stop.free_vars() | self.step.free_vars() 
+  
+  def const_eval(self, env):
+    new_arg = self.arg.const_eval(env)
+    new_start = self.start.const_eval(env)
+    new_stop = self.stop.const_eval(env)
+    new_step = self.step.const_eval(env)
+    return Slice(self.location, new_arg, new_start, new_stop, new_step)
+
+  def type_check(self, env, ctx):
+    arg_type, new_arg = self.arg.type_check(env, ctx)
+    start_type, new_start = self.start.type_check(env, 'none')
+    require_consistent(start_type, IntType(self.location),
+                       'start of slice must be an integer', self.location)
+    stop_type, new_stop = self.stop.type_check(env, 'none')
+    require_consistent(stop_type, IntType(self.location),
+                       'stop of slice must be an integer', self.location)
+    step_type, new_step = self.step.type_check(env, 'none')
+    require_consistent(step_type, IntType(self.location),
+                       'step of slice must be an integer', self.location)
+    new_self = Slice(self.location, new_arg, new_start, new_stop, new_step)
+    if isinstance(arg_type, ArrayType):
+        return arg_type, new_self
+    else:
+      static_error(self.location, 'in slice, expected array, not '
+                   + str(arg_type))
+
+  def step(self, runner, machine):
+      raise Exception('unimplemented')
+      
+# TODO partition
+
 # for_in loop
 @dataclass
 class ForIn(Stmt):

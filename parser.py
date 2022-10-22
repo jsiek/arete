@@ -245,6 +245,10 @@ def parse_tree_to_ast(e):
     elif e.data == 'index':
         e1, e2 = e.children
         return Index(e.meta, parse_tree_to_ast(e1), parse_tree_to_ast(e2))
+    elif e.data == 'slice':
+        e1, e2, e3, e4 = e.children
+        return Slice(e.meta, parse_tree_to_ast(e1), parse_tree_to_ast(e2),
+                     parse_tree_to_ast(e3), parse_tree_to_ast(e4))
     elif e.data == 'deref':
         return Deref(e.meta, parse_tree_to_ast(e.children[0]))
     elif e.data == 'addrof':

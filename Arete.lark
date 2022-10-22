@@ -97,6 +97,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "[" expression "of" expression "]"                -> array
     | "⟨" initializer_list "⟩"                          -> tuple
     | expression_hi "[" expression "]"                  -> index
+    | expression_hi "[" expression ":" expression ":" expression "]"   -> slice
     | expression_hi "(" initializer_list ")"            -> call
     | "fun" "(" parameter_list ")" return_mode block    -> lambda
     | "true"                                            -> true
