@@ -1,0 +1,14 @@
+fun main() {
+  let n = 10;
+  var a = [n of 0];
+  var i = 0;
+  while (i < len(a)) {
+    a[i] = i;
+    i = i + 1;
+  }
+  var sum = 0;
+  for x in a {
+    sum = sum + x;
+  }
+  return sum - ((n * (n - 1)) / 2);
+}
