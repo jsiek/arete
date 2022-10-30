@@ -1,0 +1,42 @@
+// Test a generic function calling another constrained generic.
+
+interface Monoid(T) {
+  combine : (let T, let T) -> T;
+  identity : T;
+}
+
+fun accumulate<T>(A: [T], let init: T) -> T where Monoid(T) {
+  var total:T = copy(init);
+  var i:int = 0;
+  while (i != len(A)) {
+    total = combine(total, A[i]);
+    i = i + 1;
+  }
+  return total;
+}
+
+fun sum<T>(A: [T]) -> T where Monoid(T) {
+  return accumulate(A, identity);
+}
+
+fun add(x:int, y:int) -> int {
+  return x + y;
+}
+let zero: int = 0;
+
+impl Monoid(int) {
+  combine = add;
+  identity = zero;
+}
+
+fun main() {
+  let n:int = 5;
+  var A: [int] = [n of 0];
+  var i:int = 0;
+  while (i != n) {
+    A[i] = i; 
+    i = i + 1;
+  }
+  return sum(A) - n*(n - 1)/2;
+}
+
