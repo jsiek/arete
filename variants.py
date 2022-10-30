@@ -30,21 +30,21 @@ class Variant(Value):
   def kill(self, mem, location, progress=set()):
     self.value.kill(mem, location, progress)
 
-  def get_subobject(self, path, loc):
+  def get_subobject(self, path, loc, mem):
     if len(path) == 0:
       return self
     else:
       if path[0] == self.tag:
-        return self.value.get_subobject(path[1:], loc)
+        return self.value.get_subobject(path[1:], loc, mem)
       else:
         error(loc, path[0]  + ' is not present in variant ' + str(self))
 
-  def set_subobject(self, path, val, loc):
+  def set_subobject(self, path, val, loc, mem):
     if len(path) == 0:
       return val
     else:
       if path[0] == self.tag:
-        new_value = self.value.set_subobject(path[1:], val, loc)
+        new_value = self.value.set_subobject(path[1:], val, loc, mem)
       else:
         error(loc, path[0]  + ' is not present in variant ' + str(self))
       return Variant(self.tag, new_value)

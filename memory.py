@@ -45,15 +45,15 @@ class Memory:
   def raw_read(self, address, path, loc):
     if tracing_on():
       print('raw_read(' + str(address) + ', ' + str(path) + ')')
-    return self.memory[address].get_subobject(path, loc)
+    return self.memory[address].get_subobject(path, loc, self)
 
   def read(self, ptr, location):
-      if not (isinstance(ptr, Pointer) or isinstance(ptr, PointerOffset)):
+      if not ptr.is_pointer():
           error(location, 'in read expected a pointer, not ' + str(ptr))
       if none(ptr.get_permission()):
           error(location, 'pointer does not have read permission: ' + str(ptr))
       if not self.valid_address(ptr.get_address()):
-          error(location, 'in read, bad address: ' + str(ptr.address))
+          error(location, 'in read, bad address: ' + str(ptr.get_address()))
 
       retval = self.raw_read(ptr.get_address(), ptr.get_ptr_path(), location)
       if tracing_on():
@@ -65,10 +65,10 @@ class Memory:
   def unchecked_write(self, ptr, val, location):
       address = ptr.get_address()
       path = ptr.get_ptr_path()
-      old_val = self.memory[address].get_subobject(path, location)
+      old_val = self.memory[address].get_subobject(path, location, self)
       val_copy = val.duplicate(1, location)
       self.memory[address] = \
-          self.memory[address].set_subobject(path, val_copy, location)
+          self.memory[address].set_subobject(path, val_copy, location, self)
       if tracing_on():
         print('wrote ' + str(val_copy) + ' into ' + str(ptr))
       old_val.kill(self, location)

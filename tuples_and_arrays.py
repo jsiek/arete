@@ -16,8 +16,9 @@ from variables_and_binding import Param
 from ast_base import *
 from ast_types import *
 from values import Result, to_integer, duplicate_if_temporary, PointerOffset, \
-    Number
+    Number, Pointer
 from utilities import *
+import math
 
 @dataclass
 class TupleValue(Value):
@@ -40,13 +41,13 @@ class TupleValue(Value):
       for elt in self.elts:
         elt.clear(mem, location, progress)
 
-    def get_subobject(self, path, loc):
+    def get_subobject(self, path, loc, mem):
       if len(path) == 0:
         return self
       else:
-        return self.elts[path[0]].get_subobject(path[1:], loc)
+        return self.elts[path[0]].get_subobject(path[1:], loc, mem)
 
-    def set_subobject(self, path, val, loc):
+    def set_subobject(self, path, val, loc, mem):
         if len(path) == 0:
           return val
         else:
@@ -56,7 +57,7 @@ class TupleValue(Value):
                   + str(self))
           front = self.elts[:i]
           back = self.elts[i+1:]
-          ith = self.elts[i].set_subobject(path[1:], val, loc)
+          ith = self.elts[i].set_subobject(path[1:], val, loc, mem)
           return TupleValue(front + [ith] + back)
       
     def __str__(self):
@@ -64,6 +65,9 @@ class TupleValue(Value):
       
     def __repr__(self):
         return str(self)
+
+    def __len__(self):
+      return len(self.elts)
       
     def node_name(self):
         return str(self)
@@ -100,6 +104,63 @@ class TupleValue(Value):
 
       return result, name, '•'
 
+@dataclass
+class SliceValue(Value):
+  tuple_ptr: Pointer # pointer to a tuple
+  start: int
+  stop: int
+  step: int
+
+  def is_pointer(self):
+    return True
+      
+  def __str__(self):
+    return str(self.tuple_ptr) + "[" + str(self.start) \
+      + ":" + str(self.stop) + ":" + str(self.step) + "]"
+      
+  def __repr__(self):
+    return str(self)
+
+  def __len__(self):
+    return math.ceil((self.stop - self.start) / self.step)
+
+  def get_permission(self):
+    return self.tuple_ptr.get_permission()
+
+  def get_address(self):
+    return self.tuple_ptr.get_address()
+  
+  def get_ptr_path(self):
+    return self.tuple_ptr.get_ptr_path()
+
+  def extended_path(self, offset):
+    return self.tuple_ptr.get_ptr_path() + [self.start + self.step * offset]
+
+  def set_permission(self, perm):
+    self.tuple_ptr.set_permission(perm)
+
+  def get_kill_when_zero(self):
+    return self.tuple_ptr.get_kill_when_zero()
+
+  def kill(self, mem, location, progress=set()):
+    pass
+
+  def duplicate(self, percentage, location):
+    return SliceValue(self.tuple_ptr.duplicate(percentage, location),
+                      self.start, self.stop, self.step)
+
+  def transfer(self, percent, source, location):
+    self.tuple_ptr.transfer(percent, source, location)
+
+  def get_subobject(self, path, loc, mem):
+    if len(path) == 0:
+      return self
+    else:
+      i = path[0]
+      index = self.start + i * self.step
+      tup = mem.read(self.tuple_ptr)
+      return tup.get_subobject([i] + path[1:], loc, mem)
+    
 # The primitive `split` operator
 
 def interp_split(vals, machine, location):
@@ -124,7 +185,7 @@ def interp_len(vals, machine, location):
   tup = vals[0]
   if not isinstance(tup, TupleValue):
       error(location, 'in len, expected a tuple, not ' + str(tup))
-  return Number(len(tup.elts))
+  return Number(len(tup))
 
 set_primitive_interp('len', interp_len)
 
@@ -146,7 +207,7 @@ class Array(Exp):
   __match_args__ = ("size","arg")
   
   def __str__(self):
-      return "new " + "[" + str(self.size) + "]" + str(self.arg)
+      return "[" + str(self.size) + " of " + str(self.arg) + "]" 
     
   def __repr__(self):
       return str(self)
@@ -281,9 +342,8 @@ class Index(Exp):
       
   def step(self, runner, machine):
     if runner.state == 0:
-      # machine.schedule(self.arg, runner.env, runner.context)
-      machine.schedule(self.arg, runner.env,
-                       AddressCtx(runner.context.duplicate))
+        machine.schedule(self.arg, runner.env,
+                         AddressCtx(runner.context.duplicate))
     elif runner.state == 1:
       machine.schedule(self.index, runner.env)
     else:
@@ -296,7 +356,7 @@ class Index(Exp):
         tup = machine.memory.read(tup_ptr, self.location)
         if not isinstance(tup, TupleValue):
           error(self.location, 'expected a tuple, not ' + str(tup))
-        val = tup.elts[int(i)]
+        val = tup.get_subobject([int(i)], self.location, machine.memory)
         if runner.results[0].temporary:
             val = val.duplicate(tup_ptr.get_permission(), self.location)
         result = Result(runner.results[0].temporary, val)
@@ -316,25 +376,25 @@ class Slice(Exp):
   arg: Exp
   start: Exp
   stop: Exp
-  step: Exp
-  __match_args__ = ("arg", "start", "stop", "step")
+  step_size: Exp
+  __match_args__ = ("arg", "start", "stop", "step_size")
 
   def __str__(self):
       return str(self.arg) + "[" + str(self.start) \
-          + ":" + str(self.stop) + ":" + str(self.step) + "]"
+          + ":" + str(self.stop) + ":" + str(self.step_size) + "]"
   
   def __repr__(self):
       return str(self)
   
   def free_vars(self):
       return self.arg.free_vars() | self.start.free_vars() \
-          | self.stop.free_vars() | self.step.free_vars() 
+          | self.stop.free_vars() | self.step_size.free_vars() 
   
   def const_eval(self, env):
     new_arg = self.arg.const_eval(env)
     new_start = self.start.const_eval(env)
     new_stop = self.stop.const_eval(env)
-    new_step = self.step.const_eval(env)
+    new_step = self.step_size.const_eval(env)
     return Slice(self.location, new_arg, new_start, new_stop, new_step)
 
   def type_check(self, env, ctx):
@@ -345,7 +405,7 @@ class Slice(Exp):
     stop_type, new_stop = self.stop.type_check(env, 'none')
     require_consistent(stop_type, IntType(self.location),
                        'stop of slice must be an integer', self.location)
-    step_type, new_step = self.step.type_check(env, 'none')
+    step_type, new_step = self.step_size.type_check(env, 'none')
     require_consistent(step_type, IntType(self.location),
                        'step of slice must be an integer', self.location)
     new_self = Slice(self.location, new_arg, new_start, new_stop, new_step)
@@ -356,8 +416,23 @@ class Slice(Exp):
                    + str(arg_type))
 
   def step(self, runner, machine):
-      raise Exception('unimplemented')
-      
+    if runner.state == 0:
+      machine.schedule(self.arg, runner.env,
+                       AddressCtx(runner.context.duplicate))
+    elif runner.state == 1:
+      machine.schedule(self.start, runner.env)
+    elif runner.state == 2:
+      machine.schedule(self.stop, runner.env)
+    elif runner.state == 3:
+      machine.schedule(self.step_size, runner.env)
+    else:
+      tup_ptr = runner.results[0].value
+      start = runner.results[1].value
+      stop = runner.results[2].value
+      step_size = runner.results[3].value
+      result = SliceValue(tup_ptr, start.value, stop.value, step_size.value)
+      machine.finish_expression(Result(True, result), self.location)
+        
 # TODO partition
 
 # for_in loop
@@ -400,8 +475,11 @@ class ForIn(Stmt):
       runner.tuple_ptr = runner.results[0].value
       tup = machine.memory.read(runner.tuple_ptr, self.location)
       if not isinstance(tup, TupleValue):
-          error(self.location, 'expected a tuple, not ' + str(tup))
-      runner.tuple_len = len(tup.elts)
+        error(self.location, 'expected a tuple, not ' + str(tup))
+      if isinstance(runner.tuple_ptr, SliceValue):
+        runner.tuple_len = len(runner.tuple_ptr)
+      else:
+        runner.tuple_len = len(tup)
     elif runner.state - 2 < runner.tuple_len:
         # deallocate the previous iteration's binding
         if runner.state > 2:

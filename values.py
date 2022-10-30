@@ -94,6 +94,9 @@ class Pointer(Value):
     
     __match_args__ = ("address", "path", "permission")
 
+    def is_pointer(self):
+        return True
+    
     def get_kill_when_zero(self):
         return self.kill_when_zero
     
@@ -105,6 +108,9 @@ class Pointer(Value):
     
     def get_ptr_path(self):
         return self.path
+
+    def extended_path(self, offset):
+        return self.path + [offset]
     
     def get_pointer(self):
         return self
@@ -177,10 +183,8 @@ class Pointer(Value):
         result += name + ' -> ' + str(self.address) + ';\n'
       return result, str(self.address), self.node_label()
 
-          
     def transfer(self, percent, source, location):
-        if not (isinstance(source, Pointer) \
-                or isinstance(source, PointerOffset)):
+        if not source.is_pointer():
             error(location, "in transfer, expected pointer, not " + str(source))
         if self.address != source.get_address():
             error(location, "cannot transfer between different addresses: "
@@ -265,6 +269,9 @@ class PointerOffset(Value):
     ptr: Pointer
     offset: Any
 
+    def is_pointer(self):
+        return True
+    
     def get_kill_when_zero(self):
         return self.ptr.get_kill_when_zero()
     
@@ -278,7 +285,10 @@ class PointerOffset(Value):
         self.ptr.set_address(addr)
     
     def get_ptr_path(self):
-        return self.ptr.get_ptr_path() + [self.offset]
+        return self.ptr.extended_path(self.offset)
+
+    def extended_path(self, offset):
+        return self.ptr.extended_path(self.offset) + [offset]
     
     def get_permission(self):
         return self.ptr.get_permission()
@@ -287,12 +297,14 @@ class PointerOffset(Value):
         return self.ptr.set_permission(perm)
     
     def duplicate(self, percentage, location):
-        ptr = self.ptr.duplicate(percentage, location)
-        ptr.path = ptr.path + [self.offset]
-        if tracing_on():
-            print('duplicating PointerOffset to produce\n\t '
-                  + str(ptr))
-        return ptr
+        # ptr = self.ptr.duplicate(percentage, location)
+        # ptr.path = ptr.path + [self.offset]
+        # if tracing_on():
+        #     print('duplicating PointerOffset to produce\n\t '
+        #           + str(ptr))
+        # return ptr
+        return PointerOffset(self.ptr.duplicate(percentage, location),
+                             self.offset)
 
     def transfer(self, percent, source, location):
         self.ptr.transfer(percent, source, location)

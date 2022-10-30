@@ -69,32 +69,6 @@ from variables_and_binding import Var, Param
 from records import Record, FieldAccess, RecordExp
 from utilities import *
 
-# @dataclass
-# class InterfaceInfo:
-#   name: str
-#   params: list[str]
-#   extends: list[AST]
-#   immediate_members: dict[str,Type]
-#   members: dict[str,Type]   # includes inherited members
-
-#   def copy(self):
-#     return self
-  
-#   def duplicate(self, percent, loc):
-#     return self
-  
-#   def kill(self, mem, loc, progress=set()):
-#     pass
-  
-#   def gen_graphviz(self, addr):
-#     return ('','','')
-
-#   def get_subobject(self, path, loc):
-#       if len(path) == 0:
-#         return self
-#       else:
-#         error(loc, 'InterfaceInfo has no parts')
-
 @dataclass
 class InterfaceImplInfo(StaticInfo):
   iface: Decl

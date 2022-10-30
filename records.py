@@ -29,13 +29,13 @@ class Record(Value):
       for elt in self.fields.values():
         elt.clear(mem, location, progress)
 
-    def get_subobject(self, path, loc):
+    def get_subobject(self, path, loc, mem):
       if len(path) == 0:
         return self
       else:
-        return self.fields[path[0]].get_subobject(path[1:], loc)
+        return self.fields[path[0]].get_subobject(path[1:], loc, mem)
 
-    def set_subobject(self, path, val, loc):
+    def set_subobject(self, path, val, loc, mem):
         if len(path) == 0:
           return val
         else:
@@ -44,7 +44,7 @@ class Record(Value):
             error(loc, 'path field ' + i + ' is not in record '
                   + str(self))
           new_fields = {}
-          ith = self.fields[i].set_subobject(path[1:], val, loc)
+          ith = self.fields[i].set_subobject(path[1:], val, loc, mem)
           for f, elt in self.fields.items():
             if f == i:
               new_fields[f] = ith

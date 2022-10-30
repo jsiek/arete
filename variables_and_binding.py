@@ -51,7 +51,7 @@ class Param:
     # At runtime, bind the result to this parameter/variable
     def bind(self, res : Result, env, memory, loc):
       val = res.value
-      if not (isinstance(val, Pointer) or isinstance(val, PointerOffset)):
+      if not val.is_pointer():
         error(loc, 'for binding, expected a pointer, not ' + str(val))
       if tracing_on():
           print('binding ' + self.ident + ' to ' + str(val))
@@ -113,7 +113,7 @@ class Param:
     def inout_end_of_life(self, ptr, source, loc):
         if tracing_on():
             print('inout end-of-life ' + self.ident)
-        if ptr.permission != Fraction(1,1):
+        if ptr.get_permission() != Fraction(1,1):
             error(loc, 'failed to restore inout variable '
                   + 'to full\npermission by the end of its scope')
         if source.get_address() is None:
@@ -126,7 +126,7 @@ class Param:
             print('let end-of-life ' + self.ident
                   + '\nptr: ' + str(ptr)
                   + '\nsource: ' + str(source))
-        if ptr.permission != source.permission / 2:
+        if ptr.get_permission() != source.permission / 2:
             error(loc, 'failed to restore let-bound variable '
                   + 'to\noriginal permission of\n\t'
                   + str(source.permission / 2)

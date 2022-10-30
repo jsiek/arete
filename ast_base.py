@@ -34,13 +34,16 @@ class Value:
   def node_label(self):
     return str(self)
 
-  def get_subobject(self, path, loc):
+  def is_pointer(self):
+    return False
+  
+  def get_subobject(self, path, loc, mem):
     if len(path) == 0:
       return self
     else:
       error(loc, 'in get_subobject, this value has no sub-parts: ' + str(self))
 
-  def set_subobject(self, path, val, loc):
+  def set_subobject(self, path, val, loc, mem):
     if len(path) == 0:
       return val
     else:
