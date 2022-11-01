@@ -431,7 +431,9 @@ class Slice(Exp):
       stop = runner.results[2].value
       step_size = runner.results[3].value
       result = SliceValue(tup_ptr, start.value, stop.value, step_size.value)
-      machine.finish_expression(Result(True, result), self.location)
+      # Even though we're returnig a new value, it's really just
+      # a view through an existing pointer, so no, not a temporary. 
+      machine.finish_expression(Result(False, result), self.location)
         
 # TODO partition
 

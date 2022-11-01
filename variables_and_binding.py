@@ -217,7 +217,7 @@ class Var(Exp):
     elif ctx == 'inout':
       if info.state != FullFraction():
         static_error(self.location,
-                     "don't have write permission for " + self.ident
+                     "don't have full permission for " + self.ident
                      + ", only " + str(info.state))
       add_borrowed_var(self.ident, info)
       info.state = EmptyFraction()

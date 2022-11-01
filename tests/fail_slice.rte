@@ -1,0 +1,18 @@
+fun main() {
+  let n : int = 10;
+  var A : [int] = [n of 0];
+  var i : int = 0;
+  for inout x: int in A {
+    x = i;
+    i = i + 1;
+  }
+  inout s1 = A[0:10:1];
+  inout s2 = A[0:10:1]; // don't have write permission for A, only 0/1
+  for e in s1 {
+    e = 1;
+  }
+  for e in s2 {
+    e = 2;
+  }
+  return 0;
+}
