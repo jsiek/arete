@@ -1,5 +1,5 @@
 fun split_array(let array) {
-  let half = len(array) % 2;
+  let half = len(array) div 2;
   var left = [half of 0];
   var right = [len(array) - half of 0];
   var i = 0;

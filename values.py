@@ -46,7 +46,7 @@ class Boolean(Value):
     def clear(self, mem, location, progress=set()):
         pass
     def __str__(self):
-        return repr(self.value)
+        return repr(self.value).lower()
     def __repr__(self):
         return str(self)
 

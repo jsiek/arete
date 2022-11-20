@@ -475,7 +475,7 @@ class While(Stmt):
   def step(self, runner, machine):
     if runner.state == 0:
       machine.schedule(self.cond, runner.env)
-    elif runner.state == 1:
+    elif runner.state == 1 and runner.return_value == None:
       if to_boolean(runner.results[0].value, self.cond.location):
         machine.schedule(self, runner.env)
         machine.schedule(self.body, runner.env)

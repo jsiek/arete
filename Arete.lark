@@ -67,8 +67,9 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | expression_add "-" expression_med                        -> sub
     | expression_med
 
-?expression_med: expression_med "%" expression_hi              -> int_div
+?expression_med: expression_med "div" expression_hi            -> int_div
     | expression_med "/" expression_hi                         -> div
+    | expression_med "%" expression_hi                         -> mod
     | expression_med "*" expression_hi                         -> mul
     | expression_med_hi
 
@@ -86,6 +87,8 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "breakpoint" "(" ")"                              -> breakpoint
     | "exit" "(" expression ")"                         -> exit
     | "input" "(" ")"                                   -> input
+    | "print" "(" expression ")"                        -> print
+    | "sqrt" "(" expression ")"                         -> sqrt
     | IDENT                                             -> var
     | expression_hi "::" IDENT                          -> module_member
     | expression_hi "#" IDENT                           -> variant_member

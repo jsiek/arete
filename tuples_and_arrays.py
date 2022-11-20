@@ -152,6 +152,9 @@ class SliceValue(Value):
   def transfer(self, percent, source, location):
     self.tuple_ptr.transfer(percent, source, location)
 
+  def upgrade(self, location):
+    return self.tuple_ptr.upgrade(location)
+    
   def get_subobject(self, path, loc, mem):
     if len(path) == 0:
       return self

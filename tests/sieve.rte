@@ -1,0 +1,49 @@
+
+fun fill<T>(inout A : [T], let x : T) {
+  for inout y : T in A {
+    y = x;
+  }
+}
+
+// Computes which odd numbers are prime, starting with 3.
+fun sift_primes(inout A : [bool]) {
+  ! fill(A, true);
+  var i : int = 0;
+  var index_square : int = 3;
+  var factor : int = 3;
+  while (index_square < len(A)) {
+    if (A[i]) {
+      ! fill(A[index_square : len(A) : factor], false);
+    }
+    i = i + 1;
+    index_square = index_square + factor;
+    factor = factor + 2;
+    index_square = index_square + factor;
+  }
+}
+
+// Check if n is prime using trial division.
+fun is_prime(n : int) {
+  var i : int = 2;
+  let s : int = sqrt(n); 
+  while (i <= s) {
+    if (n % i == 0) {
+      return false;
+    }
+    i = i + 1;
+  }
+  return true;
+}
+
+fun main() {
+  let N : int = 20;
+  var A : [bool] = [N of true];
+  ! sift_primes(A);
+  var i : int = 3;
+  var count : int = 0;
+  for x in A {
+    assert x == is_prime(i);
+    i = i + 2;
+  }
+  return 0;
+}

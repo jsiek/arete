@@ -1,5 +1,6 @@
 from values import *
 from ast_types import *
+import math
 
 compare_ops = { 'less': lambda x, y: x < y,
                 'less_equal': lambda x, y: x <= y,
@@ -18,6 +19,9 @@ def eval_prim(op, vals, machine, location):
         exit(vals[0])
       case 'input':
         return Number(int(input()))
+      case 'print':
+        print(vals[0])
+        return Void()
       case 'copy':
         return vals[0].duplicate(1, location)
       case 'equal':
@@ -47,9 +51,16 @@ def eval_prim(op, vals, machine, location):
         left = to_number(vals[0], location)
         right = to_number(vals[1], location)
         return Number(left // right)
+      case 'mod':
+        left = to_number(vals[0], location)
+        right = to_number(vals[1], location)
+        return Number(left % right)
       case 'neg':
         val = to_number(vals[0], location)
         return Number(- val)
+      case 'sqrt':
+        val = to_number(vals[0], location)
+        return Number(int(math.sqrt(val)))
       case 'and':
         left = to_boolean(vals[0], location)
         right = to_boolean(vals[1], location)
@@ -128,9 +139,18 @@ def type_check_prim(location, op, arg_types):
         require_consistent(arg_types[0], IntType(location), 'in //', location)
         require_consistent(arg_types[1], IntType(location), 'in //', location)
         return IntType(location)
+      case 'mod':
+        assert len(arg_types) == 2
+        require_consistent(arg_types[0], IntType(location), 'in //', location)
+        require_consistent(arg_types[1], IntType(location), 'in //', location)
+        return IntType(location)
       case 'neg':
         assert len(arg_types) == 1
         require_consistent(arg_types[0], IntType(location), 'in -', location)
+        return IntType(location)
+      case 'sqrt':
+        assert len(arg_types) == 1
+        require_consistent(arg_types[0], IntType(location), 'in sqrt', location)
         return IntType(location)
       case 'exit':
         assert len(arg_types) == 1
@@ -139,6 +159,11 @@ def type_check_prim(location, op, arg_types):
       case 'input':
         assert len(arg_types) == 0
         return IntType(location)
+      case 'print':
+        assert len(arg_types) == 1
+        require_consistent(arg_types[0], IntType(location), 'in print',
+                           location)
+        return VoidType(location)
       case 'and':
         assert len(arg_types) == 2
         require_consistent(arg_types[0], BoolType(location), 'in and', location)

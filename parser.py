@@ -194,13 +194,14 @@ def parse_tree_to_case_list(e):
     else:
         raise Exception('unrecognized as a type list ' + repr(e))
     
-primitive_ops = {'add', 'sub', 'mul', 'div', 'int_div', 'neg',
+primitive_ops = {'add', 'sub', 'mul', 'div', 'int_div', 'mod', 'neg', 'sqrt',
                  'and', 'or', 'not',
                  'copy',
                  'len', 'split', 'join',
                  'equal', 'not_equal',
                  'less', 'greater', 'less_equal', 'greater_equal',
-                 'permission', 'upgrade', 'breakpoint', 'exit', 'input'}
+                 'permission', 'upgrade', 'breakpoint',
+                 'exit', 'input', 'print'}
 
 impl_num = 0
 def next_impl_num():
