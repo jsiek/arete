@@ -12,7 +12,11 @@ fun sift_primes(inout A : [bool]) {
   var index_square : int = 3;
   var factor : int = 3;
   while (index_square < len(A)) {
+    // invariant: index_square == 2i^2 + 6i + 3
+    //              and factor == 2i + 3
     if (A[i]) {
+      // all multiples of factor are not prime
+      // the non-primes below index_square have already been marked
       ! fill(A[index_square : len(A) : factor], false);
     }
     i = i + 1;
@@ -36,7 +40,7 @@ fun is_prime(n : int) {
 }
 
 fun main() {
-  let N : int = 20;
+  let N : int = 54;
   var A : [bool] = [N of true];
   ! sift_primes(A);
   var i : int = 3;
