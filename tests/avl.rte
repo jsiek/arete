@@ -110,15 +110,15 @@ fun insert(let key: int, inout tree: tree_t) {
     var node: node_t* = find(key, top_node);
     if (key < (*node)[data]) {
       var new_node: node_t* = &⟨key, empty(), empty(), empty(), 0⟩;
-      ! gather_permission(node);
-      ! set_left(node, new_node);
-      ! scatter_permission(node);
+      gather_permission(node);
+      set_left(node, new_node);
+      scatter_permission(node);
     }
     if ((*node)[data] < key) {
       var new_node: node_t* = &⟨key, empty(), empty(), empty(), 0⟩;
-      ! gather_permission(node);
-      ! set_right(node, new_node);
-      ! scatter_permission(node);
+      gather_permission(node);
+      set_right(node, new_node);
+      scatter_permission(node);
     }
   }
 }
@@ -127,25 +127,25 @@ fun delete_node(var node: node_opt) {
   match (node) {
   case empty(_): {}
   case some(var n): 
-    ! gather_permission(n);
-    ! delete_node(copy((*n)[left]));
-    ! delete_node(copy((*n)[right]));
+    gather_permission(n);
+    delete_node(copy((*n)[left]));
+    delete_node(copy((*n)[right]));
     delete n;
   }
 }
 
 fun delete_tree(var tree: tree_t) {
-  ! delete_node(copy(*tree));
+  delete_node(copy(*tree));
   delete tree;
 }
 
 fun main() {
   var tree : tree_t = &empty();
-  ! insert(5, tree);
-  ! insert(10, tree);
-  ! insert(1, tree);
+  insert(5, tree);
+  insert(10, tree);
+  insert(1, tree);
   let ten = (let n: node_t* = find(10, (*tree)#some)
              in copy((*n)[data]));
-  ! delete_tree(tree);
+  delete_tree(tree);
   return ten - 10;
 }

@@ -5,6 +5,6 @@ fun f(let x: int, inout p: int*) {
 fun main() {
   var p: int* = &0;
   let x: int = 1;
-  ! f(x, p); // failed to restore let-bound variable to original permission
+  f(x, p); // failed to restore let-bound variable to original permission
   return *p;
 }

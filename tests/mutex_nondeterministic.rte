@@ -14,8 +14,8 @@ fun main() {
   var p = 0;
   let t1 = spawn write1(p);
   let t2 = spawn write2(p);
-  ! wait t2;
-  ! wait t1;
+  wait t2;
+  wait t1;
   if (p == 1) {
     return 0;
   } else if (p == 2) {

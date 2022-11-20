@@ -8,7 +8,7 @@ fun main() {
   var a = &0;
   let f1 = spawn write(a, 42);
   let f2 = spawn write(a, -42); // inout binding requires permission 1/1
-  ! wait f1;
-  ! wait f2;
+  wait f1;
+  wait f2;
   return *a;
 }

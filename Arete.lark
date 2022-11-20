@@ -111,7 +111,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 
 ?statement: expression "=" initializer ";"              -> write
     | expression "<-" expression "of" expression ";"    -> transfer
-    | "!" expression ";"                                -> expr
+    | expression ";"                                    -> expr
     | "delete" expression ";"                           -> delete
     | "assert" expression ";"                           -> assert
     | "while" "(" expression ")" block                  -> while

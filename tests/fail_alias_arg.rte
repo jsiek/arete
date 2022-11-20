@@ -6,6 +6,6 @@ fun f(inout x, inout y) {
 
 fun main() {
   var v = 2;
-  ! f(v, v);
+  f(v, v);
   return v;
 }

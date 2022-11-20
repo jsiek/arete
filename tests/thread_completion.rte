@@ -5,6 +5,6 @@ fun write(inout p, v) {
 fun main() {
   var p = 1;
   let t = spawn spawn write(p, 0);
-  ! wait t;
+  wait t;
   return p;
 }

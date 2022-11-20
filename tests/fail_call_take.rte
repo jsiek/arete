@@ -6,7 +6,7 @@ fun inc(inout p) {
 fun main() {
   var q = 0;
   let p = q; // create a read-only alias, causing q to lose write privilege
-  ! inc(q);    // initializing inout pointer requires 1/1 pointer
+  inc(q);    // initializing inout pointer requires 1/1 pointer
   q = q + 1;
   return p - q;
 }

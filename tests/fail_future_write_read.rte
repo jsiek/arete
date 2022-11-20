@@ -17,6 +17,6 @@ fun main() {
     x = p;                          // error, don't have permission to read from p
   } // s dies, gives back signal's permissions
   // write happens sometime in here
-  ! wait f1;
+  wait f1;
   return x;
 }

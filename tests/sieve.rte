@@ -7,7 +7,7 @@ fun fill<T>(inout A : [T], let x : T) {
 
 // Computes which odd numbers are prime, starting with 3.
 fun sift_primes(inout A : [bool]) {
-  ! fill(A, true);
+  fill(A, true);
   var i : int = 0;
   var index_square : int = 3;
   var factor : int = 3;
@@ -17,7 +17,7 @@ fun sift_primes(inout A : [bool]) {
     if (A[i]) {
       // all multiples of factor are not prime
       // the non-primes below index_square have already been marked
-      ! fill(A[index_square : len(A) : factor], false);
+      fill(A[index_square : len(A) : factor], false);
     }
     i = i + 1;
     index_square = index_square + factor;
@@ -42,7 +42,7 @@ fun is_prime(n : int) {
 fun main() {
   let N : int = 54;
   var A : [bool] = [N of true];
-  ! sift_primes(A);
+  sift_primes(A);
   var i : int = 3;
   var count : int = 0;
   for x in A {
