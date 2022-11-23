@@ -289,6 +289,8 @@ class Call(Exp):
           runner.params = params
           runner.body_env = clos_env.copy()
           runner.args = runner.results[1:]
+          # TODO: check that the captured free vars have
+          # enough permission. (See fail_capture2.rte.)
             
           # Bind the parameters to their arguments.
           for param, arg in zip(params, runner.args):

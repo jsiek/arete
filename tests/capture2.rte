@@ -1,0 +1,12 @@
+fun main() {
+  let y = 20;
+  var z = 1;
+  {
+    var f = fun (x) [inout z] {
+      z = y + x;
+    };
+    f(2);
+  }
+  assert z == 22;
+  return z + y - 42;
+}

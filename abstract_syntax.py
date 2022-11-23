@@ -342,7 +342,7 @@ class Expr(Stmt):
   __match_args__ = ("exp",)
 
   def __str__(self):
-      return "! " + str(self.exp) + ";"
+      return str(self.exp) + ";"
 
   def __repr__(self):
     return str(self)
