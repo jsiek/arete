@@ -1,0 +1,11 @@
+module Sequences
+  exports Sequence
+{
+  // TODO: change parameter E to an associated type
+  interface Sequence(S, E) {
+    for_in : (let S, inout (let E) -> void) -> void;
+  }
+  
+  // TODO: impl of Sequence for [T]
+  
+}

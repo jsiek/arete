@@ -28,8 +28,8 @@ class Closure(Value):
     
     def duplicate(self, percentage, loc):
       if tracing_on():
-        print('duplicating closure ' + str(self))
-      env_copy = {x: v.duplicate(Fraction(1,2), loc) \
+        print('duplicating closure ' + str(self) + ' at ' + str(percentage))
+      env_copy = {x: v.duplicate(percentage, loc) \
                   for x,v in self.env.items()}
       return Closure(self.name, self.params, self.return_mode,
                      self.requirements,
@@ -163,7 +163,7 @@ class Function(Decl):
       
   def step(self, runner, machine):
     if runner.state == 0:
-      lam = Lambda(self.location, self.params, self.return_mode,
+      lam = Lambda(self.location, self.params, [], self.return_mode,
                    self.requirements, self.body, self.name)
       machine.schedule(lam, runner.env)
     else:
@@ -397,15 +397,18 @@ class Return(Stmt):
 @dataclass
 class Lambda(Exp):
   params: list[Param]
+  captures: list[Param]
   return_mode: str    # 'value' or 'address'
   requirements: list[AST]
   body: Stmt
   name: str = "lambda"
-  __match_args__ = ("params", "return_mode", "requirements", "body", "name")
+  __match_args__ = ("params", "captures", "return_mode", "requirements",
+                    "body", "name")
 
   def __str__(self):
       return "lambda " \
           + "(" + ", ".join([str(p) for p in self.params]) + ") " \
+          + "[" + ", ".join([str(p) for p in self.captures]) + "] " \
           + ", ".join(str(req) for req in self.requirements) \
           + " " + str(self.body)
 
@@ -413,30 +416,23 @@ class Lambda(Exp):
       return str(self)
 
   def free_vars(self):
-    # req_vars = set()
-    # for req in self.requirements:
-    #   req_vars |= set([req.name]) | req.iface.members.keys()
-    #   for extend_req in req.iface.extends:
-    #     req_vars |= set([extend_req.name])
-    
-    # req_vars = set([req.name for req in self.requirements])
-    # req_mem_vars = set()
-    # for req in self.requirements:
-    #   req_mem_vars = req_mem_vars | set(req.iface.members.keys())
     params = set([p.ident for p in self.params])
     return self.body.free_vars() - params
 
   def const_eval(self, env):
     new_params = [p.with_type(simplify(p.type_annot, env)) for p in self.params]
+    new_captures = [p.with_type(simplify(p.type_annot, env)) \
+                    for p in self.captures]
     body_env = env.copy()
     for p in new_params:
       if p.ident in body_env.keys():
         del body_env[p.ident]
     new_body = self.body.const_eval(body_env)
-    return Lambda(self.location, new_params, self.return_mode,
+    return Lambda(self.location, new_params, new_captures, self.return_mode,
                   self.requirements, new_body, self.name)
 
   def type_check(self, env, ctx):
+    # TODO: update to deal with explicit captures.
     body_env = copy_type_env(env)
     for p in self.params:
         body_env[p.ident] = StaticVarInfo(p.type_annot, None,
@@ -446,24 +442,39 @@ class Lambda(Exp):
       new_req = req.declare_type(body_env, {})
       new_reqs.append(new_req)
     ret_type, new_body = self.body.type_check(body_env)
+    if ret_type == None:
+        ret_type = VoidType(self.location)
+    
     return FunctionType(self.location,
                         tuple(),
                         tuple((p.kind,p.type_annot) for p in self.params),
                         ret_type,
                         tuple()), \
-           Lambda(self.location, self.params, self.return_mode, new_reqs,
-                  new_body, self.name)
+           Lambda(self.location, self.params, self.captures, self.return_mode,
+                  new_reqs, new_body, self.name)
 
   def step(self, runner, machine):
       clos_env = {}
       free = self.free_vars()
       if tracing_on():
         print('free vars of ' + self.name + ': ' + str(free))
+
+      # handle explicit captures
+      for param in self.captures:
+        if not param.ident in runner.env.keys():
+            error(self.location, 'in lambda, cannot capture undefined variable '
+                  + param.ident)
+        arg = Result(False, runner.env[param.ident])
+        param.bind(arg, clos_env, machine.memory, self.location)
+        free = free - set([param.ident])
+            
+      # the default is to capture with 1/2 permission
       for x in free:
           if not x in runner.env.keys():
             error(self.location, 'in lambda, undefined free variable ' + x)
           v = runner.env[x]
           clos_env[x] = v.duplicate(Fraction(1,2), self.location)
+          
       clos = Closure(self.name, self.params, self.return_mode,
                      self.requirements, self.body, clos_env)
       if isinstance(runner.context, ValueCtx):

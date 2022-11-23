@@ -149,12 +149,20 @@ class FunctionType(Type):
     return str(self)
     
 @dataclass(eq=True, frozen=True)
+class InterfaceType(Type):
+  iface: AST
+  def __str__(self):
+    return self.iface.name
+  def __repr__(self):
+    return str(self)
+  
+@dataclass(eq=True, frozen=True)
 class ModuleType(Type):
-  member_types: dict[str, Type]
+  member_info: dict[str, Any]
   __match_args__ = ("member_types",)
   def __str__(self):
     return '{' + ', '.join([n + ':' + str(t) \
-                            for n,t in self.member_types.items()]) + '}'
+                            for n,t in self.member_info.items()]) + '}'
   def __repr__(self):
     return str(self)
 
@@ -358,6 +366,8 @@ def consistent(ty1: Type, ty2: Type, assumed_consistent=set()) -> bool:
     case (RationalType(), IntType()):
       result = True
     case (BoolType(), BoolType()):
+      result = True
+    case (VoidType(), VoidType()):
       result = True
     case (TypeVar(x), TypeVar(y)):
       result = x == y

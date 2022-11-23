@@ -12,6 +12,7 @@ from variables_and_binding import Param
 from ast_base import *
 from ast_types import *
 from values import Pointer, Result, delete_env
+from interfaces_and_impls import InterfaceImplInfo, ImplReq
 from utilities import *
 
 
@@ -61,7 +62,7 @@ class ModuleDef(Decl):
   
   def __str__(self):
     return 'module ' + self.name + '\n'\
-        + '  exports ' + ", ".join(ex for ex in self.exports) + ' {\n' \
+        + '  exports ' + ", ".join(str(ex) for ex in self.exports) + '\n{\n' \
         + '\n'.join([str(d) for d in self.body]) + '\n}\n'
   
   def __repr__(self):
@@ -76,15 +77,18 @@ class ModuleDef(Decl):
 
   def declare_type(self, env):
     body_env = env.copy()
-    member_types = {}
+    member_info = {}
     for d in self.body:
       new_members = d.declare_type(body_env)
-      member_types |= { x: info.type for x,info in new_members.items()}
+      member_info |= { x: info for x,info in new_members.items()}
       body_env |= new_members
     for ex in self.exports:
-      if not ex in member_types:
-        error(self.location, 'export ' + ex + ' not defined in module')
-    return {self.name: StaticVarInfo(ModuleType(self.location, member_types),
+      if isinstance(ex, str) and not ex in member_info:
+          error(self.location, 'during type checking, export ' + str(ex) + ' not defined in module')
+      elif isinstance(ex, ImplReq):
+        ex.search_impl(ex.impl_types, member_info, self.location)
+        
+    return {self.name: StaticVarInfo(ModuleType(self.location, member_info),
                                      None, ProperFraction())}
     
   def type_check(self, env):
@@ -99,7 +103,14 @@ class ModuleDef(Decl):
     new_body = []
     for d in self.body:
       new_body += d.type_check(body_env)
-    return [ModuleDef(self.location, self.name, self.exports, new_body)]
+    new_exports = []
+    for ex in self.exports:
+      if isinstance(ex,str) and isinstance(members[ex], StaticVarInfo):
+        new_exports.append(ex)
+      elif isinstance(ex, ImplReq):
+        witness = ex.search_impl(ex.impl_types, members, self.location)
+        new_exports.append(witness.ident)
+    return [ModuleDef(self.location, self.name, new_exports, new_body)]
     
   def step(self, runner, machine):
     if runner.state == 0:
@@ -122,12 +133,12 @@ class ModuleDef(Decl):
 @dataclass
 class Import(Decl):
   module: Exp
-  imports: list[str]
+  imports: list[Any]
   __match_args__ = ("module", "imports")
   
   def __str__(self):
     return 'from ' + str(self.module) + ' import ' \
-        + ', '.join(im for im in self.imports) + ';'
+        + ', '.join(str(im) for im in self.imports) + ';'
 
   def __repr__(self):
     return str(self)
@@ -140,13 +151,26 @@ class Import(Decl):
     mod, new_mod = self.module.type_check(env, 'none')
     mod = unfold(mod)
     if isinstance(mod, ModuleType):
+      self.module_type = mod
       results = {}
       for x in self.imports:
-          if not x in mod.member_types.keys():
+        if isinstance(x, str):
+          if not x in mod.member_info.keys():
             static_error(decl.location, "in import, no " + x
                          + " in " + str(module))
-          results[x] = StaticVarInfo(mod.member_types[x], None,
-                                     ProperFraction())
+          results[x] = mod.member_info[x]
+        elif isinstance(x, ImplReq):
+          witness = x.search_impl(x.impl_types, mod.member_info, self.location)
+          if x.iface_name in results.keys():
+            iface_info = results[x.iface_name]
+          elif x.iface_name in env.keys():
+            iface_info = env[x.iface_name]
+          else:
+            error(self.location, "unknown interface " + x.iface_name)
+          new_info = iface_info.extend([(x.impl_types, witness)])
+          results[x.iface_name] = new_info
+        else:
+          error(self.location, "unknown kind of import " + repr(x))
       return results
     else:
       static_error(self.location, "in import, expected a module, not "
@@ -154,11 +178,25 @@ class Import(Decl):
     
   def type_check(self, env):
     mod_type, new_module = self.module.type_check(env, 'none')
-    return [Import(self.location, new_module, self.imports)]
+    # erase the imports of interfaces
+    new_imports = []
+    for x in self.imports:
+      if isinstance(x,str):
+        info = self.module_type.member_info[x]
+        if isinstance(info, StaticVarInfo):
+          new_imports.append(x)
+      elif isinstance(x, ImplReq):
+        witness = x.search_impl(x.impl_types, self.module_type.member_info,
+                                self.location)
+        new_imports.append(witness.ident)
+    return [Import(self.location, new_module, new_imports)]
 
   def declare(self, env, mem):
     for x in self.imports:
+      if isinstance(x, str):
         env[x] = mem.allocate(Void())
+      elif isinstance(x, ImplReq):
+        pass
       
   def step(self, runner, machine):
     if runner.state == 0:
@@ -169,12 +207,16 @@ class Import(Decl):
       runner.results[0].temporary = False
       mod = machine.memory.read(mod_ptr, self.location)
       for x in self.imports:
-        if x in mod.exports.keys():
-          val = machine.memory.read(mod.exports[x], self.location)
-          dup = val.duplicate(mod.exports[x].get_permission, self.location)
-          machine.memory.write(runner.env[x], dup, self.location)
-        else:
-          error(self.location, 'module does not export ' + x)
+        if isinstance(x, str):
+          if x in mod.exports.keys():
+            val = machine.memory.read(mod.exports[x], self.location)
+            dup = val.duplicate(mod.exports[x].get_permission, self.location)
+            machine.memory.write(runner.env[x], dup, self.location)
+          else:
+            error(self.location, 'module does not export ' + x)
+        elif isinstance(x, ImplReq):
+          pass
+                        
       if tracing_on():
           print('** about to finish import')
       machine.finish_definition(self.location)
@@ -207,10 +249,10 @@ class ModuleMember(Exp):
     if not (isinstance(mod_type, ModuleType) \
             or isinstance(mod_type, AnyType)):
         static_error(self.location, "expected a module, not " + str(mod_type))
-    if not self.field in mod_type.member_types.keys():
+    if not self.field in mod_type.member_info.keys():
         static_error(self.location, "module " + str(self.arg)
                      + " does not contain " + self.field)
-    return mod_type.member_types[self.field], \
+    return mod_type.member_info[self.field].type, \
         ModuleMember(self.location, new_arg, self.field)
       
   def step(self, runner, machine):

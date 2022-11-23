@@ -36,6 +36,17 @@ lark_parser = Lark(open("./Arete.lark").read(), start='arete', parser='lalr',
 # Parsing Concrete to Abstract Syntax
 ##################################################
 
+def parse_tree_to_list(e):
+    if e.data == 'empty':
+        return tuple([])
+    elif e.data == 'single':
+        return tuple([parse_tree_to_ast(e.children[0])])
+    elif e.data == 'push':
+        return tuple([parse_tree_to_ast(e.children[0])]) \
+            + parse_tree_to_list(e.children[1])
+    else:
+        raise Exception('parse_tree_to_str_list, unexpected ' + str(e))
+    
 def parse_tree_to_str_list(e):
     if e.data == 'nothing':
         return tuple()
@@ -74,6 +85,8 @@ def parse_tree_to_type(e):
         return RationalType(e.meta)
     elif e.data == 'bool_type':
         return BoolType(e.meta)
+    elif e.data == 'void_type':
+        return VoidType(e.meta)
     elif e.data == 'array_type':
         return ArrayType(e.meta, parse_tree_to_type(e.children[0]))
     elif e.data == 'ptr_type':
@@ -164,8 +177,10 @@ def parse_tree_to_alt_list(e):
     
 def parse_tree_to_param(e):
   e.meta.filename = filename
-  if e.data == 'empty':
+  if e.data == 'empty' or e.data == 'nothing':
     return []
+  elif e.data == 'just':
+    return parse_tree_to_param(e.children[0])
   elif e.data == 'single':
     return [parse_tree_to_param(e.children[0])]
   elif e.data == 'push':
@@ -213,6 +228,8 @@ def next_impl_num():
 def parse_tree_to_ast(e):
     e.meta.filename = filename
     # expressions
+    if e.data == 'raw_string':
+        return str(e.children[0].value)
     if e.data == 'var':
         return Var(e.meta, str(e.children[0].value))
     elif e.data == 'int':
@@ -236,9 +253,10 @@ def parse_tree_to_ast(e):
     elif e.data == 'lambda':
         return Lambda(e.meta,
                       parse_tree_to_param(e.children[0]),
-                      str(e.children[1].data),
+                      parse_tree_to_param(e.children[1]),
+                      str(e.children[2].data),
                       [],
-                      parse_tree_to_ast(e.children[2]),
+                      parse_tree_to_ast(e.children[3]),
                       'lambda')
     elif e.data == 'call':
         e1, e2 = e.children
@@ -354,7 +372,7 @@ def parse_tree_to_ast(e):
     elif e.data == 'import':
         return Import(e.meta,
                       parse_tree_to_ast(e.children[0]),
-                      parse_tree_to_str_list(e.children[1]))
+                      parse_tree_to_list(e.children[1]))
     elif e.data == 'global':
         return Global(e.meta,
                       str(e.children[0].value),
@@ -386,7 +404,7 @@ def parse_tree_to_ast(e):
     elif e.data == 'module':
         return ModuleDef(e.meta,
                           str(e.children[0].value),
-                          parse_tree_to_str_list(e.children[1]),
+                          parse_tree_to_list(e.children[1]),
                           parse_tree_to_ast(e.children[2]))
     elif e.data == 'interface':
         return Interface(e.meta,

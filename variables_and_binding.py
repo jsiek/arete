@@ -126,6 +126,11 @@ class Param:
             print('let end-of-life ' + self.ident
                   + '\nptr: ' + str(ptr)
                   + '\nsource: ' + str(source))
+        # This happens in tests/for_in_seq.rte, don't know why.
+        # The ptr is already null. -Jeremy
+        #if source.permission == Fraction(1,1):
+        if ptr.get_address() is None:
+            return
         if ptr.get_permission() != source.permission / 2:
             error(loc, 'failed to restore let-bound variable '
                   + 'to\noriginal permission of\n\t'

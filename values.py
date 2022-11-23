@@ -183,6 +183,7 @@ class Pointer(Value):
         result += name + ' -> ' + str(self.address) + ';\n'
       return result, str(self.address), self.node_label()
 
+    # Transfer from source into this pointer.
     def transfer(self, percent, source, location):
         if not source.is_pointer():
             error(location, "in transfer, expected pointer, not " + str(source))
@@ -211,7 +212,11 @@ class Pointer(Value):
         if self.address is None:
             ptr = Pointer(None, [], Fraction(1,1), self)
         else:
-            other_priv = self.permission * percentage
+            # keep the fractions simpler by using multiplier of 1/2
+            if Fraction(0,1) < percentage and percentage < Fraction(1,1):
+              other_priv = self.permission * Fraction(1,2)
+            else:
+              other_priv = self.permission * percentage
             ptr = Pointer(self.address, self.path, other_priv, self)
             self.permission -= other_priv
             assert(self.permission >= 0)

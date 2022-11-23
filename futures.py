@@ -32,7 +32,7 @@ class FutureExp(Exp):
   __match_args__ = ("arg",)
   
   def __str__(self):
-    return "future " + str(self.arg)
+    return "spawn " + str(self.arg)
   
   def __repr__(self):
     return str(self)

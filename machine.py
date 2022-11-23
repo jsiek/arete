@@ -198,6 +198,8 @@ class Machine:
                                    + str(self.current_runner().ast))
                 raise new_ex
             if tracing_on() and len(frame.todo) > 0:
+              print('before log_graphviz, env:')
+              print(self.current_runner().env)
               log_graphviz('top', self.current_runner().env, self.memory.memory)
               print(machine.memory)
               print()
@@ -311,36 +313,40 @@ class Machine:
 flags = set(['trace', 'fail', 'debug', 'static_fail'])
 
 if __name__ == "__main__":
+    if 'fail' in sys.argv:
+      set_expect_fail(True)
+    if 'static_fail' in sys.argv:
+      set_expect_static_fail(True)
+    if 'trace' in sys.argv:
+      set_trace(True)
+      set_verbose(True)
+    if 'debug' in sys.argv:
+      set_debug(True)
+    else:
+      set_debug(False)
+      
     decls = []
     for filename in sys.argv[1:]:
-      if filename in flags:
-          continue
-      set_filename(filename)
-      file = open(filename, 'r')
-      if 'fail' in sys.argv:
-        set_expect_fail(True)
-      if 'static_fail' in sys.argv:
-        set_expect_static_fail(True)
-      if 'trace' in sys.argv:
-        set_trace(True)
-        set_verbose(True)
-      if 'debug' in sys.argv:
-        set_debug(True)
-      else:
-        set_debug(False)
-      p = file.read()
-      decls += parse(p, False)
+      if not (filename in flags):
+        set_filename(filename)
+        file = open(filename, 'r')
+        p = file.read()
+        decls += parse(p, False)
       
     decls = const_eval_decls(decls, {})
     if tracing_on():
       print('**** after const_eval ****')
-      print(decls)
+      for decl in decls:
+          print(decl)
+          print()
       print()
     try:
       decls = type_check_program(decls)
       if tracing_on():
         print('**** finished type checking ****')
-        print(decls)
+        for decl in decls:
+          print(decl)
+          print()
         print()
 
       machine = Machine(Memory(), [], None, None, None)

@@ -11,6 +11,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 ?type: "int"                                     -> int_type
     | "rational"                                 -> rational_type
     | "bool"                                     -> bool_type
+    | "void"                                     -> void_type
     | "?"                                        -> any_type
     | "[" type "]"                               -> array_type
     | type "*"                                   -> ptr_type
@@ -44,7 +45,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 ?type_opt: ":" type                              -> just
     |                                            -> nothing
 
-?return_mode: "&"                                   -> address
+?return_mode: "&"                                -> address
     |                                            -> value
 
 ?expression: expression_logic "?" expression ":" expression    -> condition
@@ -102,12 +103,15 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | expression_hi "[" expression "]"                  -> index
     | expression_hi "[" expression ":" expression ":" expression "]"   -> slice
     | expression_hi "(" initializer_list ")"            -> call
-    | "fun" "(" parameter_list ")" return_mode block    -> lambda
+    | "fun" "(" parameter_list ")" capture_opt return_mode block -> lambda
     | "true"                                            -> true
     | "false"                                           -> false
     | "spawn" expression                                -> future
     | "wait" expression_hi                              -> wait
     | "tag" IDENT "(" expression ")" "as" type          -> tag_variant
+
+?capture_opt:                                           -> nothing
+    | "[" parameter_list "]"                            -> just
 
 ?statement: expression "=" initializer ";"              -> write
     | expression "<-" expression "of" expression ";"    -> transfer
@@ -192,11 +196,18 @@ parameter: binding_kind IDENT type_opt                  -> binding
 ?extends_clause:                          -> empty
     | "extends" req_list
 
+?req_or_ident: req
+    | IDENT                                             -> raw_string
+
+?import_list:                                           -> empty
+    | req_or_ident                                      -> single
+    | req_or_ident "," import_list                      -> push
+
 ?definition: "let" IDENT type_opt "=" expression ";"              -> global
     | "const" IDENT type_opt "=" expression ";"                   -> constant
     | "fun" IDENT type_params_opt "(" parameter_list ")" ret_type return_mode where_clause block  -> function
-    | "module" IDENT "exports" ident_list "{" definition_list "}" -> module
-    | "from" expression "import" ident_list ";"                   -> import
+    | "module" IDENT "exports" import_list "{" definition_list "}" -> module
+    | "from" expression "import" import_list ";"                  -> import
     | "type" IDENT "=" type ";"                                   -> type_definition
     | "typeop" IDENT "(" ident_list ")" "=" type ";"              -> type_operator
     | "interface" IDENT "(" ident_list ")" extends_clause  "{" declaration_list "}" -> interface

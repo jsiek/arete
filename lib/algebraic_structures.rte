@@ -1,0 +1,15 @@
+module AlgebraicStructures
+  exports Monoid, Monoid(int)
+{
+
+  interface Monoid(T) {
+    combine : (let T, let T) -> T;
+    identity : T;
+  }
+
+  impl Monoid(int) {
+    combine = fun (x:int, y:int) { return x + y; };
+    identity = 0;
+  }
+
+}

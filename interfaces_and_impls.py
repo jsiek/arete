@@ -73,18 +73,22 @@ from utilities import *
 class InterfaceImplInfo(StaticInfo):
   iface: Decl
   impls: list[tuple[list[Type], Exp]]
-
+  type: Type
+  
   def extend(self, new_impls):
-    return InterfaceImplInfo(self.iface, self.impls + new_impls)
+    return InterfaceImplInfo(self.iface, self.impls + new_impls,
+                             self.type)
   
   def copy(self):
     return InterfaceImplInfo(self.iface,
-                             [(tys, e) for tys, e in self.impls])
+                             [(tys, e) for tys, e in self.impls],
+                             self.type)
 
   def merge(self, other):
     if self.iface is other.iface:
       return InterfaceImplInfo(self.iface,
-                               self.impls + other.impls)
+                               self.impls + other.impls,
+                               self.type)
     else:
       error(iface.location, "in merge, two interfaces with same name")
 
@@ -94,7 +98,7 @@ class InterfaceImplInfo(StaticInfo):
   def apply_subst(self, subst):
     new_impls = [([substitute(subst, ty) for ty in tys], exp) \
                  for (tys, exp) in self.impls]
-    return InterfaceImplInfo(self.iface, new_impls)
+    return InterfaceImplInfo(self.iface, new_impls, self.type)
 
   # def prefix(self, name, loc):
   #   new_impls = [(tys, prefix_access(exp, Var(loc, name))) \
@@ -115,10 +119,10 @@ def prefix_info(info, name, loc):
     case StaticVarInfo(ty, transl, state, param):
       return StaticVarInfo(ty, prefix_access(transl, Var(loc,name)),
                            state, param)
-    case InterfaceImplInfo(iface, impls):
+    case InterfaceImplInfo(iface, impls, typ):
       new_impls = [(tys, prefix_access(exp, Var(loc, name))) \
                    for (tys, exp) in impls]
-      return InterfaceImplInfo(iface, new_impls)
+      return InterfaceImplInfo(iface, new_impls, typ)
   
 @dataclass
 class Interface(Decl):
@@ -153,7 +157,8 @@ class Interface(Decl):
                       new_members)]
   
   def declare_type(self, env):
-    return {self.name: InterfaceImplInfo(self, [])}
+    return {self.name: InterfaceImplInfo(self, [], InterfaceType(self.location,
+                                                                 self))}
     
   # Traslate the interface to a type operator and record type
   # For example
@@ -296,7 +301,8 @@ class ImplReq(Type):
     # Bring the impl into scope
     output_env[self.iface_name] = \
       InterfaceImplInfo(info.iface,
-                        [(self.impl_types, Var(self.location, self.name))])
+                        [(self.impl_types, Var(self.location, self.name))],
+                        InterfaceType(self.location, info.iface))
     if tracing_on():
       print('declare impl ' + self.iface_name + str(self.impl_types))
 
@@ -319,15 +325,11 @@ class ImplReq(Type):
          
     return Param(self.location, 'let', 'none', self.name, None), output_env
 
-  # Used in the type checking of a Call AST node.
-  # Lookup the witnesses for the required impls.
-  def satisfy_impl(self, deduced_types, env, loc):
-    info = env[self.iface_name]
-    req_impl_types = [substitute(deduced_types, ty) \
-                      for ty in self.impl_types]
+  def search_impl(self, req_impl_types, env, loc):
     if tracing_on():
       print('searching for impl of ' + self.iface_name
-            + ' for ' + str(req_impl_types))
+            + ' for ' + ', '.join([str(t) for t in req_impl_types]))
+    info = env[self.iface_name]
     witness_exp = None
     for impl_tys, wit_exp in info.impls:
       if all([t1 == t2 for t1, t2 in zip(req_impl_types, impl_tys)]):
@@ -341,6 +343,13 @@ class ImplReq(Type):
     if tracing_on():
       print('found impl ' + str(witness_exp))
     return witness_exp    
+  
+  # Used in the type checking of a Call AST node.
+  # Lookup the witnesses for the required impls.
+  def satisfy_impl(self, deduced_types, env, loc):
+    req_impl_types = [substitute(deduced_types, ty) \
+                      for ty in self.impl_types]
+    return self.search_impl(req_impl_types, env, loc)
 
   # def bind_impl(self, witness_ptr, env, machine):
   #   # Bind impl name to its witness.
