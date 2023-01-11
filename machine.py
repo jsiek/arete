@@ -81,12 +81,15 @@ class Machine:
   return_value: Value
   pause : bool = False # for debugger control
 
+  # Run the machine on the given program.
+  # Execution begins by calling the 'main' function.
   def run(self, decls):
       self.main_thread = Thread([], None, None, 0)
       self.current_thread = self.main_thread
       self.threads = [self.main_thread]
       self.push_frame()
-      
+
+      # Evaluate all of the function definitions.
       env = {}
       for d in decls:
         if isinstance(d, Function) and d.name == 'main':
@@ -94,17 +97,21 @@ class Machine:
         d.declare(env, self.memory)
       for d in reversed(decls):
         self.schedule(d, env, return_mode='-no-return-mode-')
+        
       old_debug = debug()
       set_debug(False)
       self.loop()
       set_debug(old_debug)
 
+      # Call the 'main' function.
       self.threads = [self.main_thread]
       self.push_frame()
       loc = main.location
       call_main = Call(loc, Var(loc, 'main'), [])
       self.schedule(call_main, env, return_mode='-no-return-mode-')
       self.loop()
+
+      # Cleanup by deleting the top-level environment.
       if tracing_on():
           print('** finished program')
       if tracing_on():
@@ -116,6 +123,7 @@ class Machine:
         print('top-level env: ' + str(env))
         log_graphviz('top', env, self.memory.memory)
 
+      # Check for memory leaks.
       if self.memory.size() > 0:
           print('result:')
           print(self.return_value)
@@ -208,7 +216,7 @@ class Machine:
           else:
             self.current_thread.stack.pop()
 
-  # Call schedule to start the evaluation of an AST node.
+  # Call schedule to queue the evaluation of an AST node.
   # Returns the new runner.
   def schedule(self, ast, env, context=ValueCtx(), return_mode=None):
       return_mode = self.current_runner().return_mode if return_mode is None \
@@ -310,9 +318,15 @@ class Machine:
       print(str(k) + ':\t' + str(val) + '\t\t\t' + str(ptr))
     print()
 
-flags = set(['trace', 'fail', 'debug', 'static_fail'])
+# Command-line flags
+flags = set(['trace', # Enable the tracing output. (i.e. "printf" debugging)
+             'debug', # Run the debugger.
+             'fail',  # The program is expected to fail at runtime.
+             'static_fail']) # The program is expected to fail during type checking.
 
+# Run the machine on the specified files, and process the command-line flags.
 if __name__ == "__main__":
+    # Set some global variables based on the command-line flags.
     if 'fail' in sys.argv:
       set_expect_fail(True)
     if 'static_fail' in sys.argv:
@@ -324,7 +338,8 @@ if __name__ == "__main__":
       set_debug(True)
     else:
       set_debug(False)
-      
+
+    # Parse the program files.
     decls = []
     for filename in sys.argv[1:]:
       if not (filename in flags):
@@ -332,7 +347,8 @@ if __name__ == "__main__":
         file = open(filename, 'r')
         p = file.read()
         decls += parse(p, False)
-      
+
+    # Evaluate constant expressions.
     decls = const_eval_decls(decls, {})
     if tracing_on():
       print('**** after const_eval ****')
@@ -340,6 +356,8 @@ if __name__ == "__main__":
           print(decl)
           print()
       print()
+
+    # Type check the program.
     try:
       decls = type_check_program(decls)
       if tracing_on():
@@ -349,8 +367,10 @@ if __name__ == "__main__":
           print()
         print()
 
+      # Run the program
       machine = Machine(Memory(), [], None, None, None)
       retval = machine.run(decls)
+      
       if expect_fail():
           print("expected failure, but didn't, returned " + str(retval))
           exit(-1)
