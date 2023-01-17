@@ -280,20 +280,20 @@ zero or more definitions:
 <definition_list> ::=   | <definition> <definition_list>
 ```
 
-This document is organized according to major language features, such
-as functions, threads, arrays, modules, etc. In the section for each
-major language feature, we define the grammar rules, type checking
-rules, and runtime behavior of the feature.
+This specification is organized according to major language features,
+such as functions, threads, arrays, modules, etc. In the section for
+each major language feature, we define its grammar rules, type
+checking rules, and runtime behavior.
 
-In this document we give simplified grammar rules for the language
-that leave out the encoding of precedence. For the exact grammar
-rules, see [Arete.lark](Arete.lark). The parser for Arete produces an
-abstract syntax tree (AST) where each node is represented by a Python
-object. The class definitions for these objects are organized
-according to language feature, for example, the `Function` AST class
-for representing function definitions is defined in the file
-[`functions.py`](functions.py), along with other AST classes
-related to functions, such as `Call` and `Lambda`.
+In this document we give simplified grammar rules for the language,
+that for example, leave out the encoding of precedence. For the exact
+grammar rules, see [Arete.lark](Arete.lark). The parser for Arete
+produces an abstract syntax tree (AST) where each node is represented
+by a Python object. The class definitions for these objects are
+organized according to language feature, for example, the `Function`
+AST class for representing function definitions is defined in the file
+[`functions.py`](functions.py), along with other AST classes related
+to functions, such as `Call` and `Lambda`.
 
 We describe the runtime behavior of an Arete program in terms of a
 [machine](#machine). The precise definition of the machine is in
