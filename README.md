@@ -8,7 +8,7 @@ to the following design principles:
    programmer can control when they want the checking (that is, Arete
    will provide gradual typing).
   
-2. separate compilation: libraries (include generic ones) can be
+2. separate compilation: libraries (including generic ones) can be
    separately compiled and linked with applications. This will ensure
    scalable and efficient compilation of applications and libraries
    with large software dependencies.
@@ -202,252 +202,123 @@ This is the current specification of the Arete language.
 
 **Table of Contents**
 
-* [Values](#values)
-
-* [Types](#types)
+* [Overview](#overview)
 
 * [Machine](#machine)
 
 * [Language Features](#features)
 
-    * [Auxiliary Syntax](#auxiliary)
+    * [Miscellaneous Features](#miscellaneous)
+		* [Assert](#assert)
+		* [Block](#block)
+		* [Expression Statement](#expr) 
+		* [If Statement](#ifstmt)
+		* [Pass](#pass) (Do Nothing)
+		* [Primitive Call](#primitive)
+		* [Recursive Type](#recursive_type)
+		* [Type Variable Occurence](#rec_type_var)
+		* [While Loop](#while)
+		
+	* [Arrays](#arrays)
+        * [Array Creation](#array)
+        * [Index](#indexArray) into an Array
 
-    * [Definitions](#definitions)
-	
-	* [Statements](#statements)
-	
-	* [Expressions](#expressions)
+	* [Booleans](#booleans)
+        * [False Literal](#false)
+        * [True Literal](#true)
 
-# <a name="values"></a>Results and Values 
+	* [Functions](#functions)
+        * [Function Definition](#function_def)
+        * [Function Expression (Lambda)](#lambda)
+        * [Call](#call) a Function
+		* [Return Statement](#return)
 
-The *result* of an expression consists of a value (described next) and
-a Boolean flag that says whether the value was newly created by the
-expression (it's a temporary) or not.
+    * [Generics](#generics)
 
-A *value* is the runtime object produced by an expression during
-program execution. The kinds of values in Arete are listed below.
+	* [Modules](#modules)
+        * [Import](#import)
+        * [Member Access](#member)
+        * [Module Definition](#module)
 
-The Python classes that representation values are defined in
-[values.py](values.py).
+	* [Numbers](#numbers)
+        * [Integer Literal](#integer)
 
-All values are first class in the sense that they can be stored in
-memory, passed as argument to functions, etc.
+	* [Pointers](#pointers)
+        * [Address Of](#addressof)
+        * [Delete](#delete)
+        * [Dereference](#deref) a Pointer
+        * [Null Pointer Literal](#null)
+        * [Transfer](#transfer) Permission
+		* [Write (Assignment)](#write)
 
-We define the term *environment* to be a dictionary mapping variable
-names to pointers. (Pointers are a kind of value defined below.)
+    * [Threads](#threads)
+		* [Spawn](#spawn) a Future
+		* [Wait](#wait) on a Future
 
-## Numbers
+	* [Tuples](#tuples)
+        * [Index](#indexTuple) into a Tuple
+        * [Tuple Creation](#tuple)
 
-The numbers currently include integers and rationals.
-
-## Booleans
-
-The values `true` and `false`.
-
-## Tuples
-
-A tuple is a sequence of values.
-For example, 
-
-```
-⟨0,true,2,⟨10,false,12,13⟩,4,5⟩
-```
-
-## Pointers
-
-A pointer includes the following fields:
-
-* `address` (an integer)
-* `path` (list of integers)
-* `permission` (fraction)
-* `lender` (another pointer, optional)
-* `kill_when_zero` (a Boolean)
-* `no_give_backs` (a Boolean)
-
-If the value at `address` in memory is a tuple, then the `path`
-specifies which part of the tuple this pointer is referring to.
-The path is a list and not just a single integer because tuples
-can be nested. So, for example, the path `[3,2]` refers to
-the location of `12` in the tuple `⟨0,1,2,⟨10,11,12,13⟩,4,5⟩`.
-
-A pointer whose `permission` is `0` or greater can be copied.
-A pointer whose `permission` is greater than `0` can be used for
-reading.
-A pointer whose `permission` is `1` can be used for writing.
-
-If the pointer is a copy of another pointer, then its `lender` is that
-other pointer.
-
-If the `kill_when_zero` flag is set to true, then the pointer is
-killed when its `permission` reaches zero. This used for `let`
-variables.
-
-The if `no_give_backs` flag is set to true, then when the pointer is
-killed, it does not give its permissions back to its ender (as it
-normally would). This is used for `var` variables.
-
-A *null* pointer is a pointer whose `address` is `None`.
-
-We define the following operations on pointers.
-
-### Kill
-
-We define a *live pointer* to be a pointer whose `address` field
-contains an integer (and not `None`). If a pointer is not live,
-it's *dead*.
-
-We define the *living lender* of a pointer `P` to be the first live
-pointer in the chain of pointers obtain by following the `lender`
-fields starting with pointer `P`.
-
-1. If the pointer has a living lender, then transfer all of this
-   pointer's permission to the living lender. (Unless the
-   `no_give_backs` flag is set to true.)
-   
-2. If the pointer does not have a living lender
-
-    a. if its permission is `1`, delete the memory at its `address`.
-	
-	b. if its permission is greater than `0` but less than `1`, 
-	   halt with an error.
-
-3. Set the `address` of this pointer to `None`.
+    * [Variables](#variables)
+		* [Binding Statement](#binding_stmt)
+		* [Constant Definition](#constant)
+		* [Type Alias Definition](#type_alias)
+		* [Variable Definition](#global)
+		* [Variable Occurrence](#variable)
 
 
-### Duplicate
+# <a name="overview"></a>Overview
 
-Inputs: percentage
-
-1. If the pointer is null, return a null pointer.
-
-2. If the pointer is alive, create a new pointer with the same address
-   and path and transfer the given percentage from this pointer to the new
-   pointer.  Return the new pointer.
-
-### Transfer
-
-Inputs: source pointer, percentage
-
-Let `amount` be the permission of the source pointer multiplied by the
-given percentage.  Decrease the permission of the source pointer by
-`amount` and increase the permission of this pointer by `amount`.
-If the permission of the source pointer becomes `0` and its
-`kill_when_zero` flag is true, then kill it.
-
-### Upgrade
-
-If the pointer has a living lender, transfer all of the lender's
-permission to this pointer. Return `true` or `false` corresponding to
-whether this pointer's permission is equal to `1`.
-
-## Pointer Offset
-
-We sometimes need to delay the duplication of a pointer when using it
-to index into a tuple, which we accomplish with another pointer-like
-value called a *pointer offset*, which has the following fields.
-
-* `ptr` (a Pointer)
-* `offset` (an integer)
-
-A pointer offset acts like its underlying `ptr` but with the given
-`offset` appended to the end of its `path`.
-
-
-## Closures
-
-A closure includes information from the originating function (name,
-parameters, body, etc.) and an environment.
-
-## Futures
-
-A *future* value has an associated thread. 
-
-## Modules
-
-A module has a name, an environment of exported members, and an
-environment of all its members.
-
-# <a name="types"></a>Types
-
-A comma-separated list of types is a `type_list`.
+The Arete language has three main syntactic categories: expressions,
+statements, and definitions. At runtime, an expression produces a
+*value* (a piece of data). Most statements perform side effects; some
+statements associate a value with an identifier. Most definitions
+associate a value with an identifier.  A *program* is a sequence of
+zero or more definitions:
 
 ```
-<type_list> ::= <type> | <type> , <type_list>
+<definition_list> ::=   | <definition> <definition_list>
 ```
 
-## Array Type
+This document is organized according to major language features, such
+as functions, threads, arrays, modules, etc. In the section for each
+major language feature, we define the grammar rules, type checking
+rules, and runtime behavior of the feature.
 
-```
-<type> ::= [ <type> ]
-```
+In this document we give simplified grammar rules for the language
+that leave out the encoding of precedence. For the exact grammar
+rules, see [Arete.lark](Arete.lark). The parser for Arete produces an
+abstract syntax tree (AST) where each node is represented by a Python
+object. The class definitions for these objects are organized
+according to language feature, for example, the `Function` AST class
+for representing function definitions is defined in the file
+[`functions.py`](functions.py), along with other AST classes
+related to functions, such as `Call` and `Lambda`.
 
-## Boolean Type
+We describe the runtime behavior of an Arete program in terms of a
+[machine](#machine). The precise definition of the machine is in
+[machine.py](machine.py), and it dispatches to the `step` methods
+defined in each AST class. So the precise specification of the runtime
+behavior of each language feature is given by the `step` method of the
+corresponding Python class.
 
-```
-<type> ::= bool
-```
+Program execution begins by invoking the `declare` method on every
+definition.  For most definitions, this allocates an empty cell in
+memory and associates the name of the definition with its
+address. (See the `declare` method of the `Decl` base class in
+[`ast_base.py`](ast_base.py).) Exceptions to this behavior are
+discussed with the description of the particular kind of
+definition. The primary purpose of this first phase is to enable
+recursive definitions.
 
-## Function Type
+The machine then proceeds to interpret each definition by invoking its
+`step` method.
 
-```
-<type> ::= ( <type_list> ) -> <type>
-```
-
-## Integer Type
-
-```
-<type> ::= int
-```
-
-## Rational Type
-
-```
-<type> ::= rational
-```
-
-## Recursive Type
-
-```
-<type> ::= rec <identifier> in <type>
-```
-
-The `identifier` may occur inside the `type` expression and represents
-the whole `type`. For example, the following type could be used to
-represent a singly-linked list of integers. Each node is a tuple whose
-first element is an integer and whose second element is a pointer to
-another node.
-
-```
-rec X ⟨ int, X* ⟩
-```
-
-(Recursive types are unweildy to deal with directly, so there are
-plans to add syntactic sugar for them.)
-
-## Tuple Type
-
-```
-<type> ::= ⟨ <type_list> ⟩
-```
-
-## Unknown Type (aka. the "any" type or the "dynamic" type)
-
-```
-<type> ::= ?
-```
-
-This type enables gradual typing.
-
-
-## Type Variables
-
-```
-<type> ::= <identifier>
-```
-
-An occurence of a type variable refers to a recursive type.
-(See the above entry about Recursive Types.)
-
+Once all the definitions have been interpreted, the machine calls the
+function named `main` with no arguments. Once the execution of `main`
+is finished, the program exits with the return value of `main`,
+provided the machine's memory is empty. If the memory is non-empty,
+then the program halts with an error.
 
 # <a name="machine"></a>Machine Description
 
@@ -483,7 +354,10 @@ Each node runner has
 * `state` an integer to indicate how far along the node runner is in
    executing this AST node.
    
-* `results` a list of results for the subexpressions of this AST node. 
+* `results` a list of results for the subexpressions of this AST node.
+   Each *result* consists of a value and a Boolean flag that says
+   whether the value was newly created by the expression (it is a
+   temporary) or not.
    
 * `context` specifies whether the expression should be evaluated for
    its value (aka. rvalue) via `ValueCtx` or its address (aka. lvalue)
@@ -495,7 +369,8 @@ Each node runner has
 * `return_mode` (the strings `value` or `address`) is whether the enclosing
   function expects to return a value or address.
 
-* `env` an environment mapping all the in-scope variables to their addresses.
+* `env` an *environment*, that is, a dictionary that maps all the
+  in-scope variables to their addresses.
 
 ## Machine Operations
 
@@ -573,24 +448,6 @@ Inputs: result
 
 2. Pop the current runner from the `todo` stack of the current frame.
 
-
-### Spawn
-
-Inputs: an expression and environment
-
-1. Create a node runner with the given expression and environment,
-   with a value context and the same return mode as the current runner.
-   
-2. Create a new frame whose `todo` list just includes the new runner.
-
-3. Increment the `num_children` of this thread.
-
-4. Create a new thread whose `stack` just includes the new frame
-   and whose `parent` is the current thread.
-   
-5. Append the new thread to the `threads` of the machine.
-
-6. Return the new thread.
 
 ### <a name="bind_param"></a>Bind a Parameter
 
@@ -701,251 +558,11 @@ Inputs: address
 2. Delete the entry for this address in the memory.
 
 
-
 # <a name="features"></a>Language Features
 
-This section is organized according to the grammar of the language,
-which has three main categories: expressions, statements, and
-definitions. Within each category, the entries are ordered
-alphabetically. Each entry describe both the syntax of the language
-feature and its runtime behavior (semantics).  The syntax given here
-is a somewhat simplified variant that does not include the encoding of
-precedence.  For the exact grammar rules, see
-[Arete.lark](Arete.lark). Likewise, for the fully precise
-specification of its runtime behavior, read the `step` method of the
-corresponding Python class in
-[abstract_syntax.py](abstract_syntax.py).
 
-A *program* is a list of zero or more definitions:
 
-```
-<definition_list> ::=   | <definition> <definition_list>
-```
-
-Program execution begins with invoking `declare` on every definition.
-For most definitions, this allocates an empty cell in memory and
-associates the name of the definition with its address. Exceptions to
-this behavior are discussed with the description of the particular
-kind of definition. The purpose of this first phase is to enable
-recursive definitions.
-
-Execution then proceeds to interpret each definition by invoking its
-`step` method. We discuss what `step` does for each kind of definition
-below.
-
-Once all the definitions have been interpreted, the machine calls the
-function named `main` with no arguments. Once the execution of `main`
-is finished, the program exits with the return value of `main`,
-provided memory is empty. If memory is non-empty, then the program
-halts with an error. If there is no such `main` function, the program
-halts with an error.
-
-
-## <a name="auxiliary"></a>Auxiliary Syntax
-
-This section is about auxilliary syntactic categories that are used
-later in the definitions of the expressions, statements, and
-definitions.
-
-```
-<parameter> ::= <binding_kind> <identifier> [: <type>]
-```
-
-The `parameter` category is used for function parameters and variable
-definitions (e.g. the `let` statement). (See the definition of
-`binding_kind` below.) If no type annotation is present, the parameter
-is given the unknown type `?`.
-
-```
-<binding_kind> ::=   | let | var | inout | ref
-```
-
-If no binding kind is specified, it defaults to `let`.
-
-```
-<initializer> ::= <expression> | <expression> of <expression>
-```
-
-An initializer specifies what percentage of the permission is taken
-from the result value of the given expression. For example, the
-following initializes variable `y` to be an alias of variable `x`,
-taking 50% of its permissions.
-
-```
-let y = 1/2 of x;
-```
-
-If no percentage is specified and the context of the current node
-runner is an `AddressCtx`, then use that context's
-percentage. Otherwise use 50%.
-
-## <a name="definitions"></a>Definitions (program and module level)
-
-**Table of Contents**
-
-* [Constant](#constant)
-* [Import](#import)
-* [Function](#function_def)
-* [Module](#module)
-* [Type Alias](#type_alias)
-* [Variable Definition](#global)
-
-### <a name="constant"></a>Constant
-
-```
-<definition> ::= const <identifier> [: <type>] = <expression>;
-```
-
-#### Type Checking
-
-UNDER CONSTRUCTION
-
-#### Constant Evaluation (compile-time)
-
-The occurences of `identifier` in the program are replaced by the
-result of evaluating `expression`. (See
-[const_eval.py](const_eval.py).)
-
-#### Step
-
-1. Finish this declaration.
-
-### <a name="import"></a>Import
-
-```
-<definition> ::= from <expression> import <identifier_list>;
-```
-
-#### Type Checking
-
-UNDER CONSTRUCTION
-
-#### Declare
-
-The `declare` method of an import allocates an empty cell in memory
-for each name being imported, and associates the name with the cell's
-address in the current environment.
-
-#### Step
-
-1. Schedule the `expression` in the current environment with address context
-  and duplication.
-  
-2. Read from memory at the resulting pointer, which must produce a module. 
-   For each of the names in the `identifier_list` of the import, 
-   check whether it is in the module's exports and halt with an error
-   if it is not. Otherwise, read from memory using the pointer associated
-   with the name in the export environment of the module. Then duplicate
-   the value, taking the percentage of the pointer's permission.
-   Write the duplicated value to memory, using the pointer associated
-   with the name in the current environment.
-   
-3. Finish this definition.
-
-
-### <a name="function_def"></a>Function
-
-```
-<definition> ::= fun <identifier> (<parameter_list>) [-> <type>] [<return_mode>] <block>
-```
-
-#### Type Checking
-
-UNDER CONSTRUCTION
-
-#### Step
-
-1. Create a function expression AST node and schedule it in the
-   current environment with value context and duplication.
-   
-2. Write the resulting value to memory at the address associated with
-   the function's name in the current environment.
-
-3. Finish this definition.
-
-
-### <a name="module"></a>Module
-
-```
-<definition> ::= module <identifier> exports <identifier_list> { <definition_list> }
-```
-
-#### Type Checking
-
-UNDER CONSTRUCTION
-
-#### Step
-
-1. Let `body_env` be a new empty environment.
-
-2. Invoke the `declare` method on each definition in the module,
-   with the `body_env`.
-   
-3. Schedule each definition in the module with the `body_env`.
-
-4. For each identifier in the list of exports, check that
-   there is an entry in `body_env`.
-   
-4. Create a module value. It's `exports` environment maps each name in
-   the module's export list to the pointer for that name in
-   `body_env`. The `members` environment of the module is `body_env`.
-
-5. Write the module value to the address associated with its name in
-   the current environment.
-   
-6. Finish this definition.
-
-
-### <a name="type_alias"></a>Type Alias
-
-```
-<definition> ::= type <identifier> = <type>;
-```
-
-#### Type Checking
-
-The result of simplifying `type` is associated with `identifier` in
-the type environment.
-
-#### Step
-
-1. Finish this declaration.
-
-### <a name="global"></a>Variable Definition
-
-```
-<definition> ::= let <identifier> [: <type>] = <expression>;
-```
-
-#### Type Checking
-
-UNDER CONSTRUCTION
-
-#### Step
-
-1. Schedule the `expression` in a value context with duplication.
-
-2. Write the resulting value to memory using the pointer associated
-   with `identifier` in the current environment.
-   
-3. Finish this definition.
-
-
-## <a name="statements"></a>Statements 
-
-**Table of Contents**
-
-* [Assert](#assert)
-* [Binding](#local) (Let, Var, etc.)
-* [Block](#block)
-* [Delete](#delete)
-* [Expression](#expr) Statement
-* [If](#ifstmt) Statement
-* [Pass](#pass) (Do Nothing)
-* [Return](#return) Return
-* [Transfer](#transfer) Permission
-* [While](#while) Loop
-* [Write](#write) (aka Assignment)
+## <a name="miscellaneous"></a> Miscellaneous Features
 
 ### <a name="assert"></a>Assert
 
@@ -966,35 +583,6 @@ UNDER CONSTRUCTION
 3. Otherwise, finish this statement.
 
 
-### Binding (Let, Var, etc.)
-
-```
-<statement> ::= <parameter> = <expression>; <statement_list>
-```
-
-#### Type Checking
-
-UNDER CONSTRUCTION
-
-#### Step
-
-1. Schedule the `expression` in the current environment with address
-   context and duplication.
-
-2. Copy the current environment and name it `body_env`.
-   
-3. [Bind](#bind_param) the result from `expression` to the parameter
-   in the `body_env`.
-   
-4. Schedule the following statements in the environment `body_env`.
-
-6. Once the following statements are complete, 
-   [deallocate the parameter](#dealloc_param) with the result
-   from the `expression` and the `body_env`.
-   
-7. Finish this statement.
-   
-
 ### <a name="block"></a>Block
 
 ```
@@ -1012,25 +600,6 @@ UNDER CONSTRUCTION
 2. Finish this statement.
 
 
-### <a name="delete"></a>Delete
-
-```
-<statement> ::= delete <expression>;
-```
-
-#### Type Checking
-
-UNDER CONSTRUCTION
-
-#### Step
-
-1. Schedule the `expression` in the current environment with value
-   context and duplication.  The result must be a pointer.
-
-2. Deallocate the memory associated with the pointer,
-   set its `address` to `None` and its permission to `0`.
-
-3. Finish this statement.
 
 
 ### <a name="expr"></a>Expression Statement
@@ -1088,32 +657,10 @@ To interpret a two-armed `if`:
 
 1. Finish this statement.
 
-### <a name="return"></a>Return
+### <a name="primitive"></a>Primitive Call
 
 ```
-<statement> ::= return <expression>;
-```
-
-#### Type Checking
-
-UNDER CONSTRUCTION
-
-#### Step
-
-1. Schedule the `expression` in the current environment with
-   duplication using value or address context as specified by the
-   `return_mode` of the current node runner.
-
-2. Set the `return_value` of the current node runner to a duplicate
-   (at 100%) of the expression's result.
-
-3. Finish this statement.
-
-
-### <a name="transfer"></a>Transfer Permission
-
-```
-<statement> ::= <expression> <- <expression> of <expression>
+<expression> ::= <prim-op> ( <expression_list> )
 ```
 
 #### Type Checking
@@ -1122,25 +669,48 @@ UNDER CONSTRUCTION
 
 #### Step
 
-1. Schedule the target `expression` in the current environment with
-   value context and without duplication. The result value must be a
-   pointer.
-   
-2. Schedule the percentage `expression` in the current environment
-   with value context and duplication. The result value must be a
-   rational number.
-   
-3. Schedule the source `expression` in the current environment with
-   value context and without duplication. The result value must be a
-   pointer.
+1. Schedule each argument `expression`.
 
-4. Transfer the given percent from the source pointer to the target
-   pointer.
-   
-5. Finish this statement.
+2. Compute the result value according to the function `eval_prim`
+   in [primitive_operations.py](primitive_operations.py) with
+   the argument results and the `prim-op`.
+
+3. If the current runner's context is address context, allocate the
+   result value in memory and let `result` be the new pointer. (A
+   temporary). Otherwise, we're in value context and let `result` be
+   the result value. (Also a temporary.)
 
 
-### <a name="while"></a>While
+### <a name="recursive_type"></a>Recursive Type
+
+```
+<type> ::= rec <identifier> in <type>
+```
+
+The `identifier` may occur inside the `type` expression and represents
+the whole `type`. For example, the following type could be used to
+represent a singly-linked list of integers. Each node is a tuple whose
+first element is an integer and whose second element is a pointer to
+another node.
+
+```
+rec X ⟨ int, X* ⟩
+```
+
+(Recursive types are unweildy to deal with directly, so there are
+plans to add syntactic sugar for them.)
+
+
+### <a name="rec_type_var"></a>Type Variable Occurence
+
+```
+<type> ::= <identifier>
+```
+
+An occurence of a type variable may refer to a recursive type.
+(See the entry for [Recursive Type](#recursive_type).)
+
+### <a name="while"></a>While Loop
 
 ```
 <statement> ::= while (<expression>) <block>
@@ -1163,10 +733,82 @@ UNDER CONSTRUCTION
 3. Finish this statement.
 
 
-### <a name="write"></a>Write (Assignment)
+
+
+## <a name="variables"></a> Variables
 
 ```
-<statement> ::= <expression> = <initializer>;
+<parameter> ::= <binding_kind> <identifier> [: <type>]
+```
+
+The `parameter` category is used for function parameters and variable
+definitions (e.g. the `let` statement). (See the definition of
+`binding_kind` below.) If no type annotation is present, the parameter
+is given the unknown type `?`.
+
+```
+<binding_kind> ::=   | let | var | inout | ref
+```
+
+If no binding kind is specified, it defaults to `let`.
+
+```
+<initializer> ::= <expression> | <expression> of <expression>
+```
+
+An initializer specifies what percentage of the permission is taken
+from the result value of the given expression. For example, the
+following initializes variable `y` to be an alias of variable `x`,
+taking 50% of its permissions.
+
+```
+let y = 1/2 of x;
+```
+
+If no percentage is specified and the context of the current node
+runner is an `AddressCtx`, then use that context's
+percentage. Otherwise use 50%.
+
+### <a name="constant"></a>Constant
+
+```
+<definition> ::= const <identifier> [: <type>] = <expression>;
+```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Constant Evaluation (compile-time)
+
+The occurences of `identifier` in the program are replaced by the
+result of evaluating `expression`. (See
+[const_eval.py](const_eval.py).)
+
+#### Step
+
+1. Finish this declaration.
+
+
+### <a name="type_alias"></a>Type Alias
+
+```
+<definition> ::= type <identifier> = <type>;
+```
+
+#### Type Checking
+
+The result of simplifying `type` is associated with `identifier` in
+the type environment.
+
+#### Step
+
+1. Finish this declaration.
+
+### <a name="global"></a>Variable Definition
+
+```
+<definition> ::= let <identifier> [: <type>] = <expression>;
 ```
 
 #### Type Checking
@@ -1175,70 +817,75 @@ UNDER CONSTRUCTION
 
 #### Step
 
-1. Schedule the `initializer` in the current environment with value
-  context and duplication.
-  
-2. Schedule the `expression` in the current environment with address
-  context and duplication. The result must be a pointer.
+1. Schedule the `expression` in a value context with duplication.
 
-3. [Write](#write_op) the result of the initializer to the pointer.
-
-4. Finish this statement.
-
-(The order of evaluation here does not follow our usual left-to-right
- policy. Using left-to-right for assignment triggers errors in many of
- our test cases. I have not yet investigated why this is.)
-
-
-## <a name="expressions"></a>Expressions
-
-
-**Table of Contents**
-
-* [Address Of](#addressof)
-* [Array Creation](#array)
-* [Call](#call) a Function
-* [Dereference](#deref) a Pointer
-* [False Literal](#false)
-* [Function (Lambda)](#function)
-* [Index](#index) into a Tuple or Array
-* [Integer Literal](#integer)
-* [Member Access](#member)
-* [Null Pointer Literal](#null)
-* [Primitive Call](#primitive)
-* [True Literal](#true)
-* [Tuple Creation](#tuple)
-* [Variable](#variable)
-* [Spawn](#spawn) a Future
-* [Wait](#wait) on a Future
-
-### <a name="addressof"></a>Address Of
-
-```
-<expression> ::= & <expression>
-```
-
-#### Type Checking
-
-UNDER CONSTRUCTION
-
-#### Step
-
-1. Schedule `expression` in the current environment with address
-   context with duplication.
+2. Write the resulting value to memory using the pointer associated
+   with `identifier` in the current environment.
    
-2. If the current runner's context is value context, do the following.
-   If the result of `expression` was a temporary, duplicate it
-   and set `result` to the duplicate as a new temporary.
-   If the result of `expression` was not temporary, 
-   set `result` to the result of `expression`.
-    
-3. Otherwise, if the current runner's context is address context,
-   allocate the result's value in memory and set `result` to
-   the new pointer (it's a temporary).
+3. Finish this definition.
 
-4. Finish this expression with `result`.
 
+### <a name="binding_stmt"></a>Binding Statement (Let, Var, etc.)
+
+```
+<statement> ::= <parameter> = <expression>; <statement_list>
+```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
+1. Schedule the `expression` in the current environment with address
+   context and duplication.
+
+2. Copy the current environment and name it `body_env`.
+   
+3. [Bind](#bind_param) the result from `expression` to the parameter
+   in the `body_env`.
+   
+4. Schedule the following statements in the environment `body_env`.
+
+6. Once the following statements are complete, 
+   [deallocate the parameter](#dealloc_param) with the result
+   from the `expression` and the `body_env`.
+   
+7. Finish this statement.
+   
+### <a name="variable"></a>Variable Occurence
+
+```
+<expression> ::= <identifier>
+```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
+1. If the identifier is not in the current environment, halt with an
+   error.
+
+2. If the current runner's context is a value context, read from
+   memory using the identifier's pointer (from the current
+   environment). If the current runner's context requests duplication,
+   let `result` be a duplicate of the value in memory, taking the
+   percentage specified by the identifier's pointer. (A temporary.)
+   Otherwise, let `result` be the value in memory. (Not a temporary.)
+
+3. Otherwise the current runner's context is an address context.
+   Return the identifier's pointer. (Not a temporary).
+   
+4. Instruct the machine to finish this expression with the `result`.
+
+
+## <a name="arrays"></a> Arrays
+
+```
+<type> ::= [ <type> ]
+```
 
 ### <a name="array"></a>Array Creation
 
@@ -1286,6 +933,131 @@ UNDER CONSTRUCTION
 5. Finish this expression with `result`.
 
 
+### <a name="indexArray"></a> Index into an Array
+
+```
+<expression> ::= <expression> [ <expression> ]
+```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
+1. Schedule the first `expression` in the current environemnt 
+   in address context with the duplication specified by the current runner.
+   Let `ptr` be the result.
+   
+2. Schedule the second `expression` in a value context with
+   duplication.  Let `index` be the result, which must be an integer.
+   
+3. If the current node runner's context is a value context with
+   duplication, let `arr` be the array obtained by reading from memory
+   at `ptr`. If `ptr` is a temporary, then let `result` be a duplicate
+   of the element at `index` of `arr` (which should also be considered
+   a temporary), taking a percentage of the element according to the
+   permission of `ptr.  If `ptr` is not a temporary, let `result` be
+   the element at `index` of `arr`.
+
+4. If the current node runner's context is an address context, create
+   a pointer offset whose offset is `index` and whose underlying
+   pointer is either the `ptr` (if it was not a temporary) or a
+   duplicate of `ptr` (if it was a temporary). Let `result` be the new
+   pointer offeset. We categorize it as temporary if the `ptr` was
+   temporary.
+   
+5. Finish this expression with `result`.
+
+
+## <a name="booleans></a> Booleans
+
+The values `true` and `false` have the type `bool`.
+
+```
+<type> ::= bool
+```
+
+### <a name="false"></a>False Literal
+
+```
+<expression> ::= false
+```
+
+### <a name="true"></a>True Literal
+
+```
+<expression> ::= true
+```
+
+
+## <a name="functions></a> Functions
+
+A function value (aka. closure) includes information from the
+originating function (name, parameters, body, etc.) and the
+environment from its point of definition.
+
+A function type includes a list of parameter types and the return type.
+
+```
+<type> ::= ( <type_list> ) -> <type>
+```
+
+A comma-separated list of types is a `type_list`.
+
+```
+<type_list> ::= <type> | <type> , <type_list>
+```
+
+### <a name="function_def"></a>Function Definitions
+
+```
+<definition> ::= fun <identifier> (<parameter_list>) [-> <type>] [<return_mode>] <block>
+```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
+1. Create a function expression AST node and schedule it in the
+   current environment with value context and duplication.
+   
+2. Write the resulting value to memory at the address associated with
+   the function's name in the current environment.
+
+3. Finish this definition.
+
+### <a name="lambda"></a>Function Expression (Lambda)
+
+```
+<expression> ::= fun ( <parameter_list> ) <return_mode> <block>
+```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
+The *free variables* of a function are those variables that occur
+inside `block` without an enclosing variable binding in the `block` or
+by this function's parameters.
+
+1. Create an environment named `clos_env` with a duplicate (50%)
+   for each free variable of the function.
+2. Create a closure value with the `clos_env` and the other
+   information from this function (parameter list, return mode, and body).
+3. If the current node runner's context is a value context,
+   let `results` be the closure.
+4. If the current node runner's context is an address context,
+   allocate the closure in memory and let `result` be its pointer.
+5. Finish this expression with `result`.
+
+(There are plans to provide a way to capture free variables that are
+ mutable or to capture a variable's value.)
+
 ### <a name="call"></a>Call
 
 ```
@@ -1331,6 +1103,339 @@ UNDER CONSTRUCTION
 
 7. Finish this expression with `result`.
 
+
+### <a name="return"></a>Return Statement
+
+```
+<statement> ::= return <expression>;
+```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
+1. Schedule the `expression` in the current environment with
+   duplication using value or address context as specified by the
+   `return_mode` of the current node runner.
+
+2. Set the `return_value` of the current node runner to a duplicate
+   (at 100%) of the expression's result.
+
+3. Finish this statement.
+
+
+## <a name="generics"></a> Generics
+
+## <a name="gradual"></a> Gradual Typing
+
+### The Unknown Type (aka. the "any" type or the "dynamic" type)
+
+```
+<type> ::= ?
+```
+
+This type enables gradual typing because an expression of unkown type
+`?` may produce any type of runtime value.
+
+
+### Type Variable Occurrence
+
+```
+<type> ::= <identifier>
+```
+
+An occurence of a type variable may refer to a type parameter of a
+generic entity.
+
+
+
+## <a name="generics></a> Generics
+
+UNDER CONSTRUCTION
+
+
+## <a name="modules"></a> Modules
+
+A module has a name, an environment of exported members, and an
+environment of all its members. Modules are compile-time entities,
+they are not (runtime) values.
+
+
+### <a name="import"></a>Import
+
+```
+<definition> ::= from <expression> import <identifier_list>;
+```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Declare
+
+The `declare` method of an import allocates an empty cell in memory
+for each name being imported, and associates the name with the cell's
+address in the current environment.
+
+#### Step
+
+1. Schedule the `expression` in the current environment with address context
+  and duplication.
+  
+2. Read from memory at the resulting pointer, which must produce a module. 
+   For each of the names in the `identifier_list` of the import, 
+   check whether it is in the module's exports and halt with an error
+   if it is not. Otherwise, read from memory using the pointer associated
+   with the name in the export environment of the module. Then duplicate
+   the value, taking the percentage of the pointer's permission.
+   Write the duplicated value to memory, using the pointer associated
+   with the name in the current environment.
+   
+3. Finish this definition.
+
+
+### <a name="member"></a>Member Access
+
+```
+<expression> ::= <expression> . <identifier>
+```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
+1. Schedule `expression` in the current environment with address
+   context with duplication.
+   
+2. Read from the resulting pointer, which must produce a module value.
+   If `identifier` is not a name exported by the module, halt with an error.
+   Otherwise, let `ptr` be the associated pointer for the `identifier`
+   in the module's exports.
+   
+3. If the current node runner's context is a value context, let
+   `result` be a duplicate of the value at `ptr` in memory, taking a
+   percentage according to the permission of `ptr`. Categorize this
+   result as a temporary.
+
+4. If the current node runner's context is an address context, let
+   `result` be `ptr`. (Not a temporary.)
+   
+5. Finish this expression with `result`.
+
+### <a name="module"></a>Module Definition
+
+```
+<definition> ::= module <identifier> exports <identifier_list> { <definition_list> }
+```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
+1. Let `body_env` be a new empty environment.
+
+2. Invoke the `declare` method on each definition in the module,
+   with the `body_env`.
+   
+3. Schedule each definition in the module with the `body_env`.
+
+4. For each identifier in the list of exports, check that
+   there is an entry in `body_env`.
+   
+4. Create a module value. It's `exports` environment maps each name in
+   the module's export list to the pointer for that name in
+   `body_env`. The `members` environment of the module is `body_env`.
+
+5. Write the module value to the address associated with its name in
+   the current environment.
+   
+6. Finish this definition.
+
+
+## <a name="numbers"></a> Numbers
+
+The numbers currently include integers and rationals.
+
+```
+<type> ::= int
+```
+
+```
+<type> ::= rational
+```
+
+### <a name="integer"></a>Integer Literal
+
+```
+<expression> ::= <integer>
+```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
+1. If the current node runner's context is a value context, let
+   `result` be the `integer`.
+   
+2. If the current node runner's context is an address context,
+   allocate the `integer` in memory and let `result` be the allocated
+   pointer.
+
+3. Finish this expression with `result`.
+
+### <a name="rational"></a>Rational Literal
+
+UNDER CONSTRUCTION
+
+
+## <a name="pointers"></a> Pointers
+
+A pointer value includes the following fields:
+
+* `address` (an integer)
+* `path` (list of integers)
+* `permission` (fraction)
+* `lender` (another pointer, optional)
+* `kill_when_zero` (a Boolean)
+* `no_give_backs` (a Boolean)
+
+If the value at `address` in memory is a tuple, then the `path`
+specifies which part of the tuple this pointer is referring to.
+The path is a list and not just a single integer because tuples
+can be nested. So, for example, the path `[3,2]` refers to
+the location of `12` in the tuple `⟨0,1,2,⟨10,11,12,13⟩,4,5⟩`.
+
+A pointer whose `permission` is `0` or greater can be copied.
+A pointer whose `permission` is greater than `0` can be used for
+reading.
+A pointer whose `permission` is `1` can be used for writing.
+
+If the pointer is a copy of another pointer, then its `lender` is that
+other pointer.
+
+If the `kill_when_zero` flag is set to true, then the pointer is
+killed when its `permission` reaches zero. This used for `let`
+variables.
+
+The if `no_give_backs` flag is set to true, then when the pointer is
+killed, it does not give its permissions back to its ender (as it
+normally would). This is used for `var` variables.
+
+A *null* pointer is a pointer whose `address` is `None`.
+
+We define the following operations on pointers.
+
+### Kill
+
+We define a *live pointer* to be a pointer whose `address` field
+contains an integer (and not `None`). If a pointer is not live,
+it's *dead*.
+
+We define the *living lender* of a pointer `P` to be the first live
+pointer in the chain of pointers obtain by following the `lender`
+fields starting with pointer `P`.
+
+1. If the pointer has a living lender, then transfer all of this
+   pointer's permission to the living lender. (Unless the
+   `no_give_backs` flag is set to true.)
+   
+2. If the pointer does not have a living lender
+
+    a. if its permission is `1`, delete the memory at its `address`.
+	
+	b. if its permission is greater than `0` but less than `1`, 
+	   halt with an error.
+
+3. Set the `address` of this pointer to `None`.
+
+
+### Duplicate
+
+Inputs: percentage
+
+1. If the pointer is null, return a null pointer.
+
+2. If the pointer is alive, create a new pointer with the same address
+   and path and transfer the given percentage from this pointer to the new
+   pointer.  Return the new pointer.
+
+
+### Upgrade
+
+If the pointer has a living lender, transfer all of the lender's
+permission to this pointer. Return `true` or `false` corresponding to
+whether this pointer's permission is equal to `1`.
+
+### Pointer Offset
+
+We sometimes need to delay the duplication of a pointer when using it
+to index into a tuple, which we accomplish with another pointer-like
+value called a *pointer offset*, which has the following fields.
+
+* `ptr` (a Pointer)
+* `offset` (an integer)
+
+A pointer offset acts like its underlying `ptr` but with the given
+`offset` appended to the end of its `path`.
+
+
+
+### <a name="addressof"></a>Address Of
+
+```
+<expression> ::= & <expression>
+```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
+1. Schedule `expression` in the current environment with address
+   context with duplication.
+   
+2. If the current runner's context is value context, do the following.
+   If the result of `expression` was a temporary, duplicate it
+   and set `result` to the duplicate as a new temporary.
+   If the result of `expression` was not temporary, 
+   set `result` to the result of `expression`.
+    
+3. Otherwise, if the current runner's context is address context,
+   allocate the result's value in memory and set `result` to
+   the new pointer (it's a temporary).
+
+4. Finish this expression with `result`.
+
+### <a name="delete"></a>Delete
+
+```
+<statement> ::= delete <expression>;
+```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
+1. Schedule the `expression` in the current environment with value
+   context and duplication.  The result must be a pointer.
+
+2. Deallocate the memory associated with the pointer,
+   set its `address` to `None` and its permission to `0`.
+
+3. Finish this statement.
+
+
 ### <a name="deref"></a>Dereference a Pointer
 
 ```
@@ -1355,19 +1460,31 @@ UNDER CONSTRUCTION
    
 4. Finish this expression with `result`.
 
-
-### <a name="false"></a>False Literal
-
-```
-<expression> ::= false
-```
-
-(Similar to the case for integer literals.)
-
-### <a name="function"></a>Function (aka. lambda, anonymous function)
+### <a name="null"></a>Null Pointer Literal
 
 ```
-<expression> ::= fun ( <parameter_list> ) <return_mode> <block>
+<expression> ::= null
+```
+
+This is parsed as a call to a primitive function named `null`.
+
+
+### <a name="transfer"></a>Transfer Permission
+
+```
+<statement> ::= <expression> <- <expression> of <expression>
+```
+
+Let `amount` be the permission of the source pointer multiplied by the
+given percentage.  Decrease the permission of the source pointer by
+`amount` and increase the permission of this pointer by `amount`.  If
+the permission of the source pointer becomes `0` and its
+`kill_when_zero` flag is true, then kill it.
+
+### <a name="write"></a>Write (Assignment)
+
+```
+<statement> ::= <expression> = <initializer>;
 ```
 
 #### Type Checking
@@ -1376,25 +1493,149 @@ UNDER CONSTRUCTION
 
 #### Step
 
-The *free variables* of a function are those variables that occur
-inside `block` without an enclosing variable binding in the `block` or
-by this function's parameters.
+1. Schedule the `initializer` in the current environment with value
+  context and duplication.
+  
+2. Schedule the `expression` in the current environment with address
+  context and duplication. The result must be a pointer.
 
-1. Create an environment named `clos_env` with a duplicate (50%)
-   for each free variable of the function.
-2. Create a closure value with the `clos_env` and the other
-   information from this function (parameter list, return mode, and body).
-3. If the current node runner's context is a value context,
-   let `results` be the closure.
-4. If the current node runner's context is an address context,
-   allocate the closure in memory and let `result` be its pointer.
+3. [Write](#write_op) the result of the initializer to the pointer.
+
+4. Finish this statement.
+
+(The order of evaluation here does not follow our usual left-to-right
+ policy. Using left-to-right for assignment triggers errors in many of
+ our test cases. I have not yet investigated why this is.)
+
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
+1. Schedule the target `expression` in the current environment with
+   value context and without duplication. The result value must be a
+   pointer.
+   
+2. Schedule the percentage `expression` in the current environment
+   with value context and duplication. The result value must be a
+   rational number.
+   
+3. Schedule the source `expression` in the current environment with
+   value context and without duplication. The result value must be a
+   pointer.
+
+4. Transfer the given percent from the source pointer to the target
+   pointer.
+   
+5. Finish this statement.
+
+
+
+## <a name="threads"></a> Threads
+
+A *future* value has an associated thread. 
+
+### <a name="spawn"></a>Spawn a Future
+
+```
+<expression> ::= spawn <expression>
+```
+
+Evaluate the `expression` in a new thread, concurrent with the current
+thread.  Immediately returns a *future* associated with the new
+thread.  This *future* can later be passed to `wait` (see below the
+description for `await`).
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
+Inputs: an expression and environment
+
+1. Create a node runner with the given expression and environment,
+   with a value context and the same return mode as the current runner.
+   
+2. Create a new frame whose `todo` list just includes the new runner.
+
+3. Increment the `num_children` of this thread.
+
+4. Create a new thread whose `stack` just includes the new frame
+   and whose `parent` is the current thread.
+   
+5. Append the new thread to the `threads` of the machine.
+
+6. Return a new future associated with the new thread.
+
+### <a name="wait"></a>Wait on a Future
+
+```
+<expression> ::= wait <expression>
+```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
+The `expression` evaluates to a *future*, then the current thread
+blocks until the future's thread is finished. The result of this
+`wait` is the result of the future's thread.
+
+
+
+## <a name="tuples"></a> Tuples
+
+A tuple is a value that contains a sequence of values called its
+elements. The elements of a tuple can be accessed with zero-based
+indexing.
+
+The following tuple contains six values, and the element at index 3 is
+another tuple.
+
+```
+⟨3,true,2,⟨10,false,12,13⟩,4,5⟩
+```
+
+```
+<type> ::= ⟨ <type_list> ⟩
+```
+
+TODO: discuss the operations on tuples.
+
+
+### <a name="tuple"></a>Tuple Creation
+
+```
+<expression> ::= ⟨ <initializer_list> ⟩
+```
+
+#### Type Checking
+
+UNDER CONSTRUCTION
+
+#### Step
+
+1. Schedule each `initializer` (left-to-right) in the current
+   environment with value context with duplication.
+   
+2. Create a tuple value whose elements are duplicates (at 100%)
+   of the results of the initializers.
+   
+3. If the current node runner's context is a value context, 
+   let `result` be the tuple. (A temporary.)
+   
+4. If the current node runner's context is an address context, 
+   allocate the tuple in memory and let `result` be a pointer
+   to that memory. (A temporary.)
+
 5. Finish this expression with `result`.
 
-(There are plans to provide a way to capture free variables that are
- mutable or to capture a variable's value.)
-
-
-### <a name="index"></a> Index into a Tuple or Array
+### <a name="indexTuple"></a> Index into a Tuple
 
 ```
 <expression> ::= <expression> [ <expression> ]
@@ -1431,183 +1672,6 @@ UNDER CONSTRUCTION
 5. Finish this expression with `result`.
 
 
-### <a name="integer"></a>Integer Literal
-
-```
-<expression> ::= <integer>
-```
-
-#### Type Checking
-
-UNDER CONSTRUCTION
-
-#### Step
-
-1. If the current node runner's context is a value context, let
-   `result` be the `integer`.
-   
-2. If the current node runner's context is an address context,
-   allocate the `integer` in memory and let `result` be the allocated
-   pointer.
-
-3. Finish this expression with `result`.
-
-### <a name="member"></a>Member Access
-
-```
-<expression> ::= <expression> . <identifier>
-```
-
-#### Type Checking
-
-UNDER CONSTRUCTION
-
-#### Step
-
-1. Schedule `expression` in the current environment with address
-   context with duplication.
-   
-2. Read from the resulting pointer, which must produce a module value.
-   If `identifier` is not a name exported by the module, halt with an error.
-   Otherwise, let `ptr` be the associated pointer for the `identifier`
-   in the module's exports.
-   
-3. If the current node runner's context is a value context, let
-   `result` be a duplicate of the value at `ptr` in memory, taking a
-   percentage according to the permission of `ptr`. Categorize this
-   result as a temporary.
-
-4. If the current node runner's context is an address context, let
-   `result` be `ptr`. (Not a temporary.)
-   
-5. Finish this expression with `result`.
-
-### <a name="null"></a>Null Pointer Literal
-
-```
-<expression> ::= null
-```
-
-This is parsed as a call to a primitive function named `null`.
-
-### <a name="primitive"></a>Primitive Call
-
-```
-<expression> ::= <prim-op> ( <expression_list> )
-```
-
-#### Type Checking
-
-UNDER CONSTRUCTION
-
-#### Step
-
-1. Schedule each argument `expression`.
-
-2. Compute the result value according to the function `eval_prim`
-   in [primitive_operations.py](primitive_operations.py) with
-   the argument results and the `prim-op`.
-
-3. If the current runner's context is address context, allocate the
-   result value in memory and let `result` be the new pointer. (A
-   temporary). Otherwise, we're in value context and let `result` be
-   the result value. (Also a temporary.)
-
-### <a name="true"></a>True Literal
-
-```
-<expression> ::= true
-```
-
-(Similar to the case for [integer literals](#integer).)
-
-### <a name="tuple"></a>Tuple Creation
-
-```
-<expression> ::= ⟨ <initializer_list> ⟩
-```
-
-#### Type Checking
-
-UNDER CONSTRUCTION
-
-#### Step
-
-1. Schedule each `initializer` (left-to-right) in the current
-   environment with value context with duplication.
-   
-2. Create a tuple value whose elements are duplicates (at 100%)
-   of the results of the initializers.
-   
-3. If the current node runner's context is a value context, 
-   let `result` be the tuple. (A temporary.)
-   
-4. If the current node runner's context is an address context, 
-   allocate the tuple in memory and let `result` be a pointer
-   to that memory. (A temporary.)
-
-5. Finish this expression with `result`.
-
-### <a name="variable"></a>Variable (Occurence)
-
-```
-<expression> ::= <identifier>
-```
-
-#### Type Checking
-
-UNDER CONSTRUCTION
-
-#### Step
-
-1. If the identifier is not in the current environment, halt with an
-   error.
-
-2. If the current runner's context is a value context, read from
-   memory using the identifier's pointer (from the current
-   environment). If the current runner's context requests duplication,
-   let `result` be a duplicate of the value in memory, taking the
-   percentage specified by the identifier's pointer. (A temporary.)
-   Otherwise, let `result` be the value in memory. (Not a temporary.)
-
-3. Otherwise the current runner's context is an address context.
-   Return the identifier's pointer. (Not a temporary).
-   
-4. Instruct the machine to finish this expression with the `result`.
-
-
-### <a name="spawn"></a>Spawn a Future
-
-```
-<expression> ::= spawn <expression>
-```
-
-#### Type Checking
-
-UNDER CONSTRUCTION
-
-#### Step
-
-Evaluate the `expression` in a new thread, concurrent with the current
-thread.  Immediately returns a *future* associated with the new
-thread.  This *future* can later be passed to `wait` (see below the
-description for `await`).
-
-### <a name="wait"></a>Wait on a Future
-
-```
-<expression> ::= wait <expression>
-```
-
-#### Type Checking
-
-UNDER CONSTRUCTION
-
-#### Step
-
-The `expression` evaluates to a *future*, then the current thread
-blocks until the future's thread is finished. The result of this
-`wait` is the result of the future's thread.
 
 # TODO
 
