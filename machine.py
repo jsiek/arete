@@ -44,7 +44,7 @@ class NodeRunner:
     state: int
     results: list[Result] # results of subexpressions
     return_value: Value  # result of `return` statement
-    return_mode: str     # value or address
+    return_mode: str     # value or address mode of enclosing function
     context: Context     # rvalue/lvalue/etc.
     env: dict[str,Pointer]
     pause_on_finish : bool = False # for debugger control

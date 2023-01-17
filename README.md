@@ -576,7 +576,7 @@ The type of `expression` must be consistent with `bool`.
 #### Step
 
 1. Schedule the `expression` in the current environment with value
-   context with duplication.
+   context and duplication.
 
 2. If the result is `false`, halt with an error.
 
@@ -846,7 +846,8 @@ UNDER CONSTRUCTION
 3. [Bind](#bind_param) the result from `expression` to the parameter
    in the `body_env`.
    
-4. Schedule the following statements in the environment `body_env`.
+4. Schedule the following statements of the enclosing block in the
+   environment `body_env`.
 
 6. Once the following statements are complete, 
    [deallocate the parameter](#dealloc_param) with the result
@@ -862,7 +863,37 @@ UNDER CONSTRUCTION
 
 #### Type Checking
 
-UNDER CONSTRUCTION
+Check that the identifier is in the static environment to obtain its
+static `info` and report a static error if it is not.
+
+If the context is a `let` binding, then check that the `info` state is
+readable and report a static error if it is not. Update the `info`
+state to be a proper fraction and add this identifier to the current
+set of borrowed variables.
+
+If the context is an `inout` binding, then check that the `info` state
+is a full fraction and report a static error if it is not. Update the
+`info` state to be an empty fraction and add this identifier to the
+current set of borrowed variables.
+
+If the context is `var` binding, then check that the `info` state is a
+full fraction and report a static error if it is not. Update the
+`info` state to be dead.
+
+If the context is a `ref` binding, UNDER CONSTRUCTION
+
+If the context is the left-hand side of an assignment statement, check
+that the `info` state is a full fraction and report a static error if
+it is not. 
+
+If the context is the right-hand side of an assignment statement,
+check that the `info` state is readable and report a static error if
+it is not.
+
+Return a pair. The first component is the `type` field of `info`.  
+The second component is this AST node if the `translation` field is `None`.
+Otherwise the second component is the `translation` field of `info`.
+
 
 #### Step
 
