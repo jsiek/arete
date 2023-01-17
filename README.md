@@ -345,9 +345,9 @@ Each *frame* has a stack named `todo` of *node runners*.
 
 A *node runner* is responsible for executing one node in the abstract
 syntax tree of the program. Think of each node runner as a little
-state machine. (It's named "node runner" because I use to enjoyed playing
-[Lode Runner](https://loderunnerwebgame.com/game/) in the 1980's.)
-Each node runner has
+state machine. (It's named "node runner" because I enjoyed playing the
+[Lode Runner](https://loderunnerwebgame.com/game/) video game in the
+1980's.)  Each node runner has
 
 * `ast` (the AST node)
 
