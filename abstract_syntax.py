@@ -234,8 +234,7 @@ class IfExp(Exp):
     cond_type, new_cond = self.cond.type_check(env, 'none')
     thn_type, new_thn = self.thn.type_check(env, ctx)
     els_type, new_els = self.els.type_check(env, ctx)
-    if not (isinstance(cond_type, BoolType)
-            or isinstance(cond_type, AnyType)):
+    if not consistent(cond_type, BoolType(self.location)):
       static_error(self.location, 'in conditional, expected a Boolean, not '
             + str(cond_type))
     if not consistent(thn_type, els_type):
@@ -385,7 +384,7 @@ class Assert(Stmt):
     
   def type_check(self, env):
     arg_type, new_arg = self.exp.type_check(env, 'none')
-    if not isinstance(arg_type, BoolType):
+    if not consistent(arg_type, BoolType(self.location)):
       static_error(self.location, "in assert, expected a Boolean, not "
                    + str(arg_type))
     return None, Assert(self.location, new_arg)
@@ -468,6 +467,9 @@ class While(Stmt):
     
   def type_check(self, env):
     cond_type, new_cond = self.cond.type_check(env, 'none')
+    if not consistent(cond_type, BoolType(self.location)):
+      static_error(self.location, "in while, expected a Boolean, not "
+                   + str(cond_type))
     body_type, new_body = self.body.type_check(env)
     return body_type, \
            While(self.location, new_cond, new_body)

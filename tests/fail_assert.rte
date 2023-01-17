@@ -1,0 +1,4 @@
+fun main() {
+  assert false;
+  return 0;
+}

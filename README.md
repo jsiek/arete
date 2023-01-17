@@ -558,9 +558,8 @@ Inputs: address
 2. Delete the entry for this address in the memory.
 
 
+
 # <a name="features"></a>Language Features
-
-
 
 ## <a name="miscellaneous"></a> Miscellaneous Features
 
@@ -572,9 +571,10 @@ Inputs: address
 
 #### Type Checking
 
-UNDER CONSTRUCTION
+The type of `expression` must be consistent with `bool`.
 
 #### Step
+
 1. Schedule the `expression` in the current environment with value
    context with duplication.
 
@@ -591,7 +591,7 @@ UNDER CONSTRUCTION
 
 #### Type Checking
 
-UNDER CONSTRUCTION
+Perform type checking on each statement in the block.
 
 #### Step
 
@@ -599,18 +599,15 @@ UNDER CONSTRUCTION
 
 2. Finish this statement.
 
-
-
-
 ### <a name="expr"></a>Expression Statement
 
 ```
-<statement> ::= ! <expression>;
+<statement> ::= <expression>;
 ```
 
 #### Type Checking
 
-UNDER CONSTRUCTION
+Perform type checking on the `expression`.
 
 #### Step
 
@@ -619,10 +616,8 @@ UNDER CONSTRUCTION
 
 2. Finish this statement.
 
-(Note: the `!` is there to make the grammar unambiguous, which sucks.
-This needs work.)
 
-### <a name="ifstmt"></a>If
+### <a name="ifstmt"></a>If Statement
 
 ```
 <statement> ::= if (<expression>) <block>
@@ -634,7 +629,10 @@ else branch is a [Pass](#pass) statement.
 
 #### Type Checking
 
-UNDER CONSTRUCTION
+The type of `expression` must be consistent with `bool`.
+
+Perform type checking on the branches.
+
 
 #### Step
 
@@ -665,7 +663,8 @@ To interpret a two-armed `if`:
 
 #### Type Checking
 
-UNDER CONSTRUCTION
+See the `type_check_prim` function in
+[`primitive_operations.py`](primitive_operations.py).
 
 #### Step
 
@@ -697,8 +696,8 @@ another node.
 rec X ⟨ int, X* ⟩
 ```
 
-(Recursive types are unweildy to deal with directly, so there are
-plans to add syntactic sugar for them.)
+(Recursive types are unweildy to deal with directly, so the plan is to
+add syntactic sugar for them.)
 
 
 ### <a name="rec_type_var"></a>Type Variable Occurence
@@ -718,7 +717,7 @@ An occurence of a type variable may refer to a recursive type.
 
 #### Type Checking
 
-UNDER CONSTRUCTION
+The type of `expression` must be consistent with `bool`.
 
 #### Step
 
@@ -737,14 +736,16 @@ UNDER CONSTRUCTION
 
 ## <a name="variables"></a> Variables
 
+There are several auxiliary grammar rules related to variable and
+parameter definitions.
+
 ```
 <parameter> ::= <binding_kind> <identifier> [: <type>]
 ```
 
 The `parameter` category is used for function parameters and variable
-definitions (e.g. the `let` statement). (See the definition of
-`binding_kind` below.) If no type annotation is present, the parameter
-is given the unknown type `?`.
+definitions (e.g. the `let` statement). If no type annotation is
+present, the parameter is given the unknown type `?`.
 
 ```
 <binding_kind> ::=   | let | var | inout | ref

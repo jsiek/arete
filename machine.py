@@ -382,21 +382,23 @@ if __name__ == "__main__":
         if expect_static_fail():
             exit(0)
         else:
-            print('unexpected static failure')
+            print('Type checking error:')
             if tracing_on() or debug():
                 raise ex
             else:
                 print(str(ex))
                 print()
+                exit(-1)
     except Exception as ex:
         if expect_fail():
             exit(0)
         else:
-            print('unexpected failure')
+            print('Runtime error:')
             if tracing_on() or debug():
                 raise ex
             else:
                 print(str(ex))
                 print()
+                exit(-1)
 
 

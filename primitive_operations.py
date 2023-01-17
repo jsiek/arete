@@ -68,7 +68,7 @@ def eval_prim(op, vals, machine, location):
       case 'or':
         left = to_boolean(vals[0], location)
         right = to_boolean(vals[1], location)
-        return left or right
+        return Boolean(left or right)
       case 'not':
         val = to_boolean(vals[0], location)
         return Boolean(not val)
