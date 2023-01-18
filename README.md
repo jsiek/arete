@@ -889,9 +889,10 @@ If the context is the right-hand side of an assignment statement,
 check that the `info` state is readable and report a static error if
 it is not.
 
-Return a pair. The first component is the `type` field of `info`.  
-The second component is this AST node if the `translation` field is `None`.
-Otherwise the second component is the `translation` field of `info`.
+The type of this identifier is the `type` field of `info`.
+
+The translation is the `translation` field of `info` unless it is
+`None`, in which case the translation is this identifier.
 
 
 #### Step
