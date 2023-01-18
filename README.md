@@ -1002,7 +1002,7 @@ UNDER CONSTRUCTION
 5. Finish this expression with `result`.
 
 
-## <a name="booleans></a> Booleans
+## <a name="booleans"></a> Booleans
 
 The values `true` and `false` have the type `bool`.
 
@@ -1023,7 +1023,7 @@ The values `true` and `false` have the type `bool`.
 ```
 
 
-## <a name="functions></a> Functions
+## <a name="functions"></a> Functions
 
 A function value (aka. closure) includes information from the
 originating function (name, parameters, body, etc.) and the
