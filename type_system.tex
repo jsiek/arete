@@ -25,10 +25,10 @@ Syntax:
         \mathtt{split}(e) \mid \mathtt{join}(e,e) \mid \\
     & & e\texttt{[}e\texttt{]} \mid \langle \mathit{init}^{*} \rangle \\
   \mathit{init} & ::= & e \mid e \mathop{\mathtt{of}} e \\
-  s &::= & e; \mid p = e; s^{*} \mid e = \mathit{init}\\
+  s &::= & e \texttt{;} \mid p = e\texttt{;} \; s^{*} \mid e = \mathit{init}\\
   & & \mathtt{delete}\; e; \mid \mathit{block} \mid \\
   & & \mathtt{if}\; \texttt{(}e\texttt{)}\; \mathit{block}\;\mathtt{else}\; \mathit{block}\\
-  \mathit{block} &::= & \{ s^{*} \}
+  \mathit{block} &::= & \verb|{| \; s^{*} \; \verb|}|
 \end{array}
 \]
 
