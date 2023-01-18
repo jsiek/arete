@@ -846,10 +846,9 @@ UNDER CONSTRUCTION
 3. [Bind](#bind_param) the result from `expression` to the parameter
    in the `body_env`.
    
-4. Schedule the following statements of the enclosing block in the
-   environment `body_env`.
+4. Schedule the following `statement_list` in the environment `body_env`.
 
-6. Once the following statements are complete, 
+6. Once the `statement_list` is finished, 
    [deallocate the parameter](#dealloc_param) with the result
    from the `expression` and the `body_env`.
    
