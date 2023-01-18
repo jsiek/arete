@@ -1160,6 +1160,8 @@ UNDER CONSTRUCTION
 
 ## <a name="generics"></a> Generics
 
+UNDER CONSTRUCTION
+
 ## <a name="gradual"></a> Gradual Typing
 
 ### The Unknown Type (aka. the "any" type or the "dynamic" type)
@@ -1181,11 +1183,6 @@ This type enables gradual typing because an expression of unkown type
 An occurence of a type variable may refer to a type parameter of a
 generic entity.
 
-
-
-## <a name="generics></a> Generics
-
-UNDER CONSTRUCTION
 
 
 ## <a name="modules"></a> Modules
