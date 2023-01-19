@@ -1,0 +1,61 @@
+\documentclass{article}
+\usepackage[T1]{fontenc}
+\usepackage{amsthm}
+\usepackage{amsmath}
+\usepackage{amssymb}
+%\usepackage{mathabx}
+\usepackage{stmaryrd}
+\usepackage{semantic}
+\usepackage{natbib}
+
+\newcommand{\SC}{\texttt{;}}
+\newcommand{\LC}{\texttt{\{}}
+\newcommand{\RC}{\texttt{\}}}
+\newcommand{\LP}{\texttt{(}}
+\newcommand{\RP}{\texttt{)}}
+\newcommand{\LS}{\texttt{[}}
+\newcommand{\RS}{\texttt{]}}
+\newcommand{\EQ}{\mathop{\texttt{=}}}
+\newcommand{\OF}{\mathop{\mathtt{of}}}
+
+\title{The Arete Machine}
+\author{Jeremy G. Siek}
+
+\begin{document}
+\maketitle
+
+\[
+\begin{array}{lrcl}
+  \text{address} & a \\
+  \text{fraction} & \phi & ::= & n \div n \\
+  \text{value}& v & ::= & n \mid b \mid \ldots \\
+  \text{environment} & \rho & ::= & \{ x \mapsto a, \ldots \} \\
+  \text{result} & \mathit{res} & ::= & (v , b) \\
+  \text{context} & c & ::= & \rho, \mathit{cat}, b \\
+  \text{runner}& r & ::= & c \vdash e\\
+  \text{frame}& \psi & ::= & r^{*} \\
+  \text{stack}& \kappa & ::= & \psi^{*} \\
+  \text{thread}& t & ::= & \kappa, t, n \\
+  \text{memory}& \mu & ::= & \{ a \mapsto v, \ldots \} \\
+  \text{state}& s & ::= & \mu, t^{*}
+\end{array}
+\]
+
+\fbox{$\mu \mid r \Rightarrow \mathit{res} \mid \mu$}
+\begin{align*}
+\mu \mid (\rho,\mathtt{rvalue},b\vdash v) &\Rightarrow (v, \mathtt{true}) \mid \mu \\
+\mu \mid (\rho,\mathtt{lvalue},b\vdash v) &\Rightarrow (a, \mathtt{true}) \mid \mu(a \mapsto v) & \text{where } a \notin \mathit{dom}(\mu) \\[2ex]
+\mu \mid (\rho,\mathtt{rvalue}, \mathtt{true} \vdash x) &
+    \Rightarrow (\mathit{dup}(\mu(\rho(x))), \mathtt{true}) \mid \mu\\
+\mu \mid (\rho,\mathtt{rvalue}, \mathtt{false} \vdash x) &
+      \Rightarrow (\mu(\rho(x)), \mathtt{false}) \mid \mu\\
+\mu \mid (\rho,\mathtt{lvalue}, b \vdash x) &\Rightarrow (\rho(x), \mathtt{false}) \mid \mu \\[2ex]
+\end{align*}
+
+
+\fbox{$s \longrightarrow s$}
+\begin{align*}
+  \longrightarrow
+\end{align*}
+
+\end{document}

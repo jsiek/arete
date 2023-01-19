@@ -50,6 +50,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 
 ?expression: expression_logic "?" expression ":" expression    -> condition
     | binding_kind IDENT type_opt "=" expression "in" expression -> binding_exp
+    | expression "of" expression                        -> frac_initializer
     | expression_logic
 
 ?expression_logic: expression_logic "and" expression_cmp       -> and
@@ -99,10 +100,10 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | "not" expression_hi                               -> not
     | "(" expression ")"                                -> paren
     | "[" expression "of" expression "]"                -> array
-    | "⟨" initializer_list "⟩"                          -> tuple
+    | "⟨" expression_list "⟩"                          -> tuple
     | expression_hi "[" expression "]"                  -> index
     | expression_hi "[" expression ":" expression ":" expression "]"   -> slice
-    | expression_hi "(" initializer_list ")"            -> call
+    | expression_hi "(" expression_list ")"            -> call
     | "fun" "(" parameter_list ")" capture_opt return_mode block -> lambda
     | "true"                                            -> true
     | "false"                                           -> false
@@ -113,7 +114,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
 ?capture_opt:                                           -> nothing
     | "[" parameter_list "]"                            -> just
 
-?statement: expression "=" initializer ";"              -> write
+?statement: expression "=" expression ";"              -> write
     | expression "<-" expression "of" expression ";"    -> transfer
     | expression ";"                                    -> expr
     | "delete" expression ";"                           -> delete
@@ -147,14 +148,7 @@ COMMENT: /\/\*([^\*]|\*+[^\/])*\*+\//
     | expression                                        -> single
     | expression "," expression_list                    -> push
 
-?initializer: expression                                -> default_initializer
-    | expression "of" expression                        -> frac_initializer
-				                 
-?initializer_list:                                      -> empty
-    | initializer                                       -> single
-    | initializer "," initializer_list                  -> push
-				                 
-?strict_binding_kind: "let"                                    -> let
+?strict_binding_kind: "let"                             -> let
     | "var"                                             -> var
     | "inout"                                           -> inout
     | "ref"                                             -> ref

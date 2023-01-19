@@ -1,4 +1,5 @@
 \documentclass{article}
+\usepackage[T1]{fontenc}
 \usepackage{amsthm}
 \usepackage{amsmath}
 \usepackage{amssymb}
@@ -7,6 +8,12 @@
 \usepackage{semantic}
 \usepackage{natbib}
 
+\newcommand{\SC}{\texttt{;}}
+\newcommand{\LC}{\texttt{\{}}
+\newcommand{\RC}{\texttt{\}}}
+\newcommand{\LP}{\texttt{(}}
+\newcommand{\RP}{\texttt{)}}
+\newcommand{\EQ}{\mathop{\texttt{=}}}
 
 \title{Arete's Type System}
 \author{Jeremy G. Siek}
@@ -14,23 +21,6 @@
 \begin{document}
 \maketitle
 
-Syntax:
-\[
-\begin{array}{rcl}
-  b &::= & \mathtt{let} \mid \mathtt{var} \mid \mathtt{inout}
-         \mid \mathtt{ref}\\
-  p &::= & b \; x : \tau \\
-  e &::= & x \mid n \mid \mathtt{true} \mid \mathtt{false} \mid\\
-    & & \mathtt{*} e \mid \mathtt{copy}(e) \mid
-        \mathtt{split}(e) \mid \mathtt{join}(e,e) \mid \\
-    & & e\texttt{[}e\texttt{]} \mid \langle \mathit{init}^{*} \rangle \\
-  \mathit{init} & ::= & e \mid e \mathop{\mathtt{of}} e \\
-  s &::= & e \texttt{;} \mid p = e\texttt{;} \; s^{*} \mid e = \mathit{init}\\
-  & & \mathtt{delete}\; e; \mid \mathit{block} \mid \\
-  & & \mathtt{if}\; \texttt{(}e\texttt{)}\; \mathit{block}\;\mathtt{else}\; \mathit{block}\\
-  \mathit{block} &::= & \verb|{| \; s^{*} \; \verb|}|
-\end{array}
-\]
 
 
 

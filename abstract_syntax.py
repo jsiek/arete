@@ -120,12 +120,7 @@ class Int(Exp):
       return self
 
   def step(self, runner, machine):
-      val = Number(self.value)
-      if isinstance(runner.context, ValueCtx):
-          result = val
-      elif isinstance(runner.context, AddressCtx):
-          result = machine.memory.allocate(val)
-      machine.finish_expression(Result(True, result), self.location)
+      runner.produce_value(Number(self.value), machine, self.location)
 
   def type_check(self, env, ctx):
     return IntType(self.location), self
@@ -152,14 +147,7 @@ class Frac(Exp):
     return RationalType(self.location), self
       
   def step(self, runner,  machine):
-      val = Number(self.value)
-      if isinstance(runner.context, ValueCtx):
-          result = val
-      elif isinstance(runner.context, AddressCtx):
-          result = machine.memory.allocate(val)
-      # if not runner.context.duplicate:
-      #   error(self.location, 'fraction not allowed in this context')
-      machine.finish_expression(Result(True, result), self.location)
+      runner.produce_value(Number(self.value), machine, self.location)    
 
 @dataclass
 class Bool(Exp):
@@ -182,16 +170,9 @@ class Bool(Exp):
     return BoolType(self.location), self
   
   def step(self, runner, machine):
-      val = Boolean(self.value)
-      if isinstance(runner.context, ValueCtx):
-          result = val
-      elif isinstance(runner.context, AddressCtx):
-          result = machine.memory.allocate(val)
-      # if not runner.context.duplicate:
-      #   error(self.location, 'Boolean not allowed in this context')
-      machine.finish_expression(Result(True, result), self.location)
-      
+      runner.produce_value(Boolean(self.value), machine, self.location)
 
+      
 @dataclass
 class IfExp(Exp):
   cond: Exp

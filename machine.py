@@ -48,7 +48,15 @@ class NodeRunner:
     context: Context     # rvalue/lvalue/etc.
     env: dict[str,Pointer]
     pause_on_finish : bool = False # for debugger control
-    
+
+    def produce_value(self, val, machine, location):
+      if isinstance(self.context, ValueCtx):
+          result = val
+      elif isinstance(self.context, AddressCtx):
+          result = machine.memory.allocate(val)
+      machine.finish_expression(Result(True, result), location)
+        
+        
 @dataclass
 class Frame:
     todo: list[NodeRunner]

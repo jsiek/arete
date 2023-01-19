@@ -1,0 +1,63 @@
+\documentclass{article}
+\usepackage[T1]{fontenc}
+\usepackage{amsthm}
+\usepackage{amsmath}
+\usepackage{amssymb}
+%\usepackage{mathabx}
+\usepackage{stmaryrd}
+\usepackage{semantic}
+\usepackage{natbib}
+
+\newcommand{\SC}{\texttt{;}}
+\newcommand{\LC}{\texttt{\{}}
+\newcommand{\RC}{\texttt{\}}}
+\newcommand{\LP}{\texttt{(}}
+\newcommand{\RP}{\texttt{)}}
+\newcommand{\LS}{\texttt{[}}
+\newcommand{\RS}{\texttt{]}}
+\newcommand{\EQ}{\mathop{\texttt{=}}}
+\newcommand{\OF}{\mathop{\mathtt{of}}}
+
+\title{Syntax of the Arete Calculus}
+\author{Jeremy G. Siek}
+
+\begin{document}
+\maketitle
+
+\[
+\begin{array}{lrcl}
+  \text{types}& \tau & ::= & \mathtt{int} \mid \mathtt{bool} \mid
+   \mathtt{rational} \mid
+   \LS \tau \RS \mid \tau \texttt{*} \mid \langle \tau^{*} \rangle\\
+  \text{variables} & x,y,f \\
+  \text{integers} & n \\
+  \text{Booleans} & b & ::= & \mathtt{true} \mid \mathtt{false}\\
+ \text{binding kind} & k &::= & \mathtt{share} \mid \mathtt{own} \mid
+        \mathtt{borrow} \\
+ \text{parameter} & p &::= & k \; x \texttt{:} \tau \\
+  & e &::= & x \mid n \mid b \mid\\
+  & & & e \mathop{\texttt{+}} e \mid e \mathop{\texttt{*}} e \mid e \mathop{\texttt{/}} e \mid \texttt{-} e \mid \\
+  & & & \texttt{*} e \mid \mathtt{copy}\LP e \RP \mid
+        \mathtt{split}\LP e \RP \mid \mathtt{join}\LP e,e \RP \mid
+        e \OF e \mid \\
+  & & & \LS e \OF e \RS \mid \langle e^{*} \rangle \mid e \LS e \RS \mid \\
+  & & & \mathtt{spawn}\; e \mid \mathtt{wait}\; e \\
+  & e^{*} & ::= & \mid e \mid e \mathop{\texttt{,}} e^{*} \\
+  & s &::= & e \SC \mid \\
+  & & & e \EQ e\SC\\
+  & & & \mathtt{delete}\; e \SC \mid \\
+  & & & \mathit{block} \mid \\
+  & & & \mathtt{if}\;\LP e \RP\;\mathit{block}\;\mathtt{else}\; \mathit{block}\\
+  & s^{*} &::=& \mid p \EQ e\SC \; s^{*} \mid s \; s^{*} \mid \mathtt{return}\; e \SC \\
+  & \mathit{block} &::= & \LC\; s^{*} \;\RC \\
+  \text{category} & \mathit{cat} & ::= & \mathtt{lvalue} \mid \mathtt{rvalue}\\
+  & d & ::= & \mathtt{fun}\; f \LP p^{*} \RP \; \tau \; \mathit{cat} \; \mathit{block}\\
+  & & & \mathtt{module} \; x \;\mathtt{exports}\; y^{*} \; \LC\; d^{*} \;\RC\\
+  & & & \mathtt{from} \; x \; \mathtt{import}\; y^{*} \SC\\
+  & & & \mathtt{let}\; x \texttt{:} \tau \EQ e \SC 
+\end{array}
+\]
+
+
+
+\end{document}
