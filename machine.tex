@@ -17,6 +17,7 @@
 \newcommand{\RS}{\texttt{]}}
 \newcommand{\EQ}{\mathop{\texttt{=}}}
 \newcommand{\OF}{\mathop{\mathtt{of}}}
+\newcommand{\IN}{\mathop{\mathsf{in}}}
 
 \title{The Arete Machine}
 \author{Jeremy G. Siek}
@@ -27,29 +28,54 @@
 \[
 \begin{array}{lrcl}
   \text{address} & a \\
+  \text{pointer name} & p \\
   \text{fraction} & \phi & ::= & n \div n \\
   \text{value}& v & ::= & n \mid b \mid \ldots \\
-  \text{environment} & \rho & ::= & \{ x \mapsto a, \ldots \} \\
+  \text{environment} & \rho & ::= & \{ x \mapsto p, \ldots \} \\
   \text{result} & \mathit{res} & ::= & (v , b) \\
   \text{context} & c & ::= & \rho, \mathit{cat}, b \\
-  \text{runner}& r & ::= & c \vdash e\\
+  \text{runner}& r & ::= & e \IN c\\
   \text{frame}& \psi & ::= & r^{*} \\
   \text{stack}& \kappa & ::= & \psi^{*} \\
   \text{thread}& t & ::= & \kappa, t, n \\
   \text{memory}& \mu & ::= & \{ a \mapsto v, \ldots \} \\
+  \text{pointer store} & \sigma & ::= & \{ p \mapsto (a, \phi), \ldots \} \\
   \text{state}& s & ::= & \mu, t^{*}
 \end{array}
 \]
 
-\fbox{$\mu \mid r \Rightarrow \mathit{res} \mid \mu$}
+\fbox{$\mathit{dup}(v,\sigma) = (v', \sigma')$}
 \begin{align*}
-\mu \mid (\rho,\mathtt{rvalue},b\vdash v) &\Rightarrow (v, \mathtt{true}) \mid \mu \\
-\mu \mid (\rho,\mathtt{lvalue},b\vdash v) &\Rightarrow (a, \mathtt{true}) \mid \mu(a \mapsto v) & \text{where } a \notin \mathit{dom}(\mu) \\[2ex]
-\mu \mid (\rho,\mathtt{rvalue}, \mathtt{true} \vdash x) &
-    \Rightarrow (\mathit{dup}(\mu(\rho(x))), \mathtt{true}) \mid \mu\\
-\mu \mid (\rho,\mathtt{rvalue}, \mathtt{false} \vdash x) &
-      \Rightarrow (\mu(\rho(x)), \mathtt{false}) \mid \mu\\
-\mu \mid (\rho,\mathtt{lvalue}, b \vdash x) &\Rightarrow (\rho(x), \mathtt{false}) \mid \mu \\[2ex]
+  \mathit{dup}(p,\sigma) &= (p', \sigma') \\
+  & \text{where } \sigma' = \sigma(p \mapsto (a,\phi - \phi'))(p'\mapsto (a,\phi')) \\
+    & \text{ and } p' \notin \mathit{dom}(\sigma) \text{ and }
+         \sigma(p) = (a,\phi) \text{ and } \phi' = \phi \times \phi \\
+  \mathit{dup}(n,\sigma) &= (n,\sigma) \\
+  \mathit{dup}(b,\sigma) &= (b,\sigma) \\
+   \vdots
+\end{align*}
+
+\fbox{$r \mid \sigma \mid \mu \Rightarrow \mathit{res} \mid \sigma' \mid \mu'$}
+\begin{align*}
+  (v \IN \rho,\mathtt{rvalue},b) \mid \sigma \mid \mu  &
+     \Rightarrow (v, \mathtt{true}) \mid \sigma \mid \mu \\
+  (v \IN \rho,\mathtt{lvalue},b) \mid \sigma \mid \mu &
+     \Rightarrow (p, \mathtt{true}) \mid \sigma(p \mapsto a,1 \div 1) \mid \mu(a \mapsto v) \\
+     & \text{where } a \notin \mathit{dom}(\mu)
+     \text{ and } p \notin \mathit{dom}(\sigma)             \\[2ex]
+ (x \IN \rho,\mathtt{lvalue}, b) \mid \sigma \mid \mu &
+      \Rightarrow (\rho(x), \mathtt{false}) \mid \sigma \mid \mu \\
+  (x \IN \rho,\mathtt{rvalue}, \mathtt{true}) \mid \sigma \mid \mu  &
+     \Rightarrow (v', \mathtt{true}) \mid \sigma' \mid \mu\\
+     & \text{where } \sigma(\rho(x)) = (a, \phi) 
+       \text{ and } 0 < \phi \\
+     & \text{ and } \mu(a) = v
+       \text{ and } \mathit{dup}(v,\sigma) = (v',\sigma') \\
+ (x \IN \rho,\mathtt{rvalue}, \mathtt{false}) \mid \sigma \mid \mu &
+      \Rightarrow (v, \mathtt{false}) \mid \sigma \mid \mu\\
+     & \text{where } \sigma(\rho(x)) = (a, \phi) 
+       \text{ and } 0 < \phi \\
+     & \text{ and } \mu(a) = v\\[2ex]
 \end{align*}
 
 
