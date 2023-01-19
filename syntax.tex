@@ -32,10 +32,11 @@
   \text{variables} & x,y,f \\
   \text{integers} & n \\
   \text{Booleans} & b & ::= & \mathtt{true} \mid \mathtt{false}\\
+  \text{Constants} & c & ::= & n \mid b \\
  \text{binding kind} & k &::= & \mathtt{share} \mid \mathtt{own} \mid
         \mathtt{borrow} \\
  \text{parameter} & p &::= & k \; x \texttt{:} \tau \\
-  & e &::= & x \mid n \mid b \mid\\
+  & e &::= & x \mid c \mid\\
   & & & e \mathop{\texttt{+}} e \mid e \mathop{\texttt{*}} e \mid e \mathop{\texttt{/}} e \mid \texttt{-} e \mid \\
   & & & \texttt{*} e \mid \mathtt{copy}\LP e \RP \mid
         \mathtt{split}\LP e \RP \mid \mathtt{join}\LP e,e \RP \mid

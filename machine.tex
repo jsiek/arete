@@ -33,14 +33,15 @@
   \text{value}& v & ::= & n \mid b \mid \ldots \\
   \text{environment} & \rho & ::= & \{ x \mapsto p, \ldots \} \\
   \text{result} & \mathit{res} & ::= & (v , b) \\
-  \text{context} & c & ::= & \rho, \mathit{cat}, b \\
-  \text{runner}& r & ::= & e \IN c\\
+  \text{context} & \mathit{ctx} & ::= & \rho, \mathit{cat}, b \\
+  \text{eval. context} & F & ::= & e \mid \Box + e \mid \Box + \Box \mid ... \\
+  \text{runner}& r & ::= & F, \overline{v}, \overline{b} \IN \mathit{ctx}\\
   \text{frame}& \psi & ::= & r^{*} \\
   \text{stack}& \kappa & ::= & \psi^{*} \\
   \text{thread}& t & ::= & \kappa, t, n \\
   \text{memory}& \mu & ::= & \{ a \mapsto v, \ldots \} \\
   \text{pointer store} & \sigma & ::= & \{ p \mapsto (a, \phi), \ldots \} \\
-  \text{state}& s & ::= & \mu, t^{*}
+  \text{state}& s & ::= & \sigma, \mu, t^{*}
 \end{array}
 \]
 
@@ -55,29 +56,72 @@
    \vdots
 \end{align*}
 
-\fbox{$r \mid \sigma \mid \mu \Rightarrow \mathit{res} \mid \sigma' \mid \mu'$}
+\fbox{$\mathit{kill}(\overline{v},\overline{b}, \sigma,\mu) = \sigma',\mu'$}
 \begin{align*}
-  (v \IN \rho,\mathtt{rvalue},b) \mid \sigma \mid \mu  &
-     \Rightarrow (v, \mathtt{true}) \mid \sigma \mid \mu \\
-  (v \IN \rho,\mathtt{lvalue},b) \mid \sigma \mid \mu &
-     \Rightarrow (p, \mathtt{true}) \mid \sigma(p \mapsto a,1 \div 1) \mid \mu(a \mapsto v) \\
+\mathit{kill}([],[], \sigma,\mu) &= \sigma,\mu\\
+\end{align*}
+
+\fbox{$r \mid \sigma \mid \mu \Rightarrow \mathit{res} \mid \sigma' \mid \mu'$}\\
+
+Evaluate a constant:
+\begin{align*}
+  (c \IN \rho,\mathsf{rvalue},b) \mid \sigma \mid \mu  &
+     \Rightarrow (c, \mathsf{true}) \mid \sigma \mid \mu \\
+  (c \IN \rho,\mathsf{lvalue},b) \mid \sigma \mid \mu &
+     \Rightarrow (p, \mathsf{true}) \mid \sigma(p \mapsto a,1 \div 1) \mid \mu(a \mapsto c) \\
      & \text{where } a \notin \mathit{dom}(\mu)
-     \text{ and } p \notin \mathit{dom}(\sigma)             \\[2ex]
- (x \IN \rho,\mathtt{lvalue}, b) \mid \sigma \mid \mu &
-      \Rightarrow (\rho(x), \mathtt{false}) \mid \sigma \mid \mu \\
-  (x \IN \rho,\mathtt{rvalue}, \mathtt{true}) \mid \sigma \mid \mu  &
-     \Rightarrow (v', \mathtt{true}) \mid \sigma' \mid \mu\\
+     \text{ and } p \notin \mathit{dom}(\sigma)
+\end{align*}
+
+Evaluate a variable:
+\begin{align*}
+ (x \IN \rho,\mathsf{lvalue}, b) \mid \sigma \mid \mu &
+      \Rightarrow (\rho(x), \mathsf{false}) \mid \sigma \mid \mu \\
+  (x \IN \rho,\mathsf{rvalue}, \mathsf{true}) \mid \sigma \mid \mu  &
+     \Rightarrow (v', \mathsf{true}) \mid \sigma' \mid \mu\\
      & \text{where } \sigma(\rho(x)) = (a, \phi) 
        \text{ and } 0 < \phi \\
      & \text{ and } \mu(a) = v
        \text{ and } \mathit{dup}(v,\sigma) = (v',\sigma') \\
- (x \IN \rho,\mathtt{rvalue}, \mathtt{false}) \mid \sigma \mid \mu &
-      \Rightarrow (v, \mathtt{false}) \mid \sigma \mid \mu\\
+ (x \IN \rho,\mathsf{rvalue}, \mathsf{false}) \mid \sigma \mid \mu &
+      \Rightarrow (v, \mathsf{false}) \mid \sigma \mid \mu\\
      & \text{where } \sigma(\rho(x)) = (a, \phi) 
        \text{ and } 0 < \phi \\
      & \text{ and } \mu(a) = v\\[2ex]
 \end{align*}
 
+Evaluate a primitive operator:
+\begin{align*}
+(f(\overline{\Box}), \overline{c}, \overline{b} \IN \rho, \mathsf{rvalue}, b) \mid \sigma \mid \mu &
+  \Rightarrow (c', \mathsf{true}) \mid \sigma \mid \mu \\
+  & \text{where } c' = \llbracket f \rrbracket (\overline{c}) \\
+(f(\overline{\Box}), \overline{c}, \overline{b} \IN \rho,\mathsf{lvalue},b) \mid \sigma \mid \mu &
+     \Rightarrow (p, \mathsf{true}) \mid \sigma(p \mapsto a,1 \div 1) \mid \mu(a \mapsto c') \\
+     & \text{where } c' = \llbracket f \rrbracket (\overline{c})\\
+    & \text{ and } a \notin \mathit{dom}(\mu)
+     \text{ and } p \notin \mathit{dom}(\sigma)
+\end{align*}
+
+\fbox{$\psi \longrightarrow \psi'$} \\
+
+Step to subexpression:
+\begin{align*}
+  (F[e],\overline{v},\overline{b} \IN \rho, \mathit{cat}, b) :: \psi
+  &\longrightarrow
+  (e,[],[] \IN \rho, \mathsf{rvalue}, \mathsf{true}) :: (F,\overline{v},\overline{b} \IN  \rho, \mathit{cat}, b) :: \psi
+\end{align*}
+
+\fbox{$\psi \mid \sigma \mid \mu \longrightarrow \psi \mid \sigma \mid \mu$}\\
+
+Evaluate and finish:
+\begin{gather*}
+  \inference{(F_1,\overline{v}_1,\overline{b}_1 \IN \mathit{ctx}_1) \mid \sigma \mid \mu \Rightarrow (v,b) \mid \sigma' \mid \mu'
+   & \mathit{kill}(\overline{v}_1, \overline{b}_1, \sigma', \mu') = \sigma'', \mu''}
+{(F_1,\overline{v}_1,\overline{b}_1 \IN \mathit{ctx}_1)
+  :: (F_2,\overline{v}_2,\overline{b}_2 \IN \mathit{ctx}_2):: \psi \mid \sigma \mid \mu
+  \longrightarrow
+    (F_2,\overline{v}_2 v, \overline{b}_2 b \IN \mathit{ctx}_2) :: \psi \mid \sigma'' \mid \mu''}
+\end{gather*}
 
 \fbox{$s \longrightarrow s$}
 \begin{align*}

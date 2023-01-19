@@ -1716,3 +1716,4 @@ UNDER CONSTRUCTION
 [ ] Refactor desugar, const-eval into AST methods
 [ ] Test cases for type checking failures.
 [ ] generic impls
+[ ] Check whether the pointer "lender" logic is no longer needed
