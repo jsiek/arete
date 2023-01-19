@@ -1707,7 +1707,7 @@ UNDER CONSTRUCTION
 [X] Add variants. (safe unions)
 [X] Remove null pointers.
 [X] Refactor type-check into AST methods
-[ ] interfaces, impls, and constraints
+[X] interfaces, impls, and constraints
 [ ] adding type checking descriptions to the spec
 [ ] add variants to the spec
 [ ] Explicit type arguments for generic functions.
@@ -1715,3 +1715,4 @@ UNDER CONSTRUCTION
 [ ] debugger: command to display the stack (like backtrace in gdb)
 [ ] Refactor desugar, const-eval into AST methods
 [ ] Test cases for type checking failures.
+[ ] generic impls
