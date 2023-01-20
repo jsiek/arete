@@ -33,15 +33,16 @@
   \text{integers} & n \\
   \text{Booleans} & b & ::= & \mathtt{true} \mid \mathtt{false}\\
   \text{Constants} & c & ::= & n \mid b \\
+  \text{Primitive Op.} & \oplus \\
  \text{binding kind} & k &::= & \mathtt{share} \mid \mathtt{own} \mid
         \mathtt{borrow} \\
  \text{parameter} & p &::= & k \; x \texttt{:} \tau \\
-  & e &::= & x \mid c \mid\\
-  & & & e \mathop{\texttt{+}} e \mid e \mathop{\texttt{*}} e \mid e \mathop{\texttt{/}} e \mid \texttt{-} e \mid \\
+ \text{expression} & e &::= & x \mid c \mid \oplus(\overline{e}) \mid \\
   & & & \texttt{*} e \mid \mathtt{copy}\LP e \RP \mid
         \mathtt{split}\LP e \RP \mid \mathtt{join}\LP e,e \RP \mid
         e \OF e \mid \\
   & & & \LS e \OF e \RS \mid \langle e^{*} \rangle \mid e \LS e \RS \mid \\
+  & & & e \LP \overline{e} \RP \\
   & & & \mathtt{spawn}\; e \mid \mathtt{wait}\; e \\
   & e^{*} & ::= & \mid e \mid e \mathop{\texttt{,}} e^{*} \\
   & s &::= & e \SC \mid \\

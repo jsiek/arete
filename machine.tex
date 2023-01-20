@@ -18,6 +18,12 @@
 \newcommand{\EQ}{\mathop{\texttt{=}}}
 \newcommand{\OF}{\mathop{\mathtt{of}}}
 \newcommand{\IN}{\mathop{\mathsf{in}}}
+\newcommand{\RVAL}{\mathsf{Rval}}
+\newcommand{\LVAL}{\mathsf{Lval}}
+\newcommand{\DUP}{\mathsf{dup}}
+\newcommand{\OBS}{\mathsf{obs}}
+\newcommand{\INCTX}[4]{\boxed{#1}^{#2}_{#3} \IN #4}
+\newcommand{\act}{\text{\ae}}
 
 \title{The Arete Machine}
 \author{Jeremy G. Siek}
@@ -29,14 +35,16 @@
 \begin{array}{lrcl}
   \text{address} & a \\
   \text{pointer name} & p \\
-  \text{fraction} & \phi & ::= & n \div n \\
-  \text{value}& v & ::= & n \mid b \mid \ldots \\
+  \text{fraction} & \phi & ::= & 0 \mid 1 \mid n \div n \\
+  \text{value}& v & ::= & c \mid p \mid
+     (f(\overline{k\, x : \tau}) \mathit{block}^{\mathit{vc}}, \rho) \mid \ldots \\
   \text{environment} & \rho & ::= & \{ x \mapsto p, \ldots \} \\
-  \text{result} & \mathit{res} & ::= & (v , b) \\
-  \text{context} & \mathit{ctx} & ::= & \rho, \mathit{cat}, b \\
-  \text{eval. context} & F & ::= & e \mid \Box + e \mid \Box + \Box \mid ... \\
-  \text{runner}& r & ::= & F, \overline{v}, \overline{b} \IN \mathit{ctx}\\
-  \text{frame}& \psi & ::= & r^{*} \\
+  \text{result kind} & r & ::= & \mathsf{new} \mid \mathsf{old} \\
+  \text{value category} & \mathit{vc} & ::= & \RVAL \mid \LVAL \\
+  \text{duplicate/observe} & o & ::= & \DUP \mid \OBS \\
+  \text{eval. context} & F & ::= & (\Box^\RVAL_\DUP + e) \mid \Box^\RVAL_\DUP + \Box^\RVAL_\DUP \mid ... \\
+  \text{active expr.}& \act & ::= & \INCTX{e}{\mathit{vc}}{o}{\rho} \mid F[\overline{v_r},\overline{e^\mathit{vc}_o}] \IN \rho \\
+  \text{frame}& \psi & ::= & \act^{*} \\
   \text{stack}& \kappa & ::= & \psi^{*} \\
   \text{thread}& t & ::= & \kappa, t, n \\
   \text{memory}& \mu & ::= & \{ a \mapsto v, \ldots \} \\
@@ -56,76 +64,128 @@
    \vdots
 \end{align*}
 
-\fbox{$\mathit{kill}(\overline{v},\overline{b}, \sigma,\mu) = \sigma',\mu'$}
+\fbox{$\mathit{kill}(\overline{v_r}, \sigma,\mu) = \sigma',\mu'$}
 \begin{align*}
-\mathit{kill}([],[], \sigma,\mu) &= \sigma,\mu\\
+\mathit{kill}([], \sigma,\mu) &= \sigma,\mu\\
+\mathit{kill}(v_r \overline{v_r}, \sigma,\mu) &= (\sigma'', \mu'') \\
+ & \text{where } \mathit{kill}(\overline{v_r}, \sigma,\mu) = (\sigma',\mu')\\
+ & \text{and } \mathit{kill}(v_r, \sigma,\mu) = (\sigma'',\mu'')
 \end{align*}
 
-\fbox{$r \mid \sigma \mid \mu \Rightarrow \mathit{res} \mid \sigma' \mid \mu'$}\\
+\fbox{$\mathit{kill}(v_r, \sigma,\mu) = \sigma',\mu'$}
+\begin{align*}
+\mathit{kill}(c_r, \sigma,\mu) &= \sigma,\mu\\
+\mathit{kill}(p_r, \sigma,\mu) &=  \sigma(p \mapsto (\mathsf{none},0)), \mu \backslash a \\
+   & \text{where } \sigma(p) = (a, 1) \\
+\mathit{kill}(p_r, \sigma,\mu) &=  \sigma, \mu \\
+  & \text{where } \sigma(p) = (a, 0) \\
+\mathit{kill}(\langle v_1,\ldots,v_n \rangle, \sigma_0, \mu_0) &= \sigma_n, \mu_n\\
+& \text{where } \mathit{kill}(v_{i+1},\sigma_i,\mu_i) = \sigma_{i+1},\mu_{i+1}
+\text{ for } i\in [0,n) \\
+  \vdots
+\end{align*}
+
+\fbox{$\act \mid \sigma \mid \mu \Rightarrow v_r \mid \sigma' \mid \mu'$}\\
 
 Evaluate a constant:
 \begin{align*}
-  (c \IN \rho,\mathsf{rvalue},b) \mid \sigma \mid \mu  &
-     \Rightarrow (c, \mathsf{true}) \mid \sigma \mid \mu \\
-  (c \IN \rho,\mathsf{lvalue},b) \mid \sigma \mid \mu &
-     \Rightarrow (p, \mathsf{true}) \mid \sigma(p \mapsto a,1 \div 1) \mid \mu(a \mapsto c) \\
+  \INCTX{c}{\RVAL}{o}{\rho} \mid \sigma \mid \mu  &
+     \Rightarrow c_{\mathsf{new}} \mid \sigma \mid \mu \\
+  \INCTX{c}{\LVAL}{o}{\rho} \mid \sigma \mid \mu &
+     \Rightarrow p_{\mathsf{new}} \mid \sigma(p \mapsto a, 1) \mid \mu(a \mapsto c) \\
      & \text{where } a \notin \mathit{dom}(\mu)
      \text{ and } p \notin \mathit{dom}(\sigma)
 \end{align*}
 
 Evaluate a variable:
 \begin{align*}
- (x \IN \rho,\mathsf{lvalue}, b) \mid \sigma \mid \mu &
-      \Rightarrow (\rho(x), \mathsf{false}) \mid \sigma \mid \mu \\
-  (x \IN \rho,\mathsf{rvalue}, \mathsf{true}) \mid \sigma \mid \mu  &
-     \Rightarrow (v', \mathsf{true}) \mid \sigma' \mid \mu\\
+ \INCTX{x}{\LVAL}{o}{\rho} \mid \sigma \mid \mu &
+      \Rightarrow \rho(x)_{\mathsf{old}} \mid \sigma \mid \mu \\
+  \INCTX{x}{\RVAL}{\DUP}{\rho} \mid \sigma \mid \mu  &
+     \Rightarrow v'_{\mathsf{new}} \mid \sigma' \mid \mu\\
      & \text{where } \sigma(\rho(x)) = (a, \phi) 
        \text{ and } 0 < \phi \\
-     & \text{ and } \mu(a) = v
-       \text{ and } \mathit{dup}(v,\sigma) = (v',\sigma') \\
- (x \IN \rho,\mathsf{rvalue}, \mathsf{false}) \mid \sigma \mid \mu &
-      \Rightarrow (v, \mathsf{false}) \mid \sigma \mid \mu\\
+     &  \text{ and } \mathit{dup}(\mu(a),\sigma) = (v',\sigma') \\
+ \INCTX{x}{\RVAL}{\OBS}{\rho} \mid \sigma \mid \mu &
+      \Rightarrow \mu(a)_{\mathsf{old}} \mid \sigma \mid \mu\\
      & \text{where } \sigma(\rho(x)) = (a, \phi) 
-       \text{ and } 0 < \phi \\
-     & \text{ and } \mu(a) = v\\[2ex]
+       \text{ and } 0 < \phi 
 \end{align*}
 
 Evaluate a primitive operator:
 \begin{align*}
-(f(\overline{\Box}), \overline{c}, \overline{b} \IN \rho, \mathsf{rvalue}, b) \mid \sigma \mid \mu &
-  \Rightarrow (c', \mathsf{true}) \mid \sigma \mid \mu \\
-  & \text{where } c' = \llbracket f \rrbracket (\overline{c}) \\
-(f(\overline{\Box}), \overline{c}, \overline{b} \IN \rho,\mathsf{lvalue},b) \mid \sigma \mid \mu &
-     \Rightarrow (p, \mathsf{true}) \mid \sigma(p \mapsto a,1 \div 1) \mid \mu(a \mapsto c') \\
-     & \text{where } c' = \llbracket f \rrbracket (\overline{c})\\
+\INCTX{\oplus(\overline{c_r})}{\RVAL}{o}{\rho} \mid \sigma \mid \mu &
+  \Rightarrow c'_{\mathsf{new}} \mid \sigma \mid \mu \\
+  & \text{where } c' = \llbracket \oplus \rrbracket (\overline{c}) \\
+\boxed{\oplus(\overline{c_r})}^\LVAL_o \IN \rho \mid \sigma \mid \mu &
+     \Rightarrow p_{\mathsf{new}} \mid \sigma(p \mapsto a,1) \mid \mu(a \mapsto c') \\
+     & \text{where } c' = \llbracket \oplus \rrbracket (\overline{c})\\
     & \text{ and } a \notin \mathit{dom}(\mu)
      \text{ and } p \notin \mathit{dom}(\sigma)
 \end{align*}
 
-\fbox{$\psi \longrightarrow \psi'$} \\
-
-Step to subexpression:
-\begin{align*}
-  (F[e],\overline{v},\overline{b} \IN \rho, \mathit{cat}, b) :: \psi
-  &\longrightarrow
-  (e,[],[] \IN \rho, \mathsf{rvalue}, \mathsf{true}) :: (F,\overline{v},\overline{b} \IN  \rho, \mathit{cat}, b) :: \psi
-\end{align*}
-
 \fbox{$\psi \mid \sigma \mid \mu \longrightarrow \psi \mid \sigma \mid \mu$}\\
 
-Evaluate and finish:
-\begin{gather*}
-  \inference{(F_1,\overline{v}_1,\overline{b}_1 \IN \mathit{ctx}_1) \mid \sigma \mid \mu \Rightarrow (v,b) \mid \sigma' \mid \mu'
-   & \mathit{kill}(\overline{v}_1, \overline{b}_1, \sigma', \mu') = \sigma'', \mu''}
-{(F_1,\overline{v}_1,\overline{b}_1 \IN \mathit{ctx}_1)
-  :: (F_2,\overline{v}_2,\overline{b}_2 \IN \mathit{ctx}_2):: \psi \mid \sigma \mid \mu
-  \longrightarrow
-    (F_2,\overline{v}_2 v, \overline{b}_2 b \IN \mathit{ctx}_2) :: \psi \mid \sigma'' \mid \mu''}
-\end{gather*}
+Step to a subexpression:
+\begin{align*}
+  (F[\overline{v_r},\boxed{e}^\mathit{vc}_o] \IN \rho) :: \psi \mid \sigma \mid \mu
+  &\longrightarrow
+  (\boxed{e}^\mathit{vc}_o \IN \rho) :: (F[\overline{v_r},\Box] \IN \rho) :: \psi
+  \mid \sigma \mid \mu
+\end{align*}
+
+Evaluate and finish an active expression:
+\begin{align*}
+F[\overline{v_r}] \IN \rho :: \psi \mid \sigma \mid \mu
+ & \longrightarrow v_r :: \psi \mid \sigma'' \mid \mu''\\
+& \text{where }
+  F[\overline{v_r}] \IN \rho \mid \sigma \mid \mu \Rightarrow v_r \mid \sigma' \mid \mu'\\
+& \text{and } \mathit{kill}(\overline{v_r}, \sigma', \mu') = \sigma'', \mu''\\  
+\end{align*}
+
+Propagate the result of an active expression:
+\begin{align*}
+v_r :: (F'[\overline{v_{r}'}] \IN \rho'):: \psi \mid \sigma \mid \mu
+ & \longrightarrow
+(F'[\overline{v_{r}'}, v_r] \IN \rho') :: \psi \mid \sigma'' \mid \mu''
+\end{align*}
+
+\fbox{$\kappa \mid \sigma \mid \mu \longrightarrow \kappa \mid \sigma \mid \mu$}
+
+Call a function:
+\begin{align*}
+  (\INCTX{v_f\LP\overline{v}\RP}{vc}{o}{\rho} :: \psi) :: \kappa
+  & \longrightarrow
+  (\INCTX{\mathit{block}}{vc'}{o}{\rho'(\overline{x}\mapsto\overline{v})})
+  ::
+  (\overline{k\,x \mapsto v})\{\psi\} :: \kappa
+  \\
+  & \text{where } v_f = (f(\overline{k\, x : \tau}) \mathit{block}^{vc'}, \rho')
+\end{align*}
+
+Step in the current function:
+\begin{align*}
+  (\overline{k\,x \mapsto v})\{\psi\} :: \kappa \mid \sigma \mid \mu
+   &\longrightarrow
+  (\overline{k\,x \mapsto v})\{\psi'\} :: \kappa \mid \sigma \mid \mu \\
+  & \text{where } 
+  \psi \mid \sigma \mid \mu \longrightarrow \psi' \mid \sigma \mid \mu 
+\end{align*}
+
+Return from a function:
+\begin{align*}
+  (\overline{k\,x \mapsto v})\{v_r\} ::
+  (\overline{k'\,x'\mapsto v'})\{\psi\} :: \kappa \mid \sigma \mid \mu
+   &\longrightarrow
+  (\overline{k'\,x'\mapsto v'})\{v_r :: \psi\} :: \kappa \mid \sigma' \mid \mu'
+\end{align*}
 
 \fbox{$s \longrightarrow s$}
 \begin{align*}
-  \longrightarrow
+  \sigma,\mu, t \cup \overline{t}
+   & \longrightarrow
+  \sigma',\mu', t' \cup \overline{t} \\
+  & \text{where } t \mid \sigma \mid \mu \longrightarrow t' \mid \sigma' \mid \mu'
 \end{align*}
 
 \end{document}
