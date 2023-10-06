@@ -2,7 +2,7 @@ fun inc(inout p) {
   p = p + 1;
 }
 
-fun main() {
+fun main() -> int {
   var q = 0;
   inc(q);
   q = q + 1;

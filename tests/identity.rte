@@ -1,5 +1,5 @@
 fun id(let x) { return x; }
 
-fun main() {
+fun main() -> int {
   return id(0);
 }

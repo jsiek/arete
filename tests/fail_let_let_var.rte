@@ -1,4 +1,4 @@
-fun main() {
+fun main() -> int {
   let a = 0;
   let b = a;
   var c = b;

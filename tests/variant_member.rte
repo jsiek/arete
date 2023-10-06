@@ -1,4 +1,4 @@
-fun main() {
+fun main() -> int {
   var x = tag some(42) as (some: int | none: ⟨⟩);
   return x#some - 42;
 }

@@ -61,7 +61,7 @@ fun delete_list(var lst) {
   }
 }
 
-fun main() {
+fun main() -> int {
   var three = listof(3);
   var two_three = push(2, three);
   var one_two_three = push(1, two_three);

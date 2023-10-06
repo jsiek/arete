@@ -1,4 +1,4 @@
-fun main() {
+fun main() -> int {
   var p = 0;
   let write1 = fun (v) { p = v; };
   let write2 = write1;

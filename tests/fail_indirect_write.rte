@@ -1,4 +1,4 @@
-fun main() {
+fun main() -> int {
   var x = &⟨&⟨10⟩⟩;
   {
     let y = x; // x and y are aliases to the same mutable cell

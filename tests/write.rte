@@ -1,4 +1,4 @@
-fun main() {
+fun main() -> int {
   var x = 10;
   let z = copy(x); // otherwise z is an alias for x
   x = 20;

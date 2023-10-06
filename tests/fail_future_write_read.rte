@@ -4,7 +4,7 @@ fun write(inout q, let v, ref signal) {
   q = v;
 }
 
-fun main() {
+fun main() -> int {
   var p = 0;
   var signal = 0;
   var f1 = 0;

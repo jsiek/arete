@@ -114,10 +114,10 @@ class Deref(Exp):
       if tracing_on():
           print('in Deref.step')
       ptr = runner.results[0].value
-      if not isinstance(ptr, Pointer):
-        error(self.location, 'deref expected a pointer, not ' + str(ptr))
+      # if not isinstance(ptr, Pointer):
+      #   error(self.location, 'deref expected a pointer, not ' + str(ptr))
       if isinstance(runner.context, ValueCtx):
-          val = machine.memory.read(ptr, self.location)
+          val = ptr.read(machine.memory, self.location)
           result = Result(True, val.duplicate(ptr.get_permission(),
                                               self.location))
       elif isinstance(runner.context, AddressCtx):
@@ -184,7 +184,7 @@ class Transfer(Stmt):
     new_rhs = self.rhs.const_eval(env)
     return Transfer(self.location, new_lhs, new_percent, new_rhs)
 
-  def type_check(self, env):
+  def type_check(self, env, ret):
     lhs_type, new_lhs = self.lhs.type_check(env, 'none') # TODO
     lhs_type = unfold(lhs_type)
     percent_type, new_percent = self.percent.type_check(env, 'none')
@@ -196,7 +196,7 @@ class Transfer(Stmt):
     if not (isinstance(rhs_type, PointerType) or isinstance(rhs_type, AnyType)):
       static_error(self.location, 'in transfer RHS, expected a pointer, not '
                    + str(rhs_type))
-    return None, Transfer(self.location, new_lhs, new_percent, new_rhs)
+    return Transfer(self.location, new_lhs, new_percent, new_rhs)
 
   def step(self, runner, machine):
     if runner.state == 0:
@@ -231,13 +231,13 @@ class Delete(Stmt):
     new_arg = self.arg.const_eval(env)
     return Delete(self.location, new_arg)
     
-  def type_check(self, env):
+  def type_check(self, env, ret):
     arg_type, new_arg = self.arg.type_check(env, 'none') # TODO
     arg_type = unfold(arg_type)
     if not (isinstance(arg_type, PointerType) or isinstance(arg_type, AnyType)):
       static_error(self.location, 'in delete, expected a pointer, not '
                    + str(arg_type))
-    return None, Delete(self.location, new_arg)
+    return Delete(self.location, new_arg)
 
   def step(self, runner, machine):
     if runner.state == 0:

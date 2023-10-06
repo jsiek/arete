@@ -20,7 +20,7 @@ fun deref(x : pointer, default: int) -> int {
   }
 }
 
-fun main() {
+fun main() -> int {
   var x : pointer = null();
   var y : pointer = some(&42);
   if (is_null(x)) {

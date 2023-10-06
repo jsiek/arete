@@ -1,4 +1,4 @@
-fun main() {
+fun main() -> int {
   assert false;
   return 0;
 }

@@ -3,7 +3,7 @@ fun inc(inout p) {
   return p;
 }
 
-fun main() {
+fun main() -> int {
   var q = 0;
   let p = q; // create a read-only alias, causing q to lose write privilege
   inc(q);    // initializing inout pointer requires 1/1 pointer

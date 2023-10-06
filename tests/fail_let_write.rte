@@ -1,4 +1,4 @@
-fun main() {
+fun main() -> int {
   let x = 0;
   x = 1;     // error, can't write to a `let`
   return x;

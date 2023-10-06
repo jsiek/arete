@@ -4,7 +4,7 @@ fun f(inout x, inout y) {
   y = 1;
 }
 
-fun main() {
+fun main() -> int {
   var v = 2;
   f(v, v);
   return v;

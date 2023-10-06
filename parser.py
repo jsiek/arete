@@ -8,6 +8,7 @@ from modules import *
 from pointers import *
 from futures import *
 from interfaces_and_impls import *
+from primitive_operations import PrimitiveCall
 from ast_types import *
 from collections import OrderedDict
 from dataclasses import dataclass

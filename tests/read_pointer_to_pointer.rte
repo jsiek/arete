@@ -4,7 +4,7 @@ fun f(let y) {
   return z - y;
 }
 
-fun main() {
+fun main() -> int {
   let y = 42;
   let a = f(y);
   return a;

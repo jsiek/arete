@@ -10,7 +10,7 @@ fun inc(ref q) {
   q = q + 1;
 }
 
-fun main() {
+fun main() -> int {
   var p = 0;
   let t1 = spawn inc(p);
   let t2 = spawn inc(p);

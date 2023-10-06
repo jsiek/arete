@@ -20,7 +20,7 @@ module M
 
 from M import empty, push, front, rest;
 
-fun main() {
+fun main() -> int {
   let ls1 = push(0, push(1, push(2, empty)));
   let inc = fun (x) { return x + 1; };
   let ls2 = M::map(inc, ls1); // test :: operator

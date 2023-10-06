@@ -1,4 +1,4 @@
-fun main() {
+fun main() -> int {
   let a = spawn 1 + 2; // 3
   let b = spawn 3 + 4; // 7
   let c = spawn wait a + wait b; // 10

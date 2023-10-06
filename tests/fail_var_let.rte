@@ -1,4 +1,4 @@
-fun main() {
+fun main() -> int {
   var x = 0;
   let y = x;
   x = 0;      // error: no write permission

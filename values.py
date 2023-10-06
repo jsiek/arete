@@ -15,28 +15,49 @@ class Result:
     permission: Fraction = Fraction(0,1)
 
 @dataclass
+class Box(Value):
+    value: Value
+    source: Type
+    __match_args__ = ("value", "source")    
+    def duplicate(self, percentage, location):
+        return Box(self.value.duplicate(percentage, location), self.source)
+    def kill(self, mem, location, progress=set()):
+        self.value.kill(mem, location, progress)
+    def clear(self, mem, location, progress=set()):
+        self.value.clear(mem, location, progress)
+    def __str__(self):
+        return '⟦' + str(self.value) + '@' + str(self.source) + '⟧'
+    def get_subobject(self, path, loc, mem):
+        if len(path) == 0:
+          return self
+        else:
+          return self.value.get_subobject(path, loc, mem)
+    
+@dataclass
 class Number(Value):
-  value: numbers.Number
-  def equals(self, other):
-    return self.value == other.value
-  def duplicate(self, percentage, location):
-    return Number(self.value)
-  def kill(self, mem, location, progress=set()):
-    pass
-  def clear(self, mem, location, progress=set()):
-    pass
-  def __str__(self):
-    return str(self.value)
-  def __repr__(self):
-    return str(self)
-  def node_name(self):
-    return 'num' + str(self)
-  def node_label(self):
-    return str(self)    
+    value: numbers.Number
+    __match_args__ = ("value",)
+    def equals(self, other):
+      return self.value == other.value
+    def duplicate(self, percentage, location):
+      return Number(self.value)
+    def kill(self, mem, location, progress=set()):
+      pass
+    def clear(self, mem, location, progress=set()):
+      pass
+    def __str__(self):
+      return str(self.value)
+    def __repr__(self):
+      return str(self)
+    def node_name(self):
+      return 'num' + str(self)
+    def node_label(self):
+      return str(self)    
   
 @dataclass
 class Boolean(Value):
     value: bool
+    __match_args__ = ("value",)
     def equals(self, other):
         return self.value == other.value
     def duplicate(self, percentage, location):
@@ -268,6 +289,10 @@ class Pointer(Value):
         val = mem.memory[self.address]
         val.clear(mem, location)
 
+    def read(self, memory, loc):
+        return memory.read(self, loc)
+        
+        
 # This class is needed to avoid prematurely duplicating a Pointer.        
 @dataclass
 class PointerOffset(Value):

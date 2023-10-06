@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from lark.tree import Meta
 from typing import Any
 from fractions import Fraction
+from error import error
 
 def copy(exp):
   if exp is None:
@@ -79,12 +80,15 @@ class AST:
 class Type:
     location: Meta
 
+    def is_ground(self) -> bool:
+      raise Exception('Type.is_ground unimplemented')
+
 @dataclass
 class Exp(AST):
   
   # Returns the set of free variables of this expression.
   def free_vars(self) -> set[str]:
-    raise Exception('unimplemented')
+    raise Exception('Exp.free_vars unimplemented')
 
   # Checks that the expression obeys the type checking rules.
   # The environment `env` provides the types for all of the
@@ -97,20 +101,20 @@ class Exp(AST):
   # Returns the type of this expression and a translation
   # of this expression.
   def type_check(self, env: dict[str,Type], ctx:str = 'let') -> tuple[Type,Exp]:
-    raise Exception('unimplemented')
+    raise Exception('Exp.type_check unimplemented')
 
   # Takes one small step of runtime execution of this expression.
   # The `runner` parameter is an instance of `NodeRunner` that
   # contains the state needed for the execution of this expression.
   # The `machine` parameter is the sole instance of `Machine`.
   def step(self, runner, machine):
-    raise Exception('unimplemented')
+    raise Exception('Exp.step unimplemented')
   
   def __str__(self):
-    raise Exception('unimplemented')
+    raise Exception('Exp.__str__ unimplemented')
   
   def __repr__(self):
-    raise Exception('unimplemented')
+    raise Exception('Exp.__repr__ unimplemented')
 
   def copy(self):
     return self
@@ -131,17 +135,17 @@ class Stmt(AST):
   # Checks that the statement obeys the type checking rules.
   # The environment `env` provides the types for all of the
   # variables that are currently in scope.
-  # Returns the type of any return expressions contained in this
-  # expression (or None) and returns a translation of this statement.
-  def type_check(self, env: dict[str,Type]) -> tuple[Type,Stmt]:
-    raise Exception('unimplemented')
+  # The return type of the enclosing function is `ret`.
+  # Returns a translation of this statement.
+  def type_check(self, env: dict[str,Type], ret: Type) -> tuple[Stmt]:
+    raise Exception('Stmt.type_check unimplemented')
   
   # Takes one small step of runtime execution of this statement.
   # The `runner` parameter is an instance of `NodeRunner` that
   # contains the state needed for the execution of this expression.
   # The `machine` parameter is the sole instance of `Machine`.
   def step(self, runner, machine):
-    raise Exception('unimplemented')
+    raise Exception('Stmt.step unimplemented')
 
 
 # TODO: change name of Decl to Definition
@@ -149,25 +153,25 @@ class Stmt(AST):
 class Decl(AST):
   
   def __str__(self):
-    raise Exception('unimplemented')
+    raise Exception('Decl.__str__ unimplemented')
     
   def __repr__(self):
-    raise Exception('unimplemented')
+    raise Exception('Decl.__repr__ unimplemented')
 
   def free_vars(self) -> set[str]:
-    raise Exception('unimplemented')
+    raise Exception('Decl.free_vars unimplemented')
 
   # Evaluate compile-time constants and type expressions,
   # producing a new version of this definition.
   def const_eval(self, env: dict[str,Any]) -> list[Decl]:
-    raise Exception('unimplemented')
+    raise Exception('Decl.const_eval unimplemented')
   
   # Declares the names and types associated with this definition.
   # The `env` parameter maps the in-scope variables to their types.
   # The result is a dictionary mapping names to types and represents
   # the names declared by this definitionn.
   def declare_type(self, env: dict[str,Type]) -> dict[str,Type]:
-    raise Exception('unimplemented')
+    raise Exception('Decl.declare_type unimplemented')
     
   # type_check ensures that the definition obeys the type checking rules.
   # The environment `env` provides the types for all of the variables
@@ -177,10 +181,10 @@ class Decl(AST):
   # and impls.
   # type_check returns a translation of this definition.
   def type_check(self, env: dict[str,Any]) -> list[Decl]:
-    raise Exception('unimplemented')
+    raise Exception('Decl.type_check unimplemented')
       
   def declare(self, env: dict[str,Value], mem):
     env[self.name] = mem.allocate(Void())
     
   def step(self, runner, machine):
-    raise Exception('unimplemented')
+    raise Exception('Decl.step unimplemented')

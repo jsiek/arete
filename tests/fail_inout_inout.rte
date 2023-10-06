@@ -1,4 +1,4 @@
-fun main() {
+fun main() -> int {
   var v = 2;
   {
     inout x = v;

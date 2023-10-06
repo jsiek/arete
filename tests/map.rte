@@ -12,7 +12,7 @@ fun map(let f, let ls) {
 
 fun inc(let x) { return x + 1; }
 
-fun main() {
+fun main() -> int {
   var ls1 = ⟨0, ⟨1, ⟨2, ⟨⟩⟩⟩⟩;
   var ls2 = map(inc, ls1);
   let three = front(rest(rest(ls2)));

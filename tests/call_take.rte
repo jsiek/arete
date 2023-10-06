@@ -3,7 +3,7 @@ fun inc(var p) {
   return p;
 }
 
-fun main() {
+fun main() -> int {
   var q = 0;
   let a = inc(q);
   return a - 1;

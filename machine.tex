@@ -24,6 +24,7 @@
 \newcommand{\OBS}{\mathsf{obs}}
 \newcommand{\INCTX}[4]{\boxed{#1}^{#2}_{#3} \IN #4}
 \newcommand{\act}{\text{\ae}}
+\newcommand{\acts}{\mathrm{a}\!\mathrm{s}}
 
 \title{The Arete Machine}
 \author{Jeremy G. Siek}
@@ -44,7 +45,8 @@
   \text{duplicate/observe} & o & ::= & \DUP \mid \OBS \\
   \text{eval. context} & F & ::= & (\Box^\RVAL_\DUP + e) \mid \Box^\RVAL_\DUP + \Box^\RVAL_\DUP \mid ... \\
   \text{active expr.}& \act & ::= & \INCTX{e}{\mathit{vc}}{o}{\rho} \mid F[\overline{v_r},\overline{e^\mathit{vc}_o}] \IN \rho \\
-  \text{frame}& \psi & ::= & \act^{*} \\
+  \text{active stmts.}& \acts & ::= & \INCTX{s^{*}}{\mathit{vc}}{}{\rho} \\
+  \text{frame}& \psi & ::= & (\act \mid \acts)^{*} \\
   \text{stack}& \kappa & ::= & \psi^{*} \\
   \text{thread}& t & ::= & \kappa, t, n \\
   \text{memory}& \mu & ::= & \{ a \mapsto v, \ldots \} \\
@@ -87,7 +89,7 @@
 
 \fbox{$\act \mid \sigma \mid \mu \Rightarrow v_r \mid \sigma' \mid \mu'$}\\
 
-Evaluate a constant:
+\noindent Evaluate a constant:
 \begin{align*}
   \INCTX{c}{\RVAL}{o}{\rho} \mid \sigma \mid \mu  &
      \Rightarrow c_{\mathsf{new}} \mid \sigma \mid \mu \\
@@ -97,7 +99,7 @@ Evaluate a constant:
      \text{ and } p \notin \mathit{dom}(\sigma)
 \end{align*}
 
-Evaluate a variable:
+\noindent Evaluate a variable:
 \begin{align*}
  \INCTX{x}{\LVAL}{o}{\rho} \mid \sigma \mid \mu &
       \Rightarrow \rho(x)_{\mathsf{old}} \mid \sigma \mid \mu \\
@@ -112,7 +114,7 @@ Evaluate a variable:
        \text{ and } 0 < \phi 
 \end{align*}
 
-Evaluate a primitive operator:
+\noindent Evaluate a primitive operator:
 \begin{align*}
 \INCTX{\oplus(\overline{c_r})}{\RVAL}{o}{\rho} \mid \sigma \mid \mu &
   \Rightarrow c'_{\mathsf{new}} \mid \sigma \mid \mu \\
@@ -124,9 +126,44 @@ Evaluate a primitive operator:
      \text{ and } p \notin \mathit{dom}(\sigma)
 \end{align*}
 
+
+
 \fbox{$\psi \mid \sigma \mid \mu \longrightarrow \psi \mid \sigma \mid \mu$}\\
 
-Step to a subexpression:
+\noindent Evaluate a binding statement:
+\begin{align*}
+  (\INCTX{k\,x:\tau \EQ v\SC \; s^{*}}{}{}{\rho}) :: \psi \mid \sigma \mid \mu &
+  \longrightarrow
+  \INCTX{s^{*}}{}{}{\rho'} ::
+  (\INCTX{k\,x:\tau \EQ v\SC \; \Box}{}{\rho'}{\rho}) :: \psi \mid \sigma' \mid \mu'\\
+  & \text{where }
+    \mathit{bind}(x, v,\rho,\sigma,\mu) = \rho',\sigma',\mu'
+\end{align*}
+
+\noindent Finish a binding statement
+\begin{align*}
+  v_r :: (\INCTX{k\,x:\tau \EQ v\SC \; \Box}{}{\rho'}{\rho}) :: \psi
+    \mid \sigma \mid \mu
+ &\longrightarrow
+    v_r :: \psi \mid \sigma' \mid \mu' \\
+ & \text{where } \mathit{dealloc}(k\,x\mapsto v,\rho',\sigma,\mu) = \sigma', \mu'
+\end{align*}
+
+\noindent Start a return statement:
+\begin{align*}
+  (\INCTX{\mathtt{return}\,e \SC}{vc}{}{\rho}) :: \psi \mid \sigma \mid \mu
+  & \longrightarrow
+  (\INCTX{e}{vc}{\DUP}{\rho}):: (\INCTX{\mathtt{return}\,\Box \SC}{vc}{}{\rho}) :: \psi \mid \sigma \mid \mu
+\end{align*}
+
+\noindent Evaluate a return statement:
+\begin{align*}
+  (\INCTX{\mathtt{return}\,v_r \SC}{vc}{}{\rho} :: \psi) \mid \sigma \mid \mu
+  & \longrightarrow
+  v_r :: \psi \mid \sigma \mid \mu
+\end{align*}
+
+\noindent Step to a subexpression:
 \begin{align*}
   (F[\overline{v_r},\boxed{e}^\mathit{vc}_o] \IN \rho) :: \psi \mid \sigma \mid \mu
   &\longrightarrow
@@ -134,7 +171,7 @@ Step to a subexpression:
   \mid \sigma \mid \mu
 \end{align*}
 
-Evaluate and finish an active expression:
+\noindent Evaluate and finish an active expression:
 \begin{align*}
 F[\overline{v_r}] \IN \rho :: \psi \mid \sigma \mid \mu
  & \longrightarrow v_r :: \psi \mid \sigma'' \mid \mu''\\
@@ -143,44 +180,55 @@ F[\overline{v_r}] \IN \rho :: \psi \mid \sigma \mid \mu
 & \text{and } \mathit{kill}(\overline{v_r}, \sigma', \mu') = \sigma'', \mu''\\  
 \end{align*}
 
-Propagate the result of an active expression:
+\noindent Propagate the result of an active expression:
 \begin{align*}
 v_r :: (F'[\overline{v_{r}'}] \IN \rho'):: \psi \mid \sigma \mid \mu
  & \longrightarrow
 (F'[\overline{v_{r}'}, v_r] \IN \rho') :: \psi \mid \sigma'' \mid \mu''
 \end{align*}
 
+\begin{center}
 \fbox{$\kappa \mid \sigma \mid \mu \longrightarrow \kappa \mid \sigma \mid \mu$}
+\end{center}
 
-Call a function:
+\noindent Call a function:
 \begin{align*}
   (\INCTX{v_f\LP\overline{v}\RP}{vc}{o}{\rho} :: \psi) :: \kappa
+  \mid \sigma \mid \mu
   & \longrightarrow
-  (\INCTX{\mathit{block}}{vc'}{o}{\rho'(\overline{x}\mapsto\overline{v})})
-  ::
-  (\overline{k\,x \mapsto v})\{\psi\} :: \kappa
-  \\
-  & \text{where } v_f = (f(\overline{k\, x : \tau}) \mathit{block}^{vc'}, \rho')
+  [\INCTX{\mathit{block}}{vc'}{o}{\rho''}]
+  :: (\INCTX{v_f\LP\overline{v}\RP}{vc}{o,\rho''}{\rho} :: \psi)
+  :: \kappa \mid \sigma' \mid \mu' \\
+  & \text{where } v_f = (f(\overline{k\, x : \tau}) \mathit{block}^{vc'}, \rho')\\
+  & \text{and } \mathit{bind}( \overline{x},\overline{v},\rho',\sigma,\mu)
+    = \rho'', \sigma', \mu'
 \end{align*}
 
-Step in the current function:
+\noindent Step in the current function:
 \begin{align*}
-  (\overline{k\,x \mapsto v})\{\psi\} :: \kappa \mid \sigma \mid \mu
+  \psi :: \kappa \mid \sigma \mid \mu
    &\longrightarrow
-  (\overline{k\,x \mapsto v})\{\psi'\} :: \kappa \mid \sigma \mid \mu \\
+  \psi' :: \kappa \mid \sigma \mid \mu \\
   & \text{where } 
   \psi \mid \sigma \mid \mu \longrightarrow \psi' \mid \sigma \mid \mu 
 \end{align*}
 
-Return from a function:
+\noindent Return from a function:
 \begin{align*}
-  (\overline{k\,x \mapsto v})\{v_r\} ::
-  (\overline{k'\,x'\mapsto v'})\{\psi\} :: \kappa \mid \sigma \mid \mu
-   &\longrightarrow
-  (\overline{k'\,x'\mapsto v'})\{v_r :: \psi\} :: \kappa \mid \sigma' \mid \mu'
+  (v_r :: \psi)
+  :: (\INCTX{v_f\LP\overline{v}\RP}{vc}{o,\rho'}{\rho} :: \psi)
+  :: \kappa \mid \sigma \mid \mu
+  &\longrightarrow
+  (v_r :: \psi)  
+  :: \kappa \mid \sigma' \mid \mu'\\
+  &\text{where } v_f = (f(\overline{k\, x : \tau}) \mathit{block}^{vc'}, \rho'')\\
+  &\text{and } \mathit{dealloc}(\overline{k'\,x'\mapsto v'},\rho',\sigma,\mu) = \sigma', \mu'
 \end{align*}
 
+\begin{center}
 \fbox{$s \longrightarrow s$}
+\end{center}
+
 \begin{align*}
   \sigma,\mu, t \cup \overline{t}
    & \longrightarrow

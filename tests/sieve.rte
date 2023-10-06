@@ -39,7 +39,7 @@ fun is_prime(n : int) {
   return true;
 }
 
-fun main() {
+fun main() -> int {
   let N : int = 54;
   var A : [bool] = [N of true];
   sift_primes(A);

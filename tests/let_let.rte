@@ -1,4 +1,4 @@
-fun main() {
+fun main() -> int {
   let x = 0;
   let y = x;
   return y;

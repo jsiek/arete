@@ -2,7 +2,7 @@ fun f(let x: int, inout p: int*) {
   p = &x;
 }
 
-fun main() {
+fun main() -> int {
   var p: int* = &0;
   let x: int = 1;
   f(x, p); // failed to restore let-bound variable to original permission

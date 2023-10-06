@@ -1699,21 +1699,3 @@ UNDER CONSTRUCTION
    temporary.
    
 5. Finish this expression with `result`.
-
-
-
-# TODO
-
-[X] Add variants. (safe unions)
-[X] Remove null pointers.
-[X] Refactor type-check into AST methods
-[X] interfaces, impls, and constraints
-[ ] adding type checking descriptions to the spec
-[ ] add variants to the spec
-[ ] Explicit type arguments for generic functions.
-[ ] Make the `as T` part of the `tag` expression optional.
-[ ] debugger: command to display the stack (like backtrace in gdb)
-[ ] Refactor desugar, const-eval into AST methods
-[ ] Test cases for type checking failures.
-[ ] generic impls
-[ ] Check whether the pointer "lender" logic is no longer needed

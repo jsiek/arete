@@ -1,4 +1,4 @@
-fun main() {
+fun main() -> int {
   var p = &0;
   {
     let x = 1;

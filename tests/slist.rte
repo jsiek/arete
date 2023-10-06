@@ -49,7 +49,7 @@ fun remove_last(inout n) {
   }
 }
 
-fun main() {
+fun main() -> int {
   var one_two = push(1, listof(2));
   var two_null = remove_last(one_two);
   let one = data(one_two);

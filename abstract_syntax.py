@@ -5,9 +5,9 @@ from fractions import Fraction
 from utilities import *
 from values import *
 from memory import *
-from primitive_operations import eval_prim, compare_ops, type_check_prim
 from ast_base import *
 from ast_types import *
+from coercions import *
 
     
 # Expressions
@@ -34,73 +34,6 @@ def eval_constant(e):
     case _:
       error(e.location, "expected a constant, not " + str(e))
       
-def const_eval_prim(loc, op, args):
-  match op:
-    case 'div':
-      if is_constant(args[0]) and is_constant(args[1]):
-        left = to_number(eval_constant(args[0]), loc)
-        right = to_number(eval_constant(args[1]), loc)
-        return Frac(loc, Fraction(left, right))
-      else:
-        return PrimitiveCall(loc, op, args)
-    case _:
-        return PrimitiveCall(loc, op, args)
-
-@dataclass
-class PrimitiveCall(Exp):
-  op: str
-  args: List[Exp]
-  __match_args__ = ("op", "args")
-
-  def __str__(self):
-      return self.op + \
-          "(" + ", ".join([str(arg) for arg in self.args]) + ")"
-
-  def __repr__(self):
-      return str(self)
-
-  def free_vars(self):
-      return set().union(*[arg.free_vars() for arg in self.args])
-
-  def const_eval(self, env):
-    op = self.op
-    args = self.args
-    new_args = [arg.const_eval(env) for arg in args]
-    return const_eval_prim(self.location, op, new_args)
-  
-  def type_check(self, env, ctx):
-    if tracing_on():
-      print("starting to type checking " + str(self))
-    arg_types = []
-    new_args = []
-    for arg in self.args:
-        arg_type, new_arg = arg.type_check(env, 'none')
-        arg_types.append(arg_type)
-        new_args.append(new_arg)
-    if tracing_on():
-      print("checking primitive " + str(self.op))
-    ret = type_check_prim(self.location, self.op, arg_types)
-    if tracing_on():
-      print("finished type checking " + str(self))
-      print("type: " + str(ret))
-    return ret, PrimitiveCall(self.location, self.op, new_args)
-
-  def step(self, runner, machine):
-    if runner.state < len(self.args):
-      if self.op in set(['upgrade', 'permission']):
-        dup = False
-      else:
-        dup = True
-      machine.schedule(self.args[runner.state], runner.env,
-                       ValueCtx(dup))
-    else:
-      result = eval_prim(self.op, [res.value for res in runner.results],
-                         machine, self.location)
-      if isinstance(runner.context, AddressCtx):
-        # join produces an address, no need to allocate
-        if self.op != 'join':
-          result = machine.memory.allocate(result)
-      machine.finish_expression(Result(True, result), self.location)
 
 @dataclass
 class Int(Exp):
@@ -251,14 +184,10 @@ class Seq(Stmt):
     new_rest = self.rest.const_eval(env)
     return Seq(self.location, new_first, new_rest)
   
-  def type_check(self, env):
-    first_type, new_first = self.first.type_check(env)
-    rest_type, new_rest = self.rest.type_check(env)
-    if not consistent(first_type, rest_type):
-      static_error(self.location, "inconsistent return types: "
-                   + str(first_type) + " and " + str(rest_type))
-    return join(first_type, rest_type), \
-           Seq(self.location, new_first, new_rest)
+  def type_check(self, env, ret):
+    new_first = self.first.type_check(env, ret)
+    new_rest = self.rest.type_check(env, ret)
+    return Seq(self.location, new_first, new_rest)
 
   def step(self, runner, machine):
     if runner.state == 0:
@@ -298,11 +227,11 @@ class Write(Stmt):
     new_rhs = self.rhs.const_eval(env)
     return Write(self.location, new_lhs, new_rhs)
     
-  def type_check(self, env):
+  def type_check(self, env, ret):
     lhs_type, new_lhs = self.lhs.type_check(env, 'write_lhs')
     rhs_type, new_rhs = self.rhs.type_check(env, 'write_rhs')
     require_consistent(lhs_type, rhs_type, 'in assignment', self.location)
-    return None, Write(self.location, new_lhs, new_rhs)
+    return Write(self.location, new_lhs, make_cast(new_rhs, rhs_type, lhs_type))
     
   def step(self, runner, machine):
     if runner.state == 0:
@@ -334,9 +263,9 @@ class Expr(Stmt):
     new_arg = self.exp.const_eval(env)
     return Expr(self.location, new_arg)
     
-  def type_check(self, env):
+  def type_check(self, env, ret):
     _, new_exp = self.exp.type_check(env, 'none')
-    return None, Expr(self.location, new_exp)
+    return Expr(self.location, new_exp)
 
   def step(self, runner, machine):
     if runner.state == 0:
@@ -363,12 +292,12 @@ class Assert(Stmt):
     new_arg = self.exp.const_eval(env)
     return Assert(self.location, new_arg)
     
-  def type_check(self, env):
+  def type_check(self, env, ret):
     arg_type, new_arg = self.exp.type_check(env, 'none')
     if not consistent(arg_type, BoolType(self.location)):
       static_error(self.location, "in assert, expected a Boolean, not "
                    + str(arg_type))
-    return None, Assert(self.location, new_arg)
+    return Assert(self.location, new_arg)
   
   def step(self, runner, machine):
     if runner.state == 0:
@@ -417,13 +346,15 @@ class IfStmt(Stmt):
     else:
       machine.finish_statement(self.location)
 
-  def type_check(self, env):
+  def type_check(self, env, ret):
     cond_type, new_cond = self.cond.type_check(env, 'none')
-    thn_type, new_thn = self.thn.type_check(env)
-    els_type, new_els = self.els.type_check(env)
-    require_consistent(thn_type, els_type, 'in if statement', self.location)
-    return join(thn_type, els_type), \
-           IfStmt(self.location, new_cond, new_thn, new_els)
+    if not consistent(cond_type, BoolType(self.location)):
+      static_error(self.location, "in condition of if, expected a Boolean, not "
+                   + str(cond_type))
+    cast_cond = make_cast(new_cond, cond_type, BoolType(self.location))
+    new_thn = self.thn.type_check(env, ret)
+    new_els = self.els.type_check(env, ret)
+    return IfStmt(self.location, cast_cond, new_thn, new_els)
     
       
 @dataclass
@@ -446,14 +377,13 @@ class While(Stmt):
     new_body = self.body.const_eval(env)
     return While(self.location, new_cond, new_body)
     
-  def type_check(self, env):
+  def type_check(self, env, ret):
     cond_type, new_cond = self.cond.type_check(env, 'none')
     if not consistent(cond_type, BoolType(self.location)):
       static_error(self.location, "in while, expected a Boolean, not "
                    + str(cond_type))
-    body_type, new_body = self.body.type_check(env)
-    return body_type, \
-           While(self.location, new_cond, new_body)
+    new_body = self.body.type_check(env, ret)
+    return While(self.location, new_cond, new_body)
 
   def step(self, runner, machine):
     if runner.state == 0:
@@ -481,8 +411,8 @@ class Pass(Stmt):
   def const_eval(self, env):
     return self
   
-  def type_check(self, env):
-    return None, self
+  def type_check(self, env, ret):
+    return self
 
   def step(self, runner, machine):
     machine.finish_statement(self.location)
@@ -505,9 +435,9 @@ class Block(Stmt):
   def const_eval(self, env):
     return Block(self.location, self.body.const_eval(env))
     
-  def type_check(self, env):
-    body_type, new_body = self.body.type_check(env)
-    return body_type, Block(self.location, new_body)
+  def type_check(self, env, ret):
+    new_body = self.body.type_check(env, ret)
+    return Block(self.location, new_body)
     
   def step(self, runner, machine):
     if runner.state == 0:
@@ -632,5 +562,33 @@ class TypeOperator(Decl):
     env[self.name] = TypeOp(self.location, self.params, new_body)
     return []
     
+@dataclass
+class ApplyCoercion(Exp):
+  exp: Exp
+  coercion: Coercion
 
+  __match_args__ = ("exp", "coercion")
+
+  def __str__(self):
+    return "⟨" + str(self.coercion) + "⟩" + str(self.exp)
+
+  def __repr__(self):
+    return str(self)
   
+  def free_vars(self):
+    return self.exp.free_vars()
+
+  def step(self, runner, machine):
+    if runner.state == 0:
+      machine.schedule(self.exp, runner.env, ValueCtx())
+    else:
+      val = self.coercion.apply(runner.results[0].value)
+      runner.produce_value(val.duplicate(1, self.location),
+                           machine, self.location)
+
+def make_cast(exp: Exp, source: Type, target: Type):
+    if source == target:
+        return exp
+    else:
+        return ApplyCoercion(exp.location, exp,
+                             make_coercion(source, target, exp.location))

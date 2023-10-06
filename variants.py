@@ -11,61 +11,9 @@ from variables_and_binding import Param, NoParam
 from ast_base import *
 from ast_types import *
 from values import Result, PointerOffset, duplicate_if_temporary
+from variant_value import Variant
 from utilities import *
 
-@dataclass
-class Variant(Value):
-  tag: str
-  value: Value
-
-  def __str__(self):
-    return 'tag ' + self.tag + ':' + str(self.value)
-      
-  def __repr__(self):
-    return str(self)
-
-  def duplicate(self, percentage, loc):
-    return Variant(self.tag, self.value.duplicate(percentage, loc))
-
-  def kill(self, mem, location, progress=set()):
-    self.value.kill(mem, location, progress)
-
-  def get_subobject(self, path, loc, mem):
-    if len(path) == 0:
-      return self
-    else:
-      if path[0] == self.tag:
-        return self.value.get_subobject(path[1:], loc, mem)
-      else:
-        error(loc, path[0]  + ' is not present in variant ' + str(self))
-
-  def set_subobject(self, path, val, loc, mem):
-    if len(path) == 0:
-      return val
-    else:
-      if path[0] == self.tag:
-        new_value = self.value.set_subobject(path[1:], val, loc, mem)
-      else:
-        error(loc, path[0]  + ' is not present in variant ' + str(self))
-      return Variant(self.tag, new_value)
-    
-  def gen_graphviz(self, addr):
-    result = ''
-    subresult, elt_name, elt_label = self.value.gen_graphviz(None)
-    result += subresult
-    if addr is None:
-      name = str(id(self))
-      base = ''
-    else:
-      name = str(addr)
-      base = '<base> ' + str(addr) + ': |'
-    variant_label = base + '<' + self.tag + '>' + self.tag + '=' + elt_label
-    # add node
-    result += name + ' [shape=record,label="' + variant_label + '"];\n'
-    # add out-edges
-    if not elt_name is None:
-      result += name + ':' + self.tag + ' -> ' + elt_name + ';\n'
-    return result, name, '•'
 
 @dataclass
 class TagVariant(Exp):
@@ -75,8 +23,8 @@ class TagVariant(Exp):
   __match_args__ = ("tag", "arg", "type")
     
   def __str__(self):
-    return 'tag ' + self.tag + ': ' + str(self.arg) + ' as ' \
-      + str(self.type)
+    return '(tag ' + self.tag + ': ' + str(self.arg) + ' as ' \
+      + str(self.type) + ')'
     
   def __repr__(self):
     return str(self)
@@ -165,14 +113,13 @@ class Match(Stmt):
         new_cases += [(tag, new_param, body.const_eval(body_env))]
     return Match(self.location, new_cond, new_cases)
   
-  def type_check(self, env):
+  def type_check(self, env, ret):
     cond_ty, new_cond = self.condition.type_check(env, 'none')
     cond_ty = unfold(cond_ty)
     if not (isinstance(cond_ty, VariantType) \
             or isinstance(cond_ty, AnyType)):
       static_error(self.location, 'expected variant type in match, not '
                    + str(cond_ty))
-    return_type = None
     new_cases = []
     for (tag, param, body) in self.cases:
       if isinstance(param, NoParam):
@@ -186,12 +133,8 @@ class Match(Stmt):
             body_env = copy_type_env(env)
             #body_env[param.ident] = (alt_ty, None, param)
             param.bind_type(body_env)
-            retty, new_body = body.type_check(body_env)
+            new_body = body.type_check(body_env, ret)
             new_cases.append((tag, param, new_body))
-            if return_type is None:
-              return_type = retty
-            elif not retty is None:
-              return_type = join(retty, return_type)
             found = True
         if found == False:
           static_error(self.location, tag + ' is not a tag in ' + str(cond_ty))
@@ -201,11 +144,7 @@ class Match(Stmt):
           param.bind_type(body_env)
           retty, new_body = body.type_check(body_env)
           new_cases.append((tag, param, new_body))
-          if return_type is None:
-            return_type = retty
-          elif not retty is None:
-            return_type = join(retty, return_type)
-    return return_type, Match(self.location, new_cond, new_cases)
+    return Match(self.location, new_cond, new_cases)
     # TODO: check for completeness of the cases wrt the cond_ty
 
   def step(self, runner, machine):

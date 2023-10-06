@@ -1,6 +1,6 @@
 // encode new using address-of and tuple
 // fun new(v) { return &⟨v⟩; }
 
-fun main() {
+fun main() -> int {
   return (*(&⟨0⟩))[0];
 }

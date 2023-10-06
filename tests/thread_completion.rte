@@ -2,7 +2,7 @@ fun write(inout p, v) {
   p = v;
 }
 
-fun main() {
+fun main() -> int {
   var p = 1;
   let t = spawn spawn write(p, 0);
   wait t;

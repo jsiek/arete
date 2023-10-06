@@ -1,4 +1,4 @@
-fun main() {
+fun main() -> int {
   let t = ⟨3, 5⟩;
   let x = t[0];
   return x - 1 - 2;

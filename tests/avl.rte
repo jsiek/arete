@@ -139,7 +139,7 @@ fun delete_tree(var tree: tree_t) {
   delete tree;
 }
 
-fun main() {
+fun main() -> int {
   var tree : tree_t = &empty();
   insert(5, tree);
   insert(10, tree);

@@ -4,7 +4,7 @@ fun write(inout p, v) {
   while (i < 100) { i = i + 1; }
 }
 
-fun main() {
+fun main() -> int {
   var a = &0;
   let f1 = spawn write(a, 42);
   let f2 = spawn write(a, -42); // inout binding requires permission 1/1

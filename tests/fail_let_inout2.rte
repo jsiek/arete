@@ -1,4 +1,4 @@
-fun main() {
+fun main() -> int {
   let a = 0;
   inout b = a;
   return b; // error: inout can't return ownership because previous owner died

@@ -1,4 +1,4 @@
-fun main() {
+fun main() -> int {
   var p = &0;
   let copy1 = fun() { return p; };
   let copy2 = copy1;

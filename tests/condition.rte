@@ -1,4 +1,4 @@
-fun main() {
+fun main() -> int {
   let x = true;
   let y = false;
   return x ? (y ? 1 : 0) : 1;

@@ -62,7 +62,7 @@ fun is_sorted(let array) {
   return true;
 }
 
-fun main() {
+fun main() -> int {
   var a = [2 of 0];
   var i = 0;
   while (i < len(a)) {

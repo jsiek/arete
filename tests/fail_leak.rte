@@ -1,4 +1,4 @@
-fun main() {
+fun main() -> int {
   var x = ⟨0, 1⟩;
   x[1] = &x;
   return x[0];

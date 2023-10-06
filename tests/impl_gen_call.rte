@@ -29,7 +29,7 @@ impl Monoid(int) {
   identity = zero;
 }
 
-fun main() {
+fun main() -> int {
   let n:int = 5;
   var A: [int] = [n of 0];
   var i:int = 0;
